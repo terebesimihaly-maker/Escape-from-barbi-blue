@@ -85,7 +85,7 @@
   <button class="big" id="play">Enter the house</button>
   <p id="loadMsg" class="tip" style="color:#c98a8a!important"></p>
   <p class="tip">Left side: drag to walk &middot; Right side: drag to look around &middot; RUN: sprint (she hears it) &middot; HIDE in wardrobes &middot; PHONE: every 45s, send her a text<br>
-    Keyboard: WASD to move, drag the mouse (or arrow keys) to look, Shift to run, E to hide<br>
+    Computer: WASD to move, mouse to look (Esc frees the cursor), Shift to run, E to hide, F for the phone<br>
     Headphones on. Silent mode off.<br><span id="best"></span></p>
   <div class="song"><label for="songFile">Monster song&hellip;</label><span id="songName">Chase song</span>
     <button id="songTest" class="hidden">&#9654; Test</button>
@@ -458,7 +458,7 @@ function startFloor(i) {
 
   const openDir = DIRS.find(([dx, dy]) => !isWall(1 + dx, 1 + dy)) || [1, 0];
   const a0 = Math.atan2(openDir[1], openDir[0]);
-  player = { x: T * 1.5, y: T * 1.5, ang: a0, pitch: 0, stam: 1, exhausted: false, hidden: false, closet: null, moving: false, sprinting: false };
+  player = { x: T * 1.5, y: T * 1.5, ang: a0, pitch: 0, hideYaw: 0, hidePitch: 0, stam: 1, exhausted: false, hidden: false, closet: null, moving: false, sprinting: false };
 
   const mc = CELLS.filter(c => dist[idx(c[0], c[1])] > maxD * 0.55 && !(c[0] === far[0] && c[1] === far[1]));
   const m0 = mc.length ? mc[Math.random() * mc.length | 0] : far;
@@ -485,10 +485,27 @@ const input = { x: 0, y: 0, sprint: false };
 const keys = {};
 const joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
 const look = { id: null, x: 0, y: 0 };
-const LOOK_SENS = 0.0065;
-// left side of the screen: a joystick to walk; right side (or any mouse drag): look around
+const LOOK_SENS = 0.0065, MOUSE_SENS = 0.0024;
+// Desktop: the cursor is locked to the game (like any first-person game) and the mouse turns the camera.
+// Esc frees the cursor and pauses. Any menu or screen frees it too.
+const canLock = matchMedia('(pointer: fine)').matches && 'requestPointerLock' in cvs;
+const locked = () => document.pointerLockElement === cvs;
+function lockMouse() {
+  if (!canLock || locked()) return;
+  try { const r = cvs.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) {}
+}
+document.addEventListener('pointerlockchange', () => { if (!locked() && state === 'play') pause(); });
+// turn the view. Inside a wardrobe you can still look around, but only through the doors
+function lookBy(dx, dy) {
+  const p = player; if (state !== 'play') return;
+  if (p.hidden) { p.hideYaw = clamp(p.hideYaw + dx, -0.7, 0.7); p.hidePitch = clamp(p.hidePitch - dy, -0.4, 0.4); }
+  else { p.ang += dx; p.pitch = clamp(p.pitch - dy, -1.1, 1.1); }
+}
+document.addEventListener('mousemove', e => { if (locked()) lookBy(e.movementX * MOUSE_SENS, e.movementY * MOUSE_SENS); });
+// left side of the screen: a joystick to walk; right side (or a mouse drag, if the cursor isn't locked): look around
 cvs.addEventListener('pointerdown', e => {
   if (state !== 'play') return;
+  if (e.pointerType === 'mouse' && canLock) { lockMouse(); return; }
   if (e.pointerType === 'mouse' || e.clientX > W * 0.45) {
     if (look.id === null) { look.id = e.pointerId; look.x = e.clientX; look.y = e.clientY; }
   } else if (joy.id === null) { joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.x = joy.y = 0; }
@@ -496,7 +513,7 @@ cvs.addEventListener('pointerdown', e => {
 addEventListener('pointermove', e => {
   if (e.pointerId === look.id) {
     const dx = e.clientX - look.x, dy = e.clientY - look.y; look.x = e.clientX; look.y = e.clientY;
-    if (state === 'play' && !player.hidden) { player.ang += dx * LOOK_SENS; player.pitch = clamp(player.pitch - dy * LOOK_SENS, -1.1, 1.1); }
+    lookBy(dx * LOOK_SENS, dy * LOOK_SENS);
     return;
   }
   if (e.pointerId !== joy.id) return;
@@ -532,7 +549,8 @@ function usePhone() {
 
 addEventListener('keydown', e => { keys[e.code] = true;
   if (e.code === 'KeyE' || e.code === 'Space') toggleHide();
-  if (e.code === 'Escape' && state === 'play') pause(); });
+  if (e.code === 'KeyF' || e.code === 'KeyQ') usePhone();
+  if ((e.code === 'Escape' || e.code === 'KeyP') && state === 'play') pause(); });
 addEventListener('keyup', e => { keys[e.code] = false; });
 function readInput() {
   let kx = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
@@ -548,7 +566,7 @@ function toggleHide() {
   const p = player;
   if (p.hidden) { if (!(closetScene && closetScene.t > 0)) exitHide(); return; }
   if (!hideTarget) return;
-  p.hidden = true; p.closet = hideTarget; p.x = hideTarget.x; p.y = hideTarget.y; hideCool = 0.5;
+  p.hidden = true; p.closet = hideTarget; p.x = hideTarget.x; p.y = hideTarget.y; hideCool = 0.5; p.hideYaw = p.hidePitch = 0;
   sfx.creak(0.12);
   const m = monster, d = Math.hypot(m.x - p.x, m.y - p.y);
   if (m.active && m.state === 'chase' && m.seenT < 0.8 && d < 230) m.knowsCloset = true;
@@ -561,14 +579,14 @@ function exitHide() { closetScene = null; const p = player; p.hidden = false; p.
 function toTitle() { stopSong(); state = 'title'; setHud(false); ['dead', 'win', 'trans', 'paused', 'note'].forEach(s => show(s, false)); show('title', true); loadBest(); }
 function loadBest() { try { const b = localStorage.getItem('bb_best'); $('best').textContent = b ? 'Best escape: ' + fmtTime(+b) : ''; } catch (e) {} }
 const fmtTime = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
-$('play').onclick = () => { unlockAudio(); primeVoice(); show('title', false); runTime = 0; startFloor(0); };
-$('retry').onclick = () => { unlockAudio(); stopSong(); show('dead', false); startFloor(floorIdx); };
+$('play').onclick = () => { unlockAudio(); primeVoice(); show('title', false); runTime = 0; startFloor(0); lockMouse(); };
+$('retry').onclick = () => { unlockAudio(); stopSong(); show('dead', false); startFloor(floorIdx); lockMouse(); };
 $('menu1').onclick = toTitle; $('menu2').onclick = () => { if (ac) ac.resume(); toTitle(); };
-$('tGo').onclick = () => { unlockAudio(); show('trans', false); startFloor(floorIdx + 1); };
+$('tGo').onclick = () => { unlockAudio(); show('trans', false); startFloor(floorIdx + 1); lockMouse(); };
 $('again').onclick = () => { show('win', false); toTitle(); };
 $('pause').onclick = pause;
-$('resume').onclick = () => { show('paused', false); unlockAudio(); state = 'play'; };
-$('note').onclick = () => { show('note', false); state = 'play'; };
+$('resume').onclick = () => { show('paused', false); unlockAudio(); state = 'play'; lockMouse(); };
+$('note').onclick = () => { show('note', false); state = 'play'; lockMouse(); };
 function pause() { if (state !== 'play') return; state = 'paused'; show('paused', true); setSprint(false); if (ac) ac.suspend(); }
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 
@@ -667,7 +685,7 @@ function updatePlayer(dt) {
   const mag = Math.min(1, Math.hypot(input.x, input.y));
   if (p.hidden) {
     if (mag > 0.6 && hideCool <= 0 && !(closetScene && closetScene.t > 0)) exitHide();
-    else { p.moving = p.sprinting = false; p.stam = Math.min(1, p.stam + dt / 4); return; }
+    else { p.moving = p.sprinting = false; p.stam = Math.min(1, p.stam + dt / 4); if (input.turn) lookBy(input.turn * 2.4 * dt, 0); return; }
   }
   p.moving = mag > 0.15;
   const wantSprint = (input.sprint || input.sprintKey) && p.moving && !p.exhausted;
@@ -1304,7 +1322,7 @@ function placeCamera(t) {
   let cx = p.x, cy = p.y, yaw = p.ang, pitch = p.pitch, h = EYE;
   if (p.hidden && p.closet) {                    // inside the wardrobe, looking out through the slats
     const c = p.closet; cx = c.x - c.ox * (CLOSET_FRONT + 5); cy = c.y - c.oy * (CLOSET_FRONT + 5);
-    yaw = Math.atan2(c.oy, c.ox) + Math.sin(t * 0.7) * 0.03; pitch = closetScene && closetScene.t > 0 ? 0.14 : -0.03; h = 1.55 + Math.sin(t * 1.7) * 0.006;
+    yaw = Math.atan2(c.oy, c.ox) + p.hideYaw + Math.sin(t * 0.7) * 0.03; pitch = (closetScene && closetScene.t > 0 ? 0.14 : -0.03) + p.hidePitch; h = 1.55 + Math.sin(t * 1.7) * 0.006;
   } else if (p.moving) { h += Math.sin(stepPhase) * (p.sprinting ? 0.045 : 0.025); yaw += Math.sin(stepPhase * 0.5) * 0.006; }
   const sh = shake * 0.01;
   camera.position.set(cx * S + rnd(-sh, sh), h + rnd(-sh, sh) * 0.6, cy * S + rnd(-sh, sh));
@@ -1315,7 +1333,7 @@ function render3D(t) {
   if (!level || level.grid !== grid) buildLevel();
   placeCamera(t);
   flash.visible = !p.hidden; flash.intensity = FLASH_I * flicker;
-  aura.intensity = p.hidden ? (closetScene && closetScene.t > 0 ? 2.2 : 0.9) : 1.2;
+  aura.intensity = p.hidden ? (closetScene && closetScene.t > 0 ? 3.5 : 3.2) : 1.2; aura.distance = p.hidden ? 8 : 4.5;
 
   // her
   if (barbi) {
@@ -1370,11 +1388,17 @@ function drawScreenFx(t) {
   const p = player, m = monster, cw = cvs.width, ch = cvs.height;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   const sc = closetScene && closetScene.t > 0 ? closetScene : null;
-  if (p.hidden) { // looking out through the wardrobe slats
-    const gap = sc ? 18 : 10;
-    ctx.fillStyle = 'rgba(12,7,4,.97)'; ctx.beginPath(); ctx.rect(0, 0, cw, ch);
-    for (let k = -2; k <= 2; k++) ctx.rect(0, ch / 2 + k * 34 * DPR - gap / 2 * DPR, cw, gap * DPR);
-    ctx.fill('evenodd');
+  if (p.hidden) { // looking out between the louvres of the wardrobe doors
+    const per = 34 * DPR, slat = (sc ? 12 : 14) * DPR, off = (ch / 2) % per;
+    for (let y = off - per; y < ch; y += per) {
+      const g = ctx.createLinearGradient(0, y, 0, y + slat);
+      g.addColorStop(0, 'rgba(40,24,14,.96)'); g.addColorStop(0.35, 'rgba(22,13,7,.97)'); g.addColorStop(1, 'rgba(6,3,2,.98)');
+      ctx.fillStyle = g; ctx.fillRect(0, y, cw, slat);
+      ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, y + slat, cw, 2 * DPR);   // each slat's shadow
+    }
+    ctx.fillStyle = 'rgba(8,4,2,.97)'; ctx.fillRect(cw / 2 - 5 * DPR, 0, 10 * DPR, ch);   // where the two doors meet
+    const fr = ctx.createRadialGradient(cw / 2, ch / 2, Math.min(cw, ch) * 0.35, cw / 2, ch / 2, Math.max(cw, ch) * 0.75);
+    fr.addColorStop(0, 'rgba(8,4,2,0)'); fr.addColorStop(1, 'rgba(8,4,2,.7)'); ctx.fillStyle = fr; ctx.fillRect(0, 0, cw, ch);
     ctx.fillStyle = 'rgba(160,130,100,.5)'; ctx.font = (12 * DPR) + 'px Georgia'; ctx.textAlign = 'center';
     ctx.fillText('hiding · move to leave', cw / 2, ch - 110 * DPR);
   }
@@ -1391,6 +1415,10 @@ function drawScreenFx(t) {
       ctx.beginPath(); ctx.moveTo(12 * DPR, 0); ctx.lineTo(-6 * DPR, -8 * DPR); ctx.lineTo(-6 * DPR, 8 * DPR); ctx.fill(); ctx.restore(); } }
   if (p.hidden && sc) drawClosetLine(sc.t);
   drawGrain(0.06);
+  if (canLock && !locked() && state === 'play') {
+    ctx.fillStyle = 'rgba(200,210,255,.75)'; ctx.font = (15 * DPR) + 'px Georgia'; ctx.textAlign = 'center';
+    ctx.fillText('click to look around', cw / 2, ch / 2 + 60 * DPR);
+  }
   if (joy.id !== null) {
     ctx.strokeStyle = 'rgba(160,180,255,.25)'; ctx.lineWidth = 2 * DPR;
     ctx.beginPath(); ctx.arc(joy.ox * DPR, joy.oy * DPR, 55 * DPR, 0, 7); ctx.stroke();
@@ -1546,6 +1574,7 @@ let last = performance.now(), gameT = 0;
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (state === 'play') { gameT += dt; update(dt); }
+  else if (locked()) document.exitPointerLock();
   if (state === 'play' || state === 'note' || state === 'paused') renderGame(gameT);
   else if (state === 'dead') renderDead(dt);
   else if (state === 'title') renderTitle(dt);

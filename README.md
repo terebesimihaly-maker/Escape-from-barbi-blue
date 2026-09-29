@@ -13,4 +13,4 @@ A first-person 3D horror maze for phones and desktop. Find the fuses, unlock the
 The game loads its files over HTTP, so open it from a web server (e.g. GitHub Pages, or `python3 -m http.server` locally), not by double-clicking the file.
 
 Controls: left side of the screen, drag to walk. Right side, drag to look. RUN, HIDE, and PHONE buttons.
-Keyboard: WASD, mouse drag or arrow keys to look, Shift to run, E to hide.
+Computer: click to lock the cursor, then WASD to move and the mouse to look. Shift runs, E hides, F uses the phone, Esc frees the cursor and pauses.
