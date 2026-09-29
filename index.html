@@ -169,7 +169,7 @@
       <h2>Settings</h2>
       <label class="row"><span>Look sensitivity</span><input type="range" id="setSens" min="0.3" max="2.5" step="0.05"><output id="outSens"></output></label>
       <label class="row"><span>Volume</span><input type="range" id="setVol" min="0" max="1" step="0.05"><output id="outVol"></output></label>
-      <div class="row"><span>Graphics</span><div class="seg"><button data-q="high">High</button><button data-q="low">Low (faster)</button></div></div>
+      <div class="row"><span>Graphics</span><div class="seg"><button data-q="low">Low</button><button data-q="medium">Medium</button><button data-q="high">High</button></div></div>
       <div class="row col"><span>Her song</span>
         <div class="song"><label for="songFile">Pick a song&hellip;</label><span id="songName">Chase song</span>
           <button id="songTest" class="hidden">&#9654; Test</button>
@@ -239,12 +239,15 @@ function resize() {
   else titleCam.setViewOffset(W, H, 0, H * 0.05, W, H);   // phones: her face sits between the title and the buttons
   titleCam.updateProjectionMatrix();
 }
+// Graphics: Low = no shadows, no glow, lower resolution. Medium = flashlight shadows and beam pattern. High = plus glow (bloom)
 function applyQuality() {
   if (!renderer) return;
-  const hi = settings.quality !== 'low';
-  renderer.setPixelRatio(hi ? Math.min(DPR, LOWQ ? 1.5 : 2) : 1);
-  renderer.setSize(W, H, false);
-  flash.castShadow = hi;
+  const q = settings.quality, pr = q === 'low' ? 1 : Math.min(DPR, LOWQ ? 1.5 : 2);
+  renderer.setPixelRatio(pr); renderer.setSize(W, H, false);
+  flash.castShadow = q !== 'low';
+  flash.map = q !== 'low' ? flashCookie : null;
+  useBloom = q === 'high' && !!composer;
+  if (composer) { composer.setPixelRatio(pr); composer.setSize(W, H); bloomPass.resolution.set(W * pr / 2, H * pr / 2); }
 }
 
 const grain = document.createElement('canvas'); grain.width = grain.height = 128;
@@ -260,7 +263,7 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 const angDiff = (a, b) => { let d = (a - b) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
 const lerpAngle = (a, b, k) => a - angDiff(a, b) * k;
 /* ---------- settings (kept on this device) ---------- */
-const settings = { sens: 1, vol: 0.9, quality: 'high' };
+const settings = { sens: 1, vol: 0.9, quality: matchMedia('(pointer: coarse)').matches ? 'medium' : 'high' };
 try { Object.assign(settings, JSON.parse(localStorage.getItem('bb_settings') || '{}')); } catch (e) {}
 const saveSettings = () => { try { localStorage.setItem('bb_settings', JSON.stringify(settings)); } catch (e) {} };
 function applySettings() {
@@ -957,8 +960,9 @@ function updateAudio(dt) {
 // The 3D world is in metres: world (x, y) sits at (x * S, height, y * S).
 const S = 0.045, TILE_M = T * S, WALL_H = 3.0, EYE = 1.62, M_SCALE = 1.38;
 const LOWQ = matchMedia('(pointer: coarse)').matches;
-const FLASH_I = 30;
+const FLASH_I = 25;
 let renderer = null, scene, camera, flash, aura, exitLight, dustPts, glowTex, level = null;
+let composer = null, renderPass = null, bloomPass = null, useBloom = false, flashCookie = null;
 let titleScene, titleCam, titleLight, titleBulb, titleBulbLight, titleKey, titleAim = null, barbi = null, deathCam = null;
 let dust = [], prints = [], stepPhase = 0;
 const mkCanvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
@@ -981,15 +985,24 @@ function init3D() {
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.2;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
   glowTex = glowTexture();
+  // post-processing for the glow (bloom) on High: bright things like her eyes, fuses and lamps bleed light
+  try {
+    const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+    composer = new THREE.EffectComposer(renderer, rt);
+    renderPass = new THREE.RenderPass(new THREE.Scene(), new THREE.PerspectiveCamera());
+    bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(256, 256), 0.7, 0.45, 1.05);
+    composer.addPass(renderPass); composer.addPass(bloomPass); composer.addPass(new THREE.OutputPass());
+  } catch (e) { composer = null; }
 
   scene = new THREE.Scene(); scene.background = new THREE.Color(0x020205); scene.fog = new THREE.Fog(0x020205, 1.5, 16);
   camera = new THREE.PerspectiveCamera(70, 1, 0.05, 60); camera.rotation.order = 'YXZ'; scene.add(camera);
   scene.add(new THREE.HemisphereLight(0x4a5a8a, 0x140c0c, 0.3));
   // the flashlight is held low and to the right, so her shadow falls on the walls behind her
-  flash = new THREE.SpotLight(0xffe0b0, FLASH_I, 22, 0.52, 0.55, 1.15);
+  flash = new THREE.SpotLight(0xffe0b0, FLASH_I, 22, 0.52, 0.55, 0.95);
   flash.position.set(0.2, -0.25, 0.1); flash.target.position.set(0.1, -0.4, -6);
   camera.add(flash); camera.add(flash.target);
-  flash.castShadow = true; const sm = LOWQ ? 512 : 1024; flash.shadow.mapSize.set(sm, sm);
+  flash.castShadow = true; const sm = LOWQ ? 1024 : 2048; flash.shadow.mapSize.set(sm, sm); flash.shadow.radius = 2.5;
+  flashCookie = flashlightCookie(); flash.map = flashCookie;
   flash.shadow.camera.near = 0.25; flash.shadow.camera.far = 22; flash.shadow.bias = -0.0006; flash.shadow.normalBias = 0.03;
   aura = new THREE.PointLight(0x8595c8, 1.2, 4.5, 1.4); camera.add(aura);     // a little light around you, even in the wardrobe
   exitLight = new THREE.PointLight(0x50ff90, 0, 9, 1.3); scene.add(exitLight);
@@ -1015,7 +1028,8 @@ function init3D() {
   const tf = new THREE.Mesh(new THREE.PlaneGeometry(2.2, len), new THREE.MeshLambertMaterial({ map: ft, color: new THREE.Color().setScalar(1.8) }));
   tf.rotation.x = -Math.PI / 2; titleScene.add(tf);
   const wt = wallTexture(F); wt.repeat.set(len / TILE_M, 1);
-  for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(len, WALL_H), new THREE.MeshLambertMaterial({ map: wt }));
+  wt.userData.bump.repeat.copy(wt.repeat);
+  for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(len, WALL_H), new THREE.MeshLambertMaterial({ map: wt, bumpMap: wt.userData.bump, bumpScale: 3 }));
     w.position.set(s * 1.1, WALL_H / 2, 0); w.rotation.y = -s * Math.PI / 2; titleScene.add(w); }
   const ct = ceilingTexture(F); ct.repeat.set(2, len / TILE_M);
   const ceil = new THREE.Mesh(new THREE.PlaneGeometry(2.2, len), new THREE.MeshLambertMaterial({ map: ct }));
@@ -1033,6 +1047,19 @@ function init3D() {
   titleKey = new THREE.SpotLight(0xffe4cc, 7, 5, 0.5, 0.9, 1.6); titleScene.add(titleKey, titleKey.target);
 }
 
+// what a real flashlight throws on a wall: a hot centre, a dimmer band, a faint outer ring, uneven edges
+function flashlightCookie() {
+  const n = 256, c = mkCanvas(n, n), g = c.getContext('2d'), r = n / 2;
+  g.fillStyle = '#000'; g.fillRect(0, 0, n, n);
+  const gr = g.createRadialGradient(r, r, 0, r, r, r);
+  gr.addColorStop(0, '#fff'); gr.addColorStop(0.3, '#fff'); gr.addColorStop(0.42, '#e0e0e0'); gr.addColorStop(0.6, '#c4c4c4');
+  gr.addColorStop(0.74, '#d2d2d2'); gr.addColorStop(0.84, '#909090'); gr.addColorStop(0.97, '#303030'); gr.addColorStop(1, '#000');
+  g.fillStyle = gr; g.fillRect(0, 0, n, n);
+  for (let k = 0; k < 60; k++) { const a = Math.random() * 6.283, d = r * (0.2 + Math.random() * 0.75);
+    g.fillStyle = 'rgba(0,0,0,' + (0.03 + Math.random() * 0.05) + ')'; g.beginPath(); g.arc(r + Math.cos(a) * d, r + Math.sin(a) * d, 4 + Math.random() * 14, 0, 7); g.fill(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 function glowTexture() {
   const c = mkCanvas(64, 64), g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
   gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.18, 'rgba(255,255,255,.75)'); gr.addColorStop(0.45, 'rgba(255,255,255,.18)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
@@ -1058,15 +1085,17 @@ function loadBarbi() {
 function setupBarbi(model, anim) {
   const obj = new THREE.Group(); obj.add(model);
   if (anim) model.scale.setScalar(M_SCALE);
-  model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+  model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false;
+    // a little darker and less shiny, so the flashlight doesn't turn her white up close
+    if (anim && o.material && o.material.color) { o.material.color.multiplyScalar(0.72); if (o.material.roughness !== undefined) o.material.roughness = Math.max(o.material.roughness, 0.72); } } });
   // her eyes glow: if you can see them, she can see you
   const eyes = [];
   for (const n of ['eyeL', 'eyeR']) {
     const b = model.getObjectByName(n); if (!b) continue;
     // a wide, deep blue glow with a brighter blue core
     const k = b.getWorldScale(new THREE.Vector3()).x || 1;
-    for (const [col, size, peak] of [[0x1a4dff, 0.19, 1], [0x5aa8ff, 0.06, 1]]) {
-      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, blending: THREE.AdditiveBlending,
+    for (const [col, size, peak] of [[0x1a4dff, 0.19, 1], [0x5aa8ff, 0.06, 2.5]]) {
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color(col).multiplyScalar(peak), blending: THREE.AdditiveBlending,
         transparent: true, depthWrite: false, depthTest: false, fog: false }));
       s.scale.setScalar(size / k); s.position.set(0, 0.025 / k, 0); s.renderOrder = 10; s.userData.base = size / k;
       b.add(s); eyes.push(s);
@@ -1112,7 +1141,7 @@ function disposeLevel() {
     if (o.geometry && !seen.has(o.geometry)) { seen.add(o.geometry); o.geometry.dispose(); }
     const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
     for (const m of ms) { if (seen.has(m)) continue; seen.add(m);
-      for (const k of ['map', 'emissiveMap']) if (m[k] && m[k] !== glowTex && !seen.has(m[k])) { seen.add(m[k]); m[k].dispose(); }
+      for (const k of ['map', 'emissiveMap', 'bumpMap']) if (m[k] && m[k] !== glowTex && !seen.has(m[k])) { seen.add(m[k]); m[k].dispose(); }
       m.dispose(); }
   });
   if (level.door) { level.door.openMat.map.dispose(); level.door.openMat.dispose(); level.door.lockedMat.map.dispose(); level.door.lockedMat.dispose(); }
@@ -1122,13 +1151,17 @@ function buildLevel() {
   disposeLevel();
   const F = FLOORS[floorIdx], G = new THREE.Group(), L = TILE_M;
   level = { grid, group: G, door: null, prints: null };
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(GW * L, GH * L), new THREE.MeshLambertMaterial({ map: floorTexture(F), color: new THREE.Color().setScalar(F.style === 'tile' ? 2.6 : 1.8) }));
+  const ftx = floorTexture(F);   // the floor's own picture doubles as its relief: dark seams and grout sit lower
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(GW * L, GH * L), new THREE.MeshLambertMaterial({ map: ftx, bumpMap: ftx, bumpScale: 2.5,
+    color: new THREE.Color().setScalar(F.style === 'tile' ? 2.6 : 1.8) }));
   floor.rotation.x = -Math.PI / 2; floor.position.set(GW * L / 2, 0, GH * L / 2); floor.receiveShadow = true; G.add(floor);
   const ct = ceilingTexture(F); ct.repeat.set(GW, GH);
-  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(GW * L, GH * L), new THREE.MeshLambertMaterial({ map: ct }));
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(GW * L, GH * L), new THREE.MeshLambertMaterial({ map: ct, bumpMap: ct, bumpScale: 2 }));
   ceil.rotation.x = Math.PI / 2; ceil.position.set(GW * L / 2, WALL_H, GH * L / 2); G.add(ceil);
   const faces = [];
-  const walls = new THREE.Mesh(wallGeometry(faces), new THREE.MeshLambertMaterial({ map: wallTexture(F), color: new THREE.Color().setScalar(F.style === 'tile' ? 2.2 : 1) }));
+  const wallTx = wallTexture(F);
+  const walls = new THREE.Mesh(wallGeometry(faces), new THREE.MeshLambertMaterial({ map: wallTx, bumpMap: wallTx.userData.bump, bumpScale: 3,
+    vertexColors: true, color: new THREE.Color().setScalar(F.style === 'tile' ? 2.2 : 1) }));
   walls.castShadow = walls.receiveShadow = true; G.add(walls);
   wallDecor(G, F, faces);
   const wt = wardrobeMaterials();
@@ -1231,6 +1264,26 @@ function ceilingTexture(F) {
 function wallTexture(F) {
   const w = 384, h = 640, c = mkCanvas(w, h), g = c.getContext('2d'), pm = h / WALL_H;
   const rail = h - 0.95 * pm, base = h - 0.14 * pm;
+  // the relief (bump map): mid grey is flat, lighter sticks out, darker is sunk in
+  const hc = mkCanvas(w, h), hg = hc.getContext('2d');
+  hg.fillStyle = '#808080'; hg.fillRect(0, 0, w, h);
+  for (let k = 0; k < 900; k++) { hg.fillStyle = 'rgba(' + (Math.random() < 0.5 ? '0,0,0' : '255,255,255') + ',.05)'; hg.fillRect(Math.random() * w, Math.random() * h, 2 + Math.random() * 4, 2 + Math.random() * 4); }
+  if (F.style === 'wood') {
+    hg.fillStyle = '#9a9a9a'; hg.fillRect(0, rail, w, base - rail);
+    for (let x = 0; x < w; x += 96) { hg.strokeStyle = '#303030'; hg.lineWidth = 5; hg.strokeRect(x + 12, rail + 26, 72, base - rail - 46);
+      hg.fillStyle = '#b0b0b0'; hg.fillRect(x + 16, rail + 30, 64, base - rail - 54); }
+    hg.fillStyle = '#e0e0e0'; hg.fillRect(0, rail - 7, w, 14); hg.fillStyle = '#404040'; hg.fillRect(0, rail + 7, w, 3);
+  } else if (F.style === 'tile') {
+    hg.fillStyle = '#a8a8a8'; hg.fillRect(0, rail, w, h - rail);
+    hg.fillStyle = '#303030'; for (let y = rail; y < h; y += 32) { hg.fillRect(0, y, w, 3); for (let x = 0; x < w; x += 48) hg.fillRect(x, y, 3, 32); }
+    hg.fillStyle = '#e0e0e0'; hg.fillRect(0, rail - 6, w, 12);
+  } else {
+    for (let y = 0, r = 0; y < h; y += 18, r++) for (let x = -(r % 2) * 32; x < w; x += 64) {
+      hg.fillStyle = 'rgb(' + Array(3).fill(150 + (Math.random() * 40 | 0)).join(',') + ')'; hg.fillRect(x + 3, y + 3, 61, 15);
+      hg.fillStyle = '#2a2a2a'; hg.fillRect(x, y, 64, 3); hg.fillRect(x, y, 3, 18);
+    }
+  }
+  hg.fillStyle = '#d0d0d0'; hg.fillRect(0, base, w, h - base); hg.fillStyle = '#404040'; hg.fillRect(0, base, w, 3);
   g.fillStyle = F.face; g.fillRect(0, 0, w, h);
   if (F.style === 'wood') {            // nursery: striped wallpaper with little flowers, wooden panels below
     g.fillStyle = F.pattern; for (let x = 0; x < w; x += 48) g.fillRect(x + 8, 0, 14, rail);
@@ -1277,16 +1330,29 @@ function wallTexture(F) {
   const bg = g.createLinearGradient(0, h, 0, h - 0.5 * pm); bg.addColorStop(0, 'rgba(0,0,0,.55)'); bg.addColorStop(1, 'rgba(0,0,0,0)');
   g.fillStyle = bg; g.fillRect(0, 0, w, h);
   g.fillStyle = F.base; g.fillRect(0, base, w, h - base); g.fillStyle = 'rgba(255,255,255,.06)'; g.fillRect(0, base, w, 3);
-  return toTex(c, true);
+  const t = toTex(c, true), bump = new THREE.CanvasTexture(hc); bump.wrapS = bump.wrapT = THREE.RepeatWrapping;
+  t.userData.bump = bump;
+  return t;
 }
-// one quad for every wall side that faces an open tile
+// one wall piece for every wall side that faces an open tile. Each piece is a small grid so that
+// inside corners, the ceiling line and the floor line can be shaded darker (fake ambient occlusion)
 function wallGeometry(faces) {
-  const P = [], N = [], U = [], I = [], L = TILE_M, h = WALL_H;
+  const P = [], N = [], U = [], C = [], I = [], L = TILE_M, h = WALL_H;
+  const us = [0, 0.14, 0.86, 1], vs = [0, 0.12, 0.8, 1];
   const quad = (x0, z0, x1, z1, nx, nz, x, y) => {
+    const tx = Math.sign(x1 - x0), tz = Math.sign(z1 - z0);
+    // a wall at the next tile along means an inside corner at that end
+    const dark0 = isWall(x - tx, y - tz) ? 0.42 : 1, dark1 = isWall(x + tx, y + tz) ? 0.42 : 1;
     const b = P.length / 3;
-    P.push(x0, 0, z0, x1, 0, z1, x1, h, z1, x0, h, z0);
-    for (let k = 0; k < 4; k++) N.push(nx, 0, nz);
-    U.push(0, 0, 1, 0, 1, 1, 0, 1); I.push(b, b + 1, b + 2, b, b + 2, b + 3);
+    for (const v of vs) for (const u of us) {
+      P.push(x0 + (x1 - x0) * u, h * v, z0 + (z1 - z0) * u); N.push(nx, 0, nz); U.push(u, v);
+      let k = u === 0 ? dark0 : u === 1 ? dark1 : 1;
+      if (v === 0) k *= 0.62; else if (v === 1) k *= 0.5;
+      C.push(k, k, k);
+    }
+    for (let r = 0; r < 3; r++) for (let q = 0; q < 3; q++) {
+      const i = b + r * 4 + q; I.push(i, i + 1, i + 5, i, i + 5, i + 4);
+    }
     faces.push({ x0, z0, x1, z1, nx, nz, x, y });
   };
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
@@ -1301,6 +1367,7 @@ function wallGeometry(faces) {
   geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
   geo.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
   geo.setIndex(I);
   return geo;
 }
@@ -1372,8 +1439,9 @@ function wardrobeMaterials() {
   }
   d.fillStyle = '#120b06'; d.fillRect(126, 0, 4, 512);
   d.fillStyle = '#c9a25a'; d.beginPath(); d.arc(118, 300, 5, 0, 7); d.arc(138, 300, 5, 0, 7); d.fill();
-  const sideMat = new THREE.MeshLambertMaterial({ map: toTex(side) });
-  return { sideMat, doorMat: new THREE.MeshLambertMaterial({ map: toTex(door) }), geo: new THREE.BoxGeometry(1.15, 2.25, 0.6), crown: new THREE.BoxGeometry(1.25, 0.1, 0.68) };
+  const st = toTex(side), dt = toTex(door);
+  const sideMat = new THREE.MeshLambertMaterial({ map: st, bumpMap: st, bumpScale: 2 });
+  return { sideMat, doorMat: new THREE.MeshLambertMaterial({ map: dt, bumpMap: dt, bumpScale: 3 }), geo: new THREE.BoxGeometry(1.15, 2.25, 0.6), crown: new THREE.BoxGeometry(1.25, 0.1, 0.68) };
 }
 function makeWardrobe(c, wt) {
   const g = new THREE.Group(), body = new THREE.Mesh(wt.geo, [wt.sideMat, wt.sideMat, wt.sideMat, wt.sideMat, wt.doorMat, wt.sideMat]);
@@ -1399,7 +1467,7 @@ function makeExit(G) {
   const open = DIRS.filter(([dx, dy]) => !isWall(cx + dx, cy + dy));
   const cand = DIRS.filter(([dx, dy]) => isWall(cx + dx, cy + dy));
   const dir = cand.find(([dx, dy]) => open.some(([ox, oy]) => ox === -dx && oy === -dy)) || cand[0] || [0, -1];
-  const lockedMat = new THREE.MeshLambertMaterial({ map: doorTexture(false) }), openMat = new THREE.MeshBasicMaterial({ map: doorTexture(true) });
+  const ld = doorTexture(false), lockedMat = new THREE.MeshLambertMaterial({ map: ld, bumpMap: ld, bumpScale: 3 }), openMat = new THREE.MeshBasicMaterial({ map: doorTexture(true) });
   const door = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 2.3), lockedMat);
   const px = exit.x * S + dir[0] * (TILE_M / 2 - 0.015), pz = exit.y * S + dir[1] * (TILE_M / 2 - 0.015);
   door.position.set(px, 1.15, pz); door.rotation.y = Math.atan2(-dir[0], -dir[1]); G.add(door);
@@ -1439,7 +1507,7 @@ function makeFuse(fm) {
   const g = new THREE.Group(), body = new THREE.Group();
   const c1 = new THREE.Mesh(fm.cap, fm.capMat), c2 = new THREE.Mesh(fm.cap, fm.capMat); c1.position.y = 0.088; c2.position.y = -0.088;
   body.add(new THREE.Mesh(fm.glass, fm.glassMat), c1, c2); body.rotation.z = 0.35;
-  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffc060, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0.7 }));
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color(0xffc060).multiplyScalar(2), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0.7 }));
   glow.scale.setScalar(0.75);
   g.add(body, glow); g.userData.body = body;
   return g;
@@ -1467,6 +1535,10 @@ function makePrints() {
 
 /* ---------- drawing a frame ---------- */
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _sc = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
+function draw(sc, cam) {
+  if (useBloom) { renderPass.scene = sc; renderPass.camera = cam; composer.render(); }
+  else renderer.render(sc, cam);
+}
 function relPan(x, y) {   // -1 = to your left, 1 = to your right
   const dx = x - player.x, dy = y - player.y, d = Math.hypot(dx, dy) || 1;
   return (-Math.sin(player.ang) * dx + Math.cos(player.ang) * dy) / d;
@@ -1510,7 +1582,7 @@ function render3D(t) {
   for (const n of notes) if (n.obj) n.obj.visible = !n.read;
   const D = level.door;
   if (D) { if (powerOn && !D.open) { D.open = true; D.door.material = D.openMat; }
-    D.lamp.material.color.setHex(powerOn ? 0x4dff88 : (Math.sin(t * 6) > 0 ? 0xff3030 : 0x401010));
+    D.lamp.material.color.setHex(powerOn ? 0x4dff88 : (Math.sin(t * 6) > 0 ? 0xff3030 : 0x401010)).multiplyScalar(4);
     exitLight.intensity = powerOn ? 2.5 + Math.sin(t * 5) * 0.5 : 0; }
   const P = level.prints;
   prints.forEach((f, i) => { const k = Math.min(1, f.t / 4);
@@ -1526,7 +1598,7 @@ function render3D(t) {
     col.setXYZ(i, b, b * 0.92, b * 0.8);
   });
   pos.needsUpdate = col.needsUpdate = true;
-  renderer.render(scene, camera);
+  draw(scene, camera);
 }
 
 function updateDust(dt) {
@@ -1628,7 +1700,7 @@ function renderDead(dt) {
     barbi.obj.position.set(D.x + Math.cos(a) * dist, 0, D.z + Math.sin(a) * dist); barbi.obj.rotation.y = Math.PI / 2 - (a + Math.PI);
     barbi.anim.update(dt); setEyes(0.8 + Math.random() * 0.2);
     flash.visible = true; flash.intensity = FLASH_I * (deadT < 1.4 ? (Math.random() < 0.3 ? 0.15 : 1.1) : 0.5);
-    renderer.render(scene, camera);
+    draw(scene, camera);
     ctx.fillStyle = deadT < 1.4 && Math.random() < 0.25 ? 'rgba(90,0,0,.45)' : 'rgba(0,0,0,' + clamp((deadT - 1.4) * 0.5, 0, 0.5) + ')';
     ctx.fillRect(0, 0, cw, ch);
     // tear the picture into glitching strips
@@ -1713,7 +1785,7 @@ function renderTitle(dt) {
     titleLight.color.setHex(titleHover ? 0xa8b8ff : 0x86a8ff);
     setEyes(titleHover ? 1 : 0.75 + Math.random() * 0.2);
     for (const e of barbi.eyes) e.scale.setScalar(e.userData.base * (titleHover ? 0.75 + Math.random() * 0.15 : 0.4));   // smaller glow, this close
-    renderer.render(titleScene, titleCam);
+    draw(titleScene, titleCam);
   } else { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cw, ch); }
   for (let i = 0; i < 6; i++) {   // slow drifting fog
     const fx = (0.5 + 0.45 * Math.sin(titleT * 0.05 * (1 + i * 0.3) + i * 1.7)) * cw, fy = (0.5 + 0.45 * Math.cos(titleT * 0.04 * (1 + i * 0.2) + i * 2.3)) * ch;
