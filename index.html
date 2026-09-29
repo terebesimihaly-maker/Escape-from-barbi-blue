@@ -88,7 +88,8 @@
       <label for="songStart" style="border:none;padding:0">Drop starts at</label>
       <input id="songStart" inputmode="decimal" value="0:00" aria-label="Song start time, minutes:seconds"
         style="width:64px;background:rgba(10,14,35,.6);border:1px solid rgba(134,168,255,.35);color:#cfd8ff;border-radius:3px;padding:8px;font:inherit;text-align:center">
-      <button id="songTest">&#9654; Preview</button></span>
+</span>
+    <button id="songTest">&#9654; Hear chase music</button>
     <input type="file" id="songFile" accept="audio/*" hidden></div>
 </div>
 
@@ -255,8 +256,12 @@ function initAudio() {
   if (ac) { if (ac.state !== 'running') ac.resume(); return; }
   const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
   ac = new AC();
-  master = ac.createGain(); master.gain.value = 0.9; master.connect(ac.destination);
-  chaseBus = ac.createGain(); chaseBus.gain.value = 0; chaseBus.connect(master);
+  master = ac.createGain(); master.gain.value = 0.9;
+  const limiter = ac.createDynamicsCompressor(); limiter.threshold.value = -3; limiter.knee.value = 0; limiter.ratio.value = 20;
+  limiter.attack.value = 0.001; limiter.release.value = 0.1; master.connect(limiter); limiter.connect(ac.destination);
+  chaseBus = ac.createGain(); chaseBus.gain.value = 0;
+  const comp = ac.createDynamicsCompressor(); comp.threshold.value = -20; comp.ratio.value = 6; comp.attack.value = 0.003; comp.release.value = 0.2;
+  const makeup = ac.createGain(); makeup.gain.value = 1.2; chaseBus.connect(comp); comp.connect(makeup); makeup.connect(master);
   noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
   const nd = noiseBuf.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
   const drone = ac.createGain(); drone.gain.value = 0.05; drone.connect(master);
@@ -343,17 +348,44 @@ function tone(type, f, t, a, hold, rel, vol, detune) {
   g.gain.linearRampToValueAtTime(0, t + a + hold + rel); o.connect(g); g.connect(chaseBus); o.start(t); o.stop(t + a + hold + rel + 0.05);
   return o;
 }
+function hit(t, f0, f1, dur, vol) { // kick / boom: pitch-dropping sine
+  const o = ac.createOscillator(), g = ac.createGain(); o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.6);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); o.connect(g); g.connect(chaseBus); o.start(t); o.stop(t + dur + 0.05);
+}
+function noiseHit(t, type, f, q, dur, vol) {
+  const n = noise(), fl = ac.createBiquadFilter(), g = ac.createGain(); fl.type = type; fl.frequency.value = f; fl.Q.value = q;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); n.connect(fl); fl.connect(g); g.connect(chaseBus); n.start(t); n.stop(t + dur + 0.05);
+}
+function chaseRiser(t, len) { // the build-up right before the drop
+  const n = noise(), fl = ac.createBiquadFilter(), g = ac.createGain(); fl.type = 'bandpass'; fl.Q.value = 3;
+  fl.frequency.setValueAtTime(400, t); fl.frequency.exponentialRampToValueAtTime(9000, t + len);
+  g.gain.setValueAtTime(0.02, t); g.gain.exponentialRampToValueAtTime(0.5, t + len); g.gain.linearRampToValueAtTime(0, t + len + 0.02);
+  n.connect(fl); fl.connect(g); g.connect(chaseBus); n.start(t); n.stop(t + len + 0.05);
+  const o = ac.createOscillator(), og = ac.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(880, t + len);
+  og.gain.setValueAtTime(0.01, t); og.gain.exponentialRampToValueAtTime(0.12, t + len); og.gain.linearRampToValueAtTime(0, t + len + 0.02);
+  o.connect(og); og.connect(chaseBus); o.start(t); o.stop(t + len + 0.05);
+}
+function chaseDrop(t) { // the drop: huge boom, crash, and a stab of the first chord
+  hit(t, 120, 32, 1.4, 0.8); noiseHit(t, 'highpass', 3000, 0.5, 1.2, 0.35);
+  CH_CHORDS[0].forEach(n => { tone('sawtooth', NOTE(n + 12), t, 0.005, 0.1, 0.6, 0.07); tone('sine', NOTE(n + 24), t, 0.005, 0.1, 1.2, 0.08); });
+}
 function chaseStepAt(i, t) {
   const bar = (i >> 4) % 4, s = i % 16, ch = CH_CHORDS[bar];
-  if (s === 0) ch.forEach(n => { tone('sine', NOTE(n + 12), t, 0.4, STEP * 14, 0.8, 0.05); tone('triangle', NOTE(n + 12), t, 0.4, STEP * 14, 0.8, 0.025, 9); });
-  if (CH_BASS.includes(s)) tone('triangle', NOTE(ch[0] - 12), t, 0.005, 0.05, 0.22, 0.35);
+  // pad
+  if (s === 0) ch.forEach(n => { tone('sine', NOTE(n + 12), t, 0.3, STEP * 14, 0.8, 0.06); tone('triangle', NOTE(n + 12), t, 0.3, STEP * 14, 0.8, 0.03, 9); });
+  // drums: half-time kick/snare, hats
+  if (s === 0 || s === 10) hit(t, 150, 45, 0.35, 0.9);
+  if (s === 8) { noiseHit(t, 'bandpass', 1800, 0.8, 0.18, 0.5); tone('triangle', 190, t, 0.002, 0.02, 0.08, 0.2); }
+  if (s % 2 === 1) noiseHit(t, 'highpass', 7000, 0.7, 0.04, 0.12);
+  // bass: sub + a sawtooth an octave up so phone speakers can play it
+  if (CH_BASS.includes(s)) { tone('sine', NOTE(ch[0] - 12), t, 0.005, 0.08, 0.25, 0.4);
+    tone('sawtooth', NOTE(ch[0]), t, 0.005, 0.06, 0.2, 0.1); }
+  // icy arpeggio
   if (s % 2 === 0) { const tones = [ch[0], ch[1], ch[2], ch[0] + 12], f = NOTE(tones[CH_ARP[s / 2]] + 24);
-    tone('sine', f, t, 0.003, 0.02, 0.5, 0.07); tone('sine', f * 2.76, t, 0.002, 0.01, 0.2, 0.02); }
-  else { const n = noise(), hp = ac.createBiquadFilter(), g = ac.createGain(); hp.type = 'highpass'; hp.frequency.value = 7000;
-    g.gain.setValueAtTime(0.035, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
-    n.connect(hp); hp.connect(g); g.connect(chaseBus); n.start(t); n.stop(t + 0.05); }
+    tone('sine', f, t, 0.003, 0.02, 0.5, 0.1); tone('sine', f * 2.76, t, 0.002, 0.01, 0.2, 0.03); }
+  // sad lead
   for (const [n, st, dur] of CH_LEAD[bar]) if (st === s) {
-    const o = tone('triangle', NOTE(n), t, 0.06, dur * STEP - 0.06, 0.35, 0.13);
+    const o = tone('triangle', NOTE(n), t, 0.06, dur * STEP - 0.06, 0.35, 0.2);
     const lfo = ac.createOscillator(), lg = ac.createGain(); lfo.frequency.value = 5; lg.gain.value = 12;
     lfo.connect(lg); lg.connect(o.detune); lfo.start(t); lfo.stop(t + dur * STEP + 0.5);
   }
@@ -376,9 +408,11 @@ function updateChaseMusic(dt, chasing) {
     chaseBus.gain.setTargetAtTime(0, t, 0.1);
     return;
   }
-  chaseBus.gain.setTargetAtTime(on ? 0.55 : 0, t, on ? 0.2 : 0.8);
+  chaseBus.gain.setTargetAtTime(on ? 0.9 : 0, t, on ? 0.05 : 0.8);
   if (chaseLevel > 0) {
-    if (wasOff || chaseNext < t) { chaseNext = t + 0.05; if (wasOff) chaseStep = 0; }
+    const RISE = 1.1;
+    if (wasOff) { chaseRiser(t + 0.02, RISE); chaseDrop(t + RISE + 0.15); chaseNext = t + RISE + 0.15; chaseStep = 0; }
+    else if (chaseNext < t) chaseNext = t + 0.05;
     while (chaseNext < t + 0.25) { chaseStepAt(chaseStep++, chaseNext); chaseNext += STEP; }
   }
 }
@@ -400,14 +434,14 @@ $('songFile').addEventListener('change', e => {
 });
 $('songStart').addEventListener('input', e => { songStart = parseTime(e.target.value); });
 $('songTest').onclick = () => {
-  if (!songEl) return;
-  initAudio(); ensureSongGraph();
-  previewing = !previewing; $('songTest').textContent = previewing ? '\u25A0 Stop' : '\u25B6 Preview';
-  if (previewing) { seekSong(); songBus.gain.setValueAtTime(0.9, ac.currentTime); songEl.play().catch(() => {}); }
-  else { songEl.pause(); songBus.gain.setValueAtTime(0, ac.currentTime); }
+  initAudio(); if (!ac) return;
+  if (previewing) { stopChaseMusic(); return; }
+  previewing = true; $('songTest').textContent = '\u25A0 Stop';
+  if (songOn && songEl) { ensureSongGraph(); seekSong(); songBus.gain.setValueAtTime(0.9, ac.currentTime); songEl.play().catch(() => {}); }
+  // original theme: the title-screen loop drives updateChaseMusic while previewing
 };
-function stopPreview() { if (!previewing) return; previewing = false; $('songTest').textContent = '\u25B6 Preview'; }
-$('songClear').onclick = () => { stopPreview(); songOn = false; if (songEl) songEl.pause(); $('songName').textContent = 'Original theme'; show('songClear', false); show('songOpts', false); };
+function stopPreview() { if (!previewing) return; previewing = false; $('songTest').textContent = '\u25B6 Hear chase music'; }
+$('songClear').onclick = () => { stopChaseMusic(); songOn = false; if (songEl) songEl.pause(); $('songName').textContent = 'Original theme'; show('songClear', false); show('songOpts', false); };
 
 /* ---------- game state ---------- */
 let state = 'title', floorIdx = 0, fuses = [], notes = [], closets = [], decals = [], exit = null;
@@ -1078,6 +1112,7 @@ let last = performance.now(), gameT = 0;
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (state === 'play') { gameT += dt; update(dt); }
+  else if (state === 'title' && previewing && !songOn) updateChaseMusic(dt, true);
   if (state === 'play' || state === 'note' || state === 'paused') renderGame(gameT);
   else if (state === 'dead') renderDead(dt);
   else if (state === 'title') renderTitle(dt);
