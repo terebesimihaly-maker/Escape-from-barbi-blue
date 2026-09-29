@@ -147,14 +147,14 @@ const CLIPS = {
 // in the open wardrobe door: bent deep into the wardrobe, face right up to yours, holding the door with one hand
 CLIPS.lean = { dur: 3.0, loop: true, fn(t, P) {
   const ph = t / 3 * TAU, br = sin(ph * 2), snap = spike(t, 1.9, 0.1);
-  P.spine(48 + br * 2, sin(ph) * 4, 0).neck(-26, 0, 0);
+  P.spine(60 + br * 2, sin(ph) * 4, 0).neck(-34, 0, 0);
   P.rot('head', -8 + snap * 8, sin(ph) * 6 + snap * 18, 26 + sin(ph) * 5 - snap * 14);
   P.rot('jaw', 4 + 3 * Math.max(0, sin(ph * 3)), 0, 0);
   P.side('clavicle', 1, 0, 0, 8).side('upperarm01', 1, -70, 0, 34).side('lowerarm01', 1, -38, 0, 0).side('wrist', 1, -10, 0, 0);
   P.hand(1, 0.55, 6);                                                     // gripping the edge of the door
   P.side('upperarm01', -1, -28, 0, -4).side('lowerarm01', -1, -30, 0, 0).hand(-1, 0.3 + 0.3 * Math.max(0, sin(t * 7)), 8);
-  P.sym('upperleg01', -22, 0, 0).sym('lowerleg01', 22, 0, 0).sym('foot', -4, 0, 0);
-  P.move(0, -0.06, 0.08);
+  P.sym('upperleg01', -30, 0, 0).sym('lowerleg01', 38, 0, 0).sym('foot', -8, 0, 0);
+  P.move(0, -0.12, 0.08);
 } };
 
 function run(t, P, dur, reach) {

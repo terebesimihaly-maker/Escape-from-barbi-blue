@@ -813,7 +813,7 @@ function speakCreepy() {
 function updateCloset(dt) {
   const sc = closetScene; sc.t += dt;
   if (sc.t < 0) { if (Math.random() < dt * 2.5) sfx.step(false); return; }
-  if (!sc.started) { sc.started = true; sfx.sting(); shake = 3; sfx.voiceBed(); if (navigator.vibrate) navigator.vibrate([60, 60, 60]); }
+  if (!sc.started) { sc.started = true; sfx.sting(); shake = 3; sfx.voiceBed(); if (navigator.vibrate) navigator.vibrate([60, 60, 60]); $('msg').style.opacity = 0; msgTimer = 0; }
   if (!sc.creak && sc.t > SC.open) { sc.creak = true; sfx.creak(0.22); }
   if (!sc.leanSting && sc.t > SC.lean + 0.5) { sc.leanSting = true; sfx.sting(); shake = 4; if (navigator.vibrate) navigator.vibrate(90); }
   if (!sc.spoke && sc.t > SC.speak) { sc.spoke = true; speakCreepy(); }
@@ -1137,7 +1137,7 @@ function sceneDoor(t) {
   return 1 - ease(clamp((t - SC.shut) / (SC.end - SC.shut - 0.1), 0, 1));
 }
 // where she stands during the scene, in world units in front of the wardrobe's centre (the doors are at -CLOSET_FRONT)
-const SC_STAND = 18, SC_LEAN = 9.5;
+const SC_STAND = 20, SC_LEAN = 14;
 function sceneAlong(t, c) {
   if (t < 0) { let n = 0; while (n < 2 && !isWall(Math.floor(c.x / T) + c.ox * (n + 1), Math.floor(c.y / T) + c.oy * (n + 1))) n++;
     return SC_STAND + (-t / 1.4) * n * T; }                                     // walking up to the doors
@@ -1622,6 +1622,17 @@ function render3D(t) {
     const near = sc ? clamp((sc.t - SC.lean) / (SC.leanEnd - SC.lean), 0, 1) : 0;
     for (const e of barbi.eyes) if (e.userData.base) e.scale.setScalar(e.userData.base * (1 - 0.65 * near));
   }
+  // in the wardrobe scene the camera turns to look her in the eyes as she leans in
+  if (barbi && closetScene && p.closet && barbi.eyes.length) {
+    const k = clamp((closetScene.t - SC.lean) / (SC.leanEnd - SC.lean), 0, 1) * (closetScene.t < SC.vanish ? 1 : 0);
+    if (k > 0) {
+      barbi.obj.updateMatrixWorld(true);
+      const e = new THREE.Vector3(); barbi.eyes.forEach(s => e.add(s.parent.getWorldPosition(_v))); e.divideScalar(barbi.eyes.length);
+      const dx = e.x - camera.position.x, dy = e.y - camera.position.y, dz = e.z - camera.position.z;
+      const yaw = Math.atan2(-dx, -dz), pitch = clamp(Math.atan2(dy, Math.hypot(dx, dz)), -0.9, 0.9), kk = k * k * (3 - 2 * k);
+      camera.rotation.y += angDiff(yaw, camera.rotation.y) * kk; camera.rotation.x += (pitch - camera.rotation.x) * kk;
+    }
+  }
   // wardrobe doors: only the one you're in ever opens (in the scene). From inside, closed doors are drawn as the slats overlay.
   for (const c of closets) if (c.doors) for (const d of c.doors) {
     const mine = p.hidden && p.closet === c, k = mine && closetScene && d.side < 0 ? sceneDoor(closetScene.t) : 0;
@@ -1680,7 +1691,7 @@ function drawScreenFx(t) {
     const fr = ctx.createRadialGradient(cw / 2, ch / 2, Math.min(cw, ch) * 0.35, cw / 2, ch / 2, Math.max(cw, ch) * 0.75);
     fr.addColorStop(0, 'rgba(8,4,2,0)'); fr.addColorStop(1, 'rgba(8,4,2,.7)'); ctx.fillStyle = fr; ctx.fillRect(0, 0, cw, ch);
     ctx.fillStyle = 'rgba(160,130,100,.5)'; ctx.font = (12 * DPR) + 'px Georgia'; ctx.textAlign = 'center';
-    ctx.fillText('hiding · move to leave', cw / 2, ch - 110 * DPR);
+    if (!closetScene) ctx.fillText('hiding · move to leave', cw / 2, ch - 110 * DPR);
   }
   const d = m.active ? Math.hypot(m.x - p.x, m.y - p.y) : 9999, c = clamp(1 - d / 380, 0, 1);
   const vg = ctx.createRadialGradient(cw / 2, ch / 2, Math.min(cw, ch) * 0.3, cw / 2, ch / 2, Math.max(cw, ch) * 0.72);
