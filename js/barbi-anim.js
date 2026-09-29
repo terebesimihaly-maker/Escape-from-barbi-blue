@@ -4,7 +4,11 @@
    Pose angles are in degrees, in the model's own space at rest (she faces +Z, +X is her left, +Y is up):
      x > 0 bends the spine/head forward, and swings a hanging arm or leg backwards (x < 0 = forwards)
      y turns (twist), z tilts sideways (for the left side z > 0 lifts an arm out; the right side is mirrored).
-   Usage: const anim = BarbiAnim.build(THREE, gltf.scene); anim.play('walk'); anim.update(dt); */
+   Most walking and running comes from motion capture (models/mocap.json, retargeted from the CMU Graphics Lab
+   Motion Capture Database by tools/retarget-mocap.mjs); the creepy parts (head tilt, twitches, reaching arms,
+   curled fingers, the scream, the lunge) are layered on top in code. Without the mocap file the clips fall back
+   to the hand-made versions below.
+   Usage: const anim = BarbiAnim.build(THREE, gltf.scene, { mocap, scale }); anim.play('walk'); anim.update(dt); */
 (function () {
 'use strict';
 
@@ -19,7 +23,11 @@ const wob = (t, f, k) => sin(t * f + k) * 0.6 + sin(t * f * 2.13 + k * 1.7) * 0.
 
 /* A pose is filled in by the clip functions through this small API. */
 class Pose {
-  constructor() { this.r = {}; this.root = [0, 0, 0]; }
+  constructor() { this.r = {}; this.root = [0, 0, 0]; this.abs = {}; this.w = {}; }
+  // replace a bone's motion-captured rotation with a hand-made one (weight w blends between them)
+  set(b, x, y, z, w) { this.abs[b] = [x, y || 0, z || 0]; this.w[b] = w === undefined ? 1 : w; return this; }
+  symSet(b, x, y, z, w) { this.set(b + '.L', x, y, z, w); this.set(b + '.R', x, -(y || 0), -(z || 0), w); return this; }
+  sideSet(b, s, x, y, z, w) { return s > 0 ? this.set(b + '.L', x, y, z, w) : this.set(b + '.R', x, -(y || 0), -(z || 0), w); }
   rot(b, x, y, z) { const o = this.r[b] || (this.r[b] = [0, 0, 0]); o[0] += x; o[1] += y || 0; o[2] += z || 0; return this; }
   // same motion on both sides, mirrored (x stays, y and z flip for the right side)
   sym(b, x, y, z) { this.rot(b + '.L', x, y, z); this.rot(b + '.R', x, -(y || 0), -(z || 0)); return this; }
@@ -42,6 +50,12 @@ class Pose {
 }
 
 /* ---------- the clips ---------- */
+// her O-legs (bow legs: knees out, feet in) are part of her design. Motion capture comes from a normal pair of legs,
+// so on top of it the thighs are turned out, the shins in, and the feet kept flat.
+function oLegs(P, amt) {
+  const a = amt === undefined ? 1 : amt;
+  P.sym('upperleg01', 0, 0, 9 * a).sym('lowerleg01', 0, 0, -17 * a).sym('foot', 0, 0, 8 * a);
+}
 // Legs for a walk/run cycle. ph: 0..TAU. amp: thigh swing, knee: extra knee bend in the swing, limp: right leg drags.
 function legs(P, ph, amp, knee, limp) {
   for (const s of [1, -1]) {
@@ -57,7 +71,11 @@ function legs(P, ph, amp, knee, limp) {
 
 const CLIPS = {
   // standing: slow breathing, her head hangs to one side, and every few seconds it snaps the other way
-  idle: { dur: 4, loop: true, fn(t, P) {
+  idle: { dur: 4, loop: true, mocap: 'm_idle', over(t, P, k) {                          // (mocap: standing)
+    const snap = spike(k, 0.7, 0.05);
+    P.rot('head', 6, sin(k * TAU) * 6 - snap * 25, 20 + sin(k * TAU * 2) * 4 - snap * 42).neck(8, 0, 0).spine(6, 0, 0);
+    P.hand(1, 0.35 + 0.15 * sin(t * 5), 4).hand(-1, 0.4 + 0.2 * spike(k, 0.3, 0.08), 4); oLegs(P);
+  }, fn(t, P) {
     const ph = t / 4 * TAU, br = sin(ph * 2);
     const snap = spike(t, 2.75, 0.18);
     P.spine(8 + br * 2.5, 0, 0).neck(10, 0, 0);
@@ -71,7 +89,10 @@ const CLIPS = {
   } },
 
   // wandering: a hunched, limping walk; the right foot drags and the head lolls and twitches
-  walk: { dur: 1.0, loop: true, speed: 2.6, fn(t, P) {
+  walk: { dur: 1.0, loop: true, speed: 2.6, mocap: 'm_walk', over(t, P, k) {          // (mocap: a real 'zombie walk')
+    P.rot('head', 2, 0, 16 + sin(k * TAU) * 3 - spike(k, 0.55, 0.05) * 22).neck(4, 0, 0);
+    P.hand(1, 0.45, 5).hand(-1, 0.55, 5); oLegs(P);
+  }, fn(t, P) {
     const ph = t / 1.0 * TAU;
     legs(P, ph, 25, 42, 1);
     P.move(sin(ph) * 0.03, -0.03 + 0.03 * cos(ph * 2), 0);
@@ -84,7 +105,11 @@ const CLIPS = {
   } },
 
   // searching: a slower walk, head sweeping left and right, looking for you
-  search: { dur: 2.4, loop: true, speed: 3.1, fn(t, P) {
+  search: { dur: 2.4, loop: true, speed: 3.1, mocap: 'm_creep', over(t, P, k) {        // (mocap: a 'creeping walk')
+    const look = sin(k * TAU);
+    P.rot('head', 0, look * 34, 10 - look * 6).neck(0, look * 14, 0);
+    P.hand(1, 0.3, 6).hand(-1, 0.3, 6); oLegs(P);
+  }, fn(t, P) {
     const ph = t / 1.2 * TAU, look = sin(t / 2.4 * TAU);
     legs(P, ph, 22, 38, 0.6);
     P.move(sin(ph) * 0.025, -0.035 + 0.025 * cos(ph * 2), 0);
@@ -96,9 +121,18 @@ const CLIPS = {
   } },
 
   // chasing: sprinting at you, bent forward, both arms reaching for your face, fingers spread
-  chase: { dur: 0.62, loop: true, speed: 6, fn(t, P) { run(t, P, 0.62, 1); } },
+  chase: { dur: 0.62, loop: true, speed: 6, mocap: 'p_run', over(t, P, k) {           // (mocap: a real run, arms replaced)
+    const ph = k * TAU;
+    P.spine(12, 0, 0).neck(-12, 0, 0).rot('head', -4 + wob(t, 23, 0) * 4, wob(t, 17, 1) * 5, 12 + wob(t, 13, 2) * 5);
+    P.symSet('upperarm01', -78, 0, -14).symSet('lowerarm01', -14, 0, 0).symSet('wrist', -10, 0, 0);
+    P.rot('upperarm01.L', 10 * sin(ph), 0, 0).rot('upperarm01.R', -10 * sin(ph), 0, 0);
+    P.hand(1, -0.15, 14).hand(-1, -0.15, 14); oLegs(P, 0.8);
+  }, fn(t, P) { run(t, P, 0.62, 1); } },
   // hunting (running to where she heard you): the same run, arms flailing instead of reaching
-  run: { dur: 0.62, loop: true, speed: 5, fn(t, P) { run(t, P, 0.62, 0); } },
+  run: { dur: 0.62, loop: true, speed: 5, mocap: 'p_jog', over(t, P, k) {
+    P.spine(10, 0, 0).rot('head', wob(t, 19, 0) * 5, wob(t, 15, 1) * 6, 14 + wob(t, 11, 2) * 5);
+    P.hand(1, 0.5, 4).hand(-1, 0.5, 4); oLegs(P, 0.8);
+  }, fn(t, P) { run(t, P, 0.62, 0); } },
 
   // the scream: she stops, bends, then throws her head back with her arms spread, shaking
   scream: { dur: 2.0, loop: false, fn(t, P) {
@@ -141,6 +175,37 @@ const CLIPS = {
     P.side('upperarm01', 1, 6, 0, -8).side('lowerarm01', 1, -12, 0, 0).hand(1, 0.45, 4);
     P.sym('upperleg01', -12, 0, 0).sym('lowerleg01', 16, 0, 0).sym('foot', -6, 0, 0);
     P.move(0, -0.035, 0.04);
+  } },
+};
+
+/* ---------- teammates (multiplayer): the same rig, all motion capture ---------- */
+// her O-legs are hers alone: the teammates' legs are straightened
+function straightLegs(P) { P.sym('upperleg01', 0, 0, -12).sym('lowerleg01', 0, 0, 13).sym('foot', 0, 0, -5); }
+// the right arm holds the flashlight out in front (so it doesn't swing around with the walk)
+function torchArm(P, w) {
+  P.sideSet('upperarm01', -1, -62, 0, -14, w).sideSet('lowerarm01', -1, -38, 0, 0, w).sideSet('wrist', -1, -6, 0, 0, w);
+  P.hand(-1, 0.75, 0);
+}
+const PLAYER_CLIPS = {
+  p_idle: { loop: true, mocap: 'p_idle', over(t, P) { P.hand(-1, 0.75, 0); P.hand(1, 0.3, 3); straightLegs(P); } },   // looking around with the flashlight
+  p_walk: { loop: true, mocap: 'p_walk', over(t, P) { torchArm(P, 0.85); P.hand(1, 0.35, 3); straightLegs(P); } },
+  p_jog: { loop: true, mocap: 'p_jog', over(t, P) { torchArm(P, 0.8); P.hand(1, 0.5, 2); straightLegs(P); } },
+  p_run: { loop: true, mocap: 'p_run', over(t, P) { torchArm(P, 0.7); P.hand(1, 0.6, 2); straightLegs(P); } },
+  // down: lying on the back, one hand reaching up for help (the whole body is laid down by rotating the root)
+  p_down: { dur: 3, loop: true, fn(t, P) {
+    const k = t / 3 * TAU;
+    P.rot('root', -88, 0, 0).move(0, -0.72, -0.05);
+    P.spine(-4 + sin(k * 2) * 2, 0, 0).rot('head', -10, 25 + sin(k) * 12, 0);
+    P.side('upperarm01', 1, -150 + sin(k) * 14, 0, -10).side('lowerarm01', 1, -25, 0, 0).hand(1, 0.2 + 0.2 * sin(k * 2), 8);
+    P.side('upperarm01', -1, 10, 0, 18).side('lowerarm01', -1, -20, 0, 0).hand(-1, 0.5, 2);
+    P.side('upperleg01', 1, -28, 0, 4).side('lowerleg01', 1, 50, 0, 0).side('foot', 1, -10, 0, 0);
+    P.side('upperleg01', -1, -4, 0, 6).side('lowerleg01', -1, 6, 0, 0); straightLegs(P);
+  } },
+  p_dead: { dur: 1, loop: true, fn(t, P) {
+    P.rot('root', -90, 0, 0).move(0, -0.74, -0.05).rot('head', -6, 50, 0);
+    P.side('upperarm01', 1, 12, 0, 28).side('upperarm01', -1, 8, 0, 34).side('lowerarm01', 1, -15, 0, 0).side('lowerarm01', -1, -10, 0, 0);
+    P.hand(1, 0.35, 4).hand(-1, 0.3, 4);
+    P.side('upperleg01', 1, -6, 0, 6).side('upperleg01', -1, -2, 0, 8); straightLegs(P);
   } },
 };
 
@@ -233,7 +298,10 @@ function relaxHair(THREE, root) {
 }
 
 /* ---------- sampling poses into clips ---------- */
-function build(THREE, root) {
+function build(THREE, root, opts) {
+  opts = opts || {};
+  const mocap = opts.mocap || null, scale = opts.scale || 1;
+  const TABLE = opts.set === 'player' ? PLAYER_CLIPS : CLIPS;
   hideCoveredSkin(THREE, root);
   relaxHair(THREE, root);
   const bones = {};
@@ -253,7 +321,38 @@ function build(THREE, root) {
   const localQ = (b, a) => { const R = rest.get(b); rq.setFromEuler(eu.set(a[0] * D, a[1] * D, a[2] * D));
     return tq.copy(R.pwi).multiply(rq).multiply(R.pw).multiply(R.q); };
 
+  // a clip built on motion capture: the captured rotations, then the hand-made layer on top
+  //  P.rot = an extra turn (like a head tilt), P.set = replace the captured rotation (like her reaching arms)
+  const qa = new THREE.Quaternion(), qb = new THREE.Quaternion();
+  function sampleMocap(name, def, mc) {
+    const n = mc.n, fps = mc.fps, dur = n / fps, nb = mocap.bones.length, times = [], frames = [];
+    for (let i = 0; i <= n; i++) {
+      const fi = i % n, t = i / fps, P = new Pose(); if (def.over) def.over(t, P, (i % n) / n);
+      times.push(t); frames.push({ fi, P });
+    }
+    const set = new Set(mocap.bones); frames.forEach(({ P }) => { Object.keys(P.r).forEach(k => set.add(k)); Object.keys(P.abs).forEach(k => set.add(k)); });
+    const tracks = [];
+    for (const k of set) {
+      const b = B(k); if (!b) continue;
+      const bi = mocap.bones.indexOf(k), R = rest.get(b), vals = [];
+      for (const { fi, P } of frames) {
+        if (bi >= 0) { const o = (fi * nb + bi) * 4; qa.set(mc.q[o] / 1e4, mc.q[o + 1] / 1e4, mc.q[o + 2] / 1e4, mc.q[o + 3] / 1e4).normalize(); }
+        else qa.copy(R.q);
+        if (P.abs[k]) { qb.copy(localQ(b, P.abs[k])); if (qa.dot(qb) < 0) qb.set(-qb.x, -qb.y, -qb.z, -qb.w); qa.slerp(qb, P.w[k]); }
+        if (P.r[k]) { const a = P.r[k]; rq.setFromEuler(eu.set(a[0] * D, a[1] * D, a[2] * D)); qb.copy(R.pwi).multiply(rq).multiply(R.pw); qa.premultiply(qb); }
+        qa.toArray(vals, vals.length);
+      }
+      tracks.push(new THREE.QuaternionKeyframeTrack(b.name + '.quaternion', times, vals));
+    }
+    if (rootBone) { const rp = rest.get(rootBone).p, vals = [];
+      frames.forEach(({ fi, P }) => vals.push(rp.x + P.root[0], rp.y + mc.ry[fi] / 1000 + P.root[1], rp.z + P.root[2]));
+      tracks.push(new THREE.VectorKeyframeTrack(rootBone.name + '.position', times, vals)); }
+    def.dur = dur; if (mc.speed) def.speed = mc.speed * scale;
+    return new THREE.AnimationClip(name, dur, tracks);
+  }
   function sample(name, def) {
+    if (def.mocap && mocap && mocap.clips[def.mocap]) return sampleMocap(name, def, mocap.clips[def.mocap]);
+    if (!def.fn) return null;
     const fps = 30, n = Math.max(2, Math.round(def.dur * fps)), times = [], poses = [];
     for (let i = 0; i <= n; i++) { const t = def.dur * i / n; const P = new Pose(); def.fn(def.loop && i === n ? 0 : t, P); times.push(t); poses.push(P); }
     const used = new Set(); poses.forEach(P => Object.keys(P.r).forEach(k => used.add(k)));
@@ -271,8 +370,11 @@ function build(THREE, root) {
   }
 
   const mixer = new THREE.AnimationMixer(root), actions = {}, clips = {};
-  for (const [name, def] of Object.entries(CLIPS)) {
+  const defs = {};
+  for (const [name, d] of Object.entries(TABLE)) {
+    const def = defs[name] = Object.assign({}, d);           // (a copy per model: durations and speeds depend on the model's size)
     clips[name] = sample(name, def);
+    if (!clips[name]) { delete defs[name]; continue; }
     const a = mixer.clipAction(clips[name]);
     if (!def.loop) { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
     actions[name] = a;
@@ -291,19 +393,19 @@ function build(THREE, root) {
   }
   // match the playback speed to how fast she actually moves (so her feet don't slide)
   function setSpeed(metersPerSec) {
-    const def = CLIPS[curName]; if (!cur || !def || !def.speed) { if (cur) cur.timeScale = 1; return; }
-    cur.timeScale = clamp(metersPerSec / def.speed, 0.45, 1.8);
+    const def = defs[curName]; if (!cur || !def || !def.speed) { if (cur) cur.timeScale = 1; return; }
+    cur.timeScale = clamp(metersPerSec / def.speed, 0.4, opts.maxTime || 2.3);
   }
   return {
     mixer, actions, clips, bones: B, play, setSpeed,
     get current() { return curName; },
-    get finished() { return !!cur && !CLIPS[curName].loop && cur.time >= CLIPS[curName].dur - 1e-3; },
+    get finished() { return !!cur && !defs[curName].loop && cur.time >= defs[curName].dur - 1e-3; },
     update(dt) { mixer.update(dt); },
     // jump straight to a moment of a clip (for the viewer and screenshots)
     pose(name, t) { mixer.stopAllAction(); const a = actions[name]; a.reset(); a.play(); a.setEffectiveWeight(1); cur = a; curName = name; mixer.setTime(t); },
-    names: Object.keys(CLIPS),
+    names: Object.keys(defs), defs,
   };
 }
 
-window.BarbiAnim = { build, hideCoveredSkin, CLIPS };
+window.BarbiAnim = { build, hideCoveredSkin, CLIPS, PLAYER_CLIPS };
 })();
