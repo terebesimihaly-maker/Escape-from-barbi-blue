@@ -56,6 +56,11 @@ function oLegs(P, amt) {
   const a = amt === undefined ? 1 : amt;
   P.sym('upperleg01', 0, 0, 9 * a).sym('lowerleg01', 0, 0, -17 * a).sym('foot', 0, 0, 8 * a);
 }
+// the same while running: the knees bend a lot, so the shins turn in less (or the kicking foot swings across) and the thighs go out more
+function oLegsRun(P, amt) {
+  const a = amt === undefined ? 1 : amt;
+  P.sym('upperleg01', 0, 0, 16 * a).sym('lowerleg01', 0, 0, -4 * a).sym('foot', 0, 0, 7 * a);
+}
 // Legs for a walk/run cycle. ph: 0..TAU. amp: thigh swing, knee: extra knee bend in the swing, limp: right leg drags.
 function legs(P, ph, amp, knee, limp) {
   for (const s of [1, -1]) {
@@ -126,12 +131,12 @@ const CLIPS = {
     P.spine(12, 0, 0).neck(-12, 0, 0).rot('head', -4 + wob(t, 23, 0) * 4, wob(t, 17, 1) * 5, 12 + wob(t, 13, 2) * 5);
     P.symSet('upperarm01', -78, 0, -14).symSet('lowerarm01', -14, 0, 0).symSet('wrist', -10, 0, 0);
     P.rot('upperarm01.L', 10 * sin(ph), 0, 0).rot('upperarm01.R', -10 * sin(ph), 0, 0);
-    P.hand(1, -0.15, 14).hand(-1, -0.15, 14); oLegs(P, 0.8);
+    P.hand(1, -0.15, 14).hand(-1, -0.15, 14); oLegsRun(P, 1.2);
   }, fn(t, P) { run(t, P, 0.62, 1); } },
   // hunting (running to where she heard you): the same run, arms flailing instead of reaching
   run: { dur: 0.62, loop: true, speed: 5, mocap: 'p_jog', over(t, P, k) {
     P.spine(10, 0, 0).rot('head', wob(t, 19, 0) * 5, wob(t, 15, 1) * 6, 14 + wob(t, 11, 2) * 5);
-    P.hand(1, 0.5, 4).hand(-1, 0.5, 4); oLegs(P, 0.8);
+    P.hand(1, 0.5, 4).hand(-1, 0.5, 4); oLegsRun(P, 1.2);
   }, fn(t, P) { run(t, P, 0.62, 0); } },
 
   // the scream: she stops, bends, then throws her head back with her arms spread, shaking
@@ -146,6 +151,7 @@ const CLIPS = {
     P.sym('lowerarm01', -35 * wind - 12 * out, 0, 0);
     P.hand(1, 0.6 * wind - 0.4 * out, 6 + 10 * out).hand(-1, 0.6 * wind - 0.4 * out, 6 + 10 * out);
     P.sym('upperleg01', -8 * wind - 6 * out, 0, 3 * out).sym('lowerleg01', 16 * wind + 10 * out, 0, 0).sym('foot', -8 * wind - 4 * out, 0, 0);
+    oLegs(P, 0.8);
     P.move(0, -0.06 * wind - 0.04 * out, -0.04 * out);
   } },
 
@@ -160,7 +166,7 @@ const CLIPS = {
     P.sym('upperarm01', -10 * crouch - 88 * go, 0, 12 * go + sh * 5).sym('lowerarm01', -30 * crouch - 12 * go, 0, 0);
     P.sym('wrist', -25 * go, 0, 0);
     P.hand(1, 0.5 * crouch + 0.55 * go, 14 * go).hand(-1, 0.5 * crouch + 0.6 * go, 14 * go);
-    P.sym('upperleg01', -25 * crouch - 30 * go, 0, 0).sym('lowerleg01', 45 * crouch + 25 * go, 0, 0).sym('foot', -20 * crouch, 0, 0);
+    P.sym('upperleg01', -25 * crouch - 30 * go, 0, 0).sym('lowerleg01', 45 * crouch + 25 * go, 0, 0).sym('foot', -20 * crouch, 0, 0); oLegsRun(P, 1);
     P.move(0, -0.14 * crouch - 0.06 * go, 0.3 * go);
   } },
 
@@ -173,7 +179,7 @@ const CLIPS = {
     P.side('upperarm01', -1, -62, 0, -12).side('lowerarm01', -1, -48, 0, 0).side('wrist', -1, -20, 0, 0);
     P.hand(-1, 0.25 + 0.35 * Math.max(0, sin(t * 9)), 6);
     P.side('upperarm01', 1, 6, 0, -8).side('lowerarm01', 1, -12, 0, 0).hand(1, 0.45, 4);
-    P.sym('upperleg01', -12, 0, 0).sym('lowerleg01', 16, 0, 0).sym('foot', -6, 0, 0);
+    P.sym('upperleg01', -12, 0, 0).sym('lowerleg01', 16, 0, 0).sym('foot', -6, 0, 0); oLegs(P, 1.4);
     P.move(0, -0.035, 0.04);
   } },
 };
@@ -218,7 +224,7 @@ CLIPS.lean = { dur: 3.0, loop: true, fn(t, P) {
   P.side('clavicle', 1, 0, 0, 8).side('upperarm01', 1, -70, 0, 34).side('lowerarm01', 1, -38, 0, 0).side('wrist', 1, -10, 0, 0);
   P.hand(1, 0.55, 6);                                                     // gripping the edge of the door
   P.side('upperarm01', -1, -28, 0, -4).side('lowerarm01', -1, -30, 0, 0).hand(-1, 0.3 + 0.3 * Math.max(0, sin(t * 7)), 8);
-  P.sym('upperleg01', -30, 0, 0).sym('lowerleg01', 38, 0, 0).sym('foot', -8, 0, 0);
+  P.sym('upperleg01', -30, 0, 0).sym('lowerleg01', 38, 0, 0).sym('foot', -8, 0, 0); oLegsRun(P, 0.9);
   P.move(0, -0.12, 0.08);
 } };
 
