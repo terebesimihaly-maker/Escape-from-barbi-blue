@@ -233,9 +233,10 @@ function resize() {
   // keep about 80 degrees of view sideways, in portrait and landscape
   const asp = W / H, fov = clamp(2 * Math.atan(Math.tan(40 * Math.PI / 180) / asp) * 180 / Math.PI, 58, 95);
   camera.aspect = asp; camera.fov = fov; camera.updateProjectionMatrix();
-  titleCam.aspect = asp; titleCam.fov = asp < 1 ? 50 : 40;
+  titleCam.aspect = asp; titleCam.fov = asp < 1 ? 38 : 30;
   // wide screens: the menu is on the left, so she is moved to the right of the picture
-  if (asp >= 1 && W >= 700) titleCam.setViewOffset(W, H, -W * 0.2, 0, W, H); else titleCam.clearViewOffset();
+  if (asp >= 1 && W >= 700) titleCam.setViewOffset(W, H, -W * 0.22, 0, W, H);
+  else titleCam.setViewOffset(W, H, 0, H * 0.05, W, H);   // phones: her face sits between the title and the buttons
   titleCam.updateProjectionMatrix();
 }
 function applyQuality() {
@@ -954,7 +955,7 @@ const S = 0.045, TILE_M = T * S, WALL_H = 3.0, EYE = 1.62, M_SCALE = 1.38;
 const LOWQ = matchMedia('(pointer: coarse)').matches;
 const FLASH_I = 30;
 let renderer = null, scene, camera, flash, aura, exitLight, dustPts, glowTex, level = null;
-let titleScene, titleCam, titleLight, titleBulb, titleBulbLight, barbi = null, deathCam = null;
+let titleScene, titleCam, titleLight, titleBulb, titleBulbLight, titleKey, titleAim = null, barbi = null, deathCam = null;
 let dust = [], prints = [], stepPhase = 0;
 const mkCanvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
 function toTex(c, rep) {
@@ -1024,6 +1025,8 @@ function init3D() {
   const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.3, 4), new THREE.MeshBasicMaterial({ color: 0x111111 }));
   cord.position.set(0, WALL_H - 0.15, -1.6); titleScene.add(cord);
   titleBulbLight = new THREE.PointLight(0xffd9a0, 6, 7, 1.4); titleBulbLight.position.copy(titleBulb.position).y -= 0.1; titleScene.add(titleBulbLight);
+  // a soft light on her face, so the close-up reads clearly
+  titleKey = new THREE.SpotLight(0xffe4cc, 7, 5, 0.5, 0.9, 1.6); titleScene.add(titleKey, titleKey.target);
 }
 
 function glowTexture() {
@@ -1688,16 +1691,24 @@ function renderTitle(dt) {
   if (three) {   // her, standing at the end of a hallway, lit by a failing bulb
     putBarbi(titleScene); barbi.obj.visible = true; barbi.obj.position.set(0, 0, -2.2); barbi.obj.rotation.y = 0;
     barbi.anim.play('idle', 0.3); barbi.anim.update(dt);
-    const portrait = W < H, cz = portrait ? 4.2 : 5.6;
-    titleCam.position.set(Math.sin(titleT * 0.13) * 0.2, 1.5, cz); titleCam.lookAt(0, portrait ? 1.2 : 1.3, -2);
+    // a close-up of her face: the camera follows the point between her eyes (smoothly, so her twitches still show)
+    barbi.obj.updateMatrixWorld(true);
+    const eyes = ['eyeL', 'eyeR'].map(n => barbi.model.getObjectByName(n)).filter(Boolean);
+    const tgt = new THREE.Vector3();
+    if (eyes.length) { eyes.forEach(e => tgt.add(e.getWorldPosition(_v))); tgt.divideScalar(eyes.length); } else tgt.set(0, 1.9, -2.1);
+    if (!titleAim) titleAim = tgt.clone(); else titleAim.lerp(tgt, Math.min(1, dt * 3));
+    const dist = W < H ? 1.05 : 0.95;
+    titleCam.position.set(titleAim.x + Math.sin(titleT * 0.23) * 0.06, titleAim.y + 0.02 + Math.sin(titleT * 0.17) * 0.02, titleAim.z + dist);
+    titleCam.lookAt(titleAim);
+    titleKey.position.set(titleAim.x + 0.55, titleAim.y - 0.05, titleAim.z + 1.0); titleKey.target.position.copy(titleAim);
     // the bulb over her keeps failing; when you point at "Enter the house" it goes mad and her eyes flare
     if (titleFlick > 0) titleFlick -= dt; else if (Math.random() < dt * (titleHover ? 6 : 0.5)) titleFlick = rnd(0.05, titleHover ? 0.15 : 0.4);
     const on = titleFlick > 0 ? (Math.random() < 0.5 ? 0.05 : 0.25) : 1;
-    titleLight.intensity = 40 * on; titleBulbLight.intensity = 6 * on;
+    titleLight.intensity = 9 * on; titleBulbLight.intensity = 2.5 * on; titleKey.intensity = 2.2 * on;
     titleBulb.material.color.setScalar(0.25 + 0.75 * on);
     titleLight.color.setHex(titleHover ? 0xa8b8ff : 0x86a8ff);
     setEyes(titleHover ? 1 : 0.75 + Math.random() * 0.2);
-    for (const e of barbi.eyes) e.scale.setScalar(e.userData.base * (titleHover ? 1.6 + Math.random() * 0.3 : 1));
+    for (const e of barbi.eyes) e.scale.setScalar(e.userData.base * (titleHover ? 0.75 + Math.random() * 0.15 : 0.4));   // smaller glow, this close
     renderer.render(titleScene, titleCam);
   } else { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cw, ch); }
   for (let i = 0; i < 6; i++) {   // slow drifting fog
