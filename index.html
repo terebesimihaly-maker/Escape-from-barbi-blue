@@ -77,7 +77,7 @@
   <p>She was a porcelain doll once. Blue glass eyes. Someone left her out in the rain&hellip; and she grew.</p>
   <p>Find the fuses. Unlock the door. Don't let her catch you.</p>
   <button class="big" id="play">Enter the house</button>
-  <p class="tip">Left side: drag to move &middot; RUN: sprint (she hears it) &middot; HIDE in wardrobes &middot; PHONE: once a minute, send her a text<br>
+  <p class="tip">Left side: drag to move &middot; RUN: sprint (she hears it) &middot; HIDE in wardrobes &middot; PHONE: every 45s, send her a text<br>
     Headphones on. Silent mode off.<br><span id="best"></span></p>
 </div>
 
@@ -296,6 +296,15 @@ const sfx = {
     [0, 0.25].forEach(o => { const osc = ac.createOscillator(), g = ac.createGain(); osc.type = 'square'; osc.frequency.value = 150;
       env(g, t + o, 0.01, 0.07, 0.18); osc.connect(g); out(g); osc.start(t + o); osc.stop(t + o + 0.3); });
     if (navigator.vibrate) navigator.vibrate([120, 80, 120]); },
+  voiceBed() { if (!ac) return; const t = ac.currentTime, ws = ac.createWaveShaper(), g = ac.createGain();
+    ws.curve = distCurve(); env(g, t + 0.5, 0.3, 0.09, 2.6); ws.connect(g); out(g);
+    const trem = ac.createOscillator(), tg = ac.createGain(); trem.frequency.value = 7; tg.gain.value = 0.4; trem.connect(tg); tg.connect(g.gain);
+    [[62, 'sawtooth'], [93.5, 'sawtooth']].forEach(([f, type]) => { const o = ac.createOscillator(), bp = ac.createBiquadFilter();
+      o.type = type; o.frequency.setValueAtTime(f, t); o.frequency.linearRampToValueAtTime(f * 0.8, t + 3.2);
+      bp.type = 'bandpass'; bp.frequency.value = 650; bp.Q.value = 4; o.connect(bp); bp.connect(ws); o.start(t + 0.4); o.stop(t + 3.6); });
+    const n = noise(), hp = ac.createBiquadFilter(), ng = ac.createGain(); hp.type = 'highpass'; hp.frequency.value = 3500;
+    env(ng, t + 0.5, 0.4, 0.06, 2.5); n.connect(hp); hp.connect(ng); out(ng); n.start(t + 0.4); n.stop(t + 3.6);
+    trem.start(t); trem.stop(t + 3.6); },
   creak(v) { if (!ac) return; const t = ac.currentTime, o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
     o.type = 'sawtooth'; o.frequency.setValueAtTime(rnd(90, 140), t); o.frequency.linearRampToValueAtTime(rnd(50, 80), t + 0.6);
     f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 12; env(g, t, 0.05, v, 0.6);
@@ -305,7 +314,7 @@ const sfx = {
 /* ---------- game state ---------- */
 let state = 'title', floorIdx = 0, fuses = [], notes = [], closets = [], decals = [], exit = null;
 let player, monster, fusesGot = 0, powerOn = false, runTime = 0, huntTimer = 0, creakTimer = 5;
-let phoneCool = 0, popT = 0;
+let phoneCool = 0, popT = 0, closetScene = null, sceneCool = 0;
 let shake = 0, deadT = 0, flicker = 1, flickTarget = 1, flickT = 0, hbTimer = 0, stepTimer = 0;
 let musicTimer = 0, musicI = 0, hideTarget = null, hideCool = 0, breathShown = false, deathReason = '';
 let titleEyes = null, titleT = 0;
@@ -354,7 +363,7 @@ function startFloor(i) {
   monster = { ...center(m0), ang: 0, state: 'wander', path: [], repath: 0, last: null, seenT: 99,
     searchT: 0, huntT: 0, target: null, knowsCloset: false, active: false, spawnT: 4, anim: 0 };
 
-  fusesGot = 0; powerOn = false; huntTimer = rnd(45, 65) - i * 8; hideTarget = null; breathShown = false; phoneCool = 0; popT = 0; $('pop').classList.remove('on');
+  fusesGot = 0; powerOn = false; huntTimer = rnd(45, 65) - i * 8; hideTarget = null; breathShown = false; phoneCool = 0; popT = 0; closetScene = null; sceneCool = 0; $('pop').classList.remove('on');
   shake = 0; deadT = 0;
   $('hFloor').textContent = 'Floor ' + (i + 1);
   updateFuseHud();
@@ -395,7 +404,7 @@ $('phone').addEventListener('pointerdown', e => { e.preventDefault(); usePhone()
 // the phone: one text a minute. If she's chasing you, she drops everything and leaves for 15 seconds.
 function usePhone() {
   if (state !== 'play' || phoneCool > 0) return;
-  phoneCool = 60; sfx.buzz();
+  phoneCool = 45; sfx.buzz();
   const m = monster, chasing = m.active && (m.state === 'chase' || m.state === 'hunt');
   $('popRes').textContent = '';
   $('pop').classList.add('on'); popT = 3.5;
@@ -423,21 +432,22 @@ function readInput() {
 function toggleHide() {
   if (state !== 'play') return;
   const p = player;
-  if (p.hidden) { exitHide(); return; }
+  if (p.hidden) { if (!(closetScene && closetScene.t > 0)) exitHide(); return; }
   if (!hideTarget) return;
   p.hidden = true; p.closet = hideTarget; p.x = hideTarget.x; p.y = hideTarget.y; hideCool = 0.5;
   sfx.creak(0.12);
   const m = monster, d = Math.hypot(m.x - p.x, m.y - p.y);
   if (m.active && m.state === 'chase' && m.seenT < 0.8 && d < 230) m.knowsCloset = true;
+  else if (m.active && sceneCool <= 0) closetScene = { t: -1.4, spoke: false };
   $('hide').textContent = 'LEAVE';
 }
-function exitHide() { const p = player; p.hidden = false; p.closet = null; hideCool = 0.3; sfx.creak(0.1); $('hide').textContent = 'HIDE'; breathShown = false; }
+function exitHide() { closetScene = null; const p = player; p.hidden = false; p.closet = null; hideCool = 0.3; sfx.creak(0.1); $('hide').textContent = 'HIDE'; breathShown = false; }
 
 /* ---------- screens ---------- */
 function toTitle() { state = 'title'; setHud(false); ['dead', 'win', 'trans', 'paused', 'note'].forEach(s => show(s, false)); show('title', true); loadBest(); }
 function loadBest() { try { const b = localStorage.getItem('bb_best'); $('best').textContent = b ? 'Best escape: ' + fmtTime(+b) : ''; } catch (e) {} }
 const fmtTime = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
-$('play').onclick = () => { initAudio(); show('title', false); runTime = 0; startFloor(0); };
+$('play').onclick = () => { initAudio(); primeVoice(); show('title', false); runTime = 0; startFloor(0); };
 $('retry').onclick = () => { initAudio(); show('dead', false); startFloor(floorIdx); };
 $('menu1').onclick = toTitle; $('menu2').onclick = () => { if (ac) ac.resume(); toTitle(); };
 $('tGo').onclick = () => { initAudio(); show('trans', false); startFloor(floorIdx + 1); };
@@ -449,6 +459,7 @@ function pause() { if (state !== 'play') return; state = 'paused'; show('paused'
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 
 function die(reason) {
+  closetScene = null;
   $('pop').classList.remove('on');
   state = 'dead'; deadT = 0; deathReason = reason; setHud(false); setSprint(false);
   joy.id = null; joy.x = joy.y = 0;
@@ -478,8 +489,10 @@ function update(dt) {
   if (popT > 0) { popT -= dt; if (popT <= 0) $('pop').classList.remove('on'); }
   if (phoneCool > 0) { phoneCool = Math.max(0, phoneCool - dt); const b = $('phone');
     b.disabled = phoneCool > 0; b.textContent = phoneCool > 0 ? Math.ceil(phoneCool) + 's' : 'PHONE'; }
+  sceneCool -= dt;
   updatePlayer(dt);
   if (state !== 'play') return;
+  if (closetScene) { updateCloset(dt); updateAudio(dt); return; }
   updateMonster(dt);
   if (state !== 'play') return;
   updateAudio(dt);
@@ -500,11 +513,41 @@ function update(dt) {
   const st = $('stam'); st.firstChild.style.width = (player.stam * 100) + '%'; st.classList.toggle('tired', player.exhausted);
 }
 
+/* ---------- "I know you're in there" ---------- */
+const CLOSET_LINE = "I know you're in there...";
+const SCENE_LEN = 4.4;
+function primeVoice() {
+  try { if (window.speechSynthesis) { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } } catch (e) {}
+}
+function speakCreepy() {
+  try {
+    if (!window.speechSynthesis) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(CLOSET_LINE);
+    const voices = speechSynthesis.getVoices();
+    const v = voices.find(v => /^en/i.test(v.lang) && /female|samantha|karen|moira|tessa|victoria|zira/i.test(v.name)) || voices.find(v => /^en/i.test(v.lang));
+    if (v) u.voice = v;
+    u.lang = v ? v.lang : 'en-US'; u.pitch = 0.1; u.rate = 0.55; u.volume = 1;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+function updateCloset(dt) {
+  const sc = closetScene; sc.t += dt;
+  if (sc.t < 0) { if (Math.random() < dt * 2.5) sfx.step(false); return; }
+  if (!sc.started) { sc.started = true; sfx.sting(); shake = 3; sfx.voiceBed(); if (navigator.vibrate) navigator.vibrate([60, 60, 60]); }
+  if (!sc.spoke && sc.t > 0.6) { sc.spoke = true; speakCreepy(); }
+  if (sc.t >= SCENE_LEN) {
+    closetScene = null; sceneCool = 25;
+    const m = monster; m.active = false; m.spawnT = 12; m.relocate = true; m.state = 'wander'; m.path = []; m.huntT = 0;
+    sfx.creak(0.1); showMsg('...and then she was gone.', 3);
+  }
+}
+
 function updatePlayer(dt) {
   const p = player; readInput();
   const mag = Math.min(1, Math.hypot(input.x, input.y));
   if (p.hidden) {
-    if (mag > 0.6 && hideCool <= 0) exitHide();
+    if (mag > 0.6 && hideCool <= 0 && !(closetScene && closetScene.t > 0)) exitHide();
     else { p.moving = p.sprinting = false; p.stam = Math.min(1, p.stam + dt / 4); return; }
   }
   p.moving = mag > 0.15;
@@ -781,9 +824,12 @@ function drawGlows(t) {
 function drawScreenFx(t) {
   const p = player, m = monster, cw = cvs.width, ch = cvs.height;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const sc = closetScene && closetScene.t > 0 ? closetScene : null;
+  if (p.hidden && sc) drawClosetFace(sc.t);
   if (p.hidden) { // looking out through the wardrobe slats
+    const gap = sc ? 18 : 10;
     ctx.fillStyle = 'rgba(12,7,4,.97)'; ctx.beginPath(); ctx.rect(0, 0, cw, ch);
-    for (let k = -2; k <= 2; k++) ctx.rect(0, ch / 2 + k * 34 * DPR - 5 * DPR, cw, 10 * DPR);
+    for (let k = -2; k <= 2; k++) ctx.rect(0, ch / 2 + k * 34 * DPR - gap / 2 * DPR, cw, gap * DPR);
     ctx.fill('evenodd');
     ctx.fillStyle = 'rgba(160,130,100,.5)'; ctx.font = (12 * DPR) + 'px Georgia'; ctx.textAlign = 'center';
     ctx.fillText('hiding · move to leave', cw / 2, ch - 110 * DPR);
@@ -799,12 +845,41 @@ function drawScreenFx(t) {
       ctx.save(); ctx.translate(cw / 2 + Math.cos(a) * r, ch / 2 + Math.sin(a) * r); ctx.rotate(a);
       ctx.fillStyle = 'rgba(80,255,140,' + (0.35 + 0.2 * Math.sin(t * 5)) + ')';
       ctx.beginPath(); ctx.moveTo(12 * DPR, 0); ctx.lineTo(-6 * DPR, -8 * DPR); ctx.lineTo(-6 * DPR, 8 * DPR); ctx.fill(); ctx.restore(); } }
+  if (p.hidden && sc) drawClosetLine(sc.t);
   drawGrain(0.06);
   if (joy.id !== null) {
     ctx.strokeStyle = 'rgba(160,180,255,.25)'; ctx.lineWidth = 2 * DPR;
     ctx.beginPath(); ctx.arc(joy.ox * DPR, joy.oy * DPR, 55 * DPR, 0, 7); ctx.stroke();
     ctx.fillStyle = 'rgba(160,180,255,.3)'; ctx.beginPath(); ctx.arc((joy.ox + joy.x * 55) * DPR, (joy.oy + joy.y * 55) * DPR, 22 * DPR, 0, 7); ctx.fill();
   }
+}
+function drawClosetFace(t) {
+  const cw = cvs.width, ch = cvs.height;
+  paintFace(fctx, t + 10);
+  const fadeIn = clamp(t / 0.7, 0, 1), fadeOut = clamp((SCENE_LEN - t) / 0.8, 0, 1);
+  const size = Math.min(cw, ch) * (1.15 + 0.2 * fadeIn), glitch = t > SCENE_LEN - 1;
+  const cx = cw / 2 + Math.sin(t * 1.3) * 6 * DPR, cy = ch / 2 - 34 * DPR + 16 / 512 * size;
+  const x = cx - size / 2, y = cy - size / 2, n = 16;
+  ctx.save(); ctx.globalAlpha = fadeIn * fadeOut;
+  for (let i = 0; i < n; i++) {
+    const off = glitch && Math.random() < 0.5 ? rnd(-60, 60) * DPR : rnd(-1.5, 1.5) * DPR;
+    ctx.drawImage(faceCv, 0, i * 512 / n, 512, 512 / n, x + off, y + i * size / n, size, size / n + 1);
+  }
+  ctx.restore();
+}
+function drawClosetLine(t) {
+  const cw = cvs.width, ch = cvs.height, shown = Math.floor(clamp((t - 0.6) / 1.8, 0, 1) * CLOSET_LINE.length);
+  if (!shown) return;
+  const fs = 22 * DPR, alpha = clamp((SCENE_LEN - t) / 0.6, 0, 1);
+  ctx.save(); ctx.font = 'italic ' + fs + 'px Georgia, serif'; ctx.textBaseline = 'middle';
+  const txt = CLOSET_LINE.slice(0, shown), full = ctx.measureText(CLOSET_LINE).width;
+  let x = cw / 2 - full / 2; const y = ch / 2 - 190 * DPR;
+  for (const chr of txt) {
+    ctx.fillStyle = 'rgba(255,' + (40 + Math.random() * 40 | 0) + ',50,' + alpha + ')';
+    ctx.shadowColor = '#f00'; ctx.shadowBlur = 12 * DPR;
+    ctx.fillText(chr, x + rnd(-2, 2) * DPR, y + rnd(-2, 2) * DPR); x += ctx.measureText(chr).width;
+  }
+  ctx.restore();
 }
 function drawGrain(a) {
   ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = grainPat;
