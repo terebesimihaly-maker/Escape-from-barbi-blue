@@ -63,6 +63,10 @@
   #paper{background:#d8cdb4;color:#2b1a14;max-width:320px;padding:26px 22px;transform:rotate(-1.6deg);
     box-shadow:0 10px 40px #000,inset 0 0 50px rgba(90,60,20,.45);font:17px/1.55 'Courier New',monospace;text-align:left;white-space:pre-line}
   #paper b{display:block;color:#6a1616;margin-bottom:8px;letter-spacing:2px}
+  /* on a computer: the key for each button, shown next to it */
+  .pc .btn[data-key]::before{content:attr(data-key);position:absolute;right:calc(100% + 10px);top:50%;transform:translateY(-50%);
+    min-width:14px;padding:4px 8px;border:1px solid rgba(200,210,255,.45);border-bottom-width:3px;border-radius:5px;background:rgba(10,12,25,.7);
+    color:#dfe6ff;font:600 12px/1.2 system-ui,sans-serif;letter-spacing:1px;text-align:center;white-space:nowrap;pointer-events:none}
   .hidden{display:none!important}
 </style>
 </head>
@@ -72,10 +76,10 @@
 
 <div id="hud" class="hidden"><span id="hFloor">Floor 1</span><button id="pause">II</button><span id="hFuse">⚡ 0/3</span></div>
 <div id="stam" class="hidden"><i></i></div>
-<button id="phone" class="btn hidden">PHONE</button>
-<button id="hide" class="btn hidden">HIDE</button>
+<button id="phone" class="btn hidden" data-key="1">PHONE</button>
+<button id="hide" class="btn hidden" data-key="E">HIDE</button>
 <div id="pop"><div class="top"><span>Messages</span><span>now</span></div><div class="who">You</div><div class="bub">Eljössz velem edzeni?</div><div class="res" id="popRes"></div></div>
-<button id="run" class="btn hidden">RUN</button>
+<button id="run" class="btn hidden" data-key="Shift">RUN</button>
 <div id="msg"></div>
 
 <div id="title" class="screen">
@@ -85,7 +89,7 @@
   <button class="big" id="play">Enter the house</button>
   <p id="loadMsg" class="tip" style="color:#c98a8a!important"></p>
   <p class="tip">Left side: drag to walk &middot; Right side: drag to look around &middot; RUN: sprint (she hears it) &middot; HIDE in wardrobes &middot; PHONE: every 45s, send her a text<br>
-    Computer: WASD to move, mouse to look (Esc frees the cursor), Shift to run, E to hide, F for the phone<br>
+    Computer: WASD to move, mouse to look (Esc frees the cursor), Shift to run, E to hide, 1 for the phone<br>
     Headphones on. Silent mode off.<br><span id="best"></span></p>
   <div class="song"><label for="songFile">Monster song&hellip;</label><span id="songName">Chase song</span>
     <button id="songTest" class="hidden">&#9654; Test</button>
@@ -489,6 +493,7 @@ const LOOK_SENS = 0.0065, MOUSE_SENS = 0.0024;
 // Desktop: the cursor is locked to the game (like any first-person game) and the mouse turns the camera.
 // Esc frees the cursor and pauses. Any menu or screen frees it too.
 const canLock = matchMedia('(pointer: fine)').matches && 'requestPointerLock' in cvs;
+if (matchMedia('(pointer: fine)').matches) document.body.classList.add('pc');   // show the keys next to the buttons
 const locked = () => document.pointerLockElement === cvs;
 function lockMouse() {
   if (!canLock || locked()) return;
@@ -548,8 +553,8 @@ function usePhone() {
 }
 
 addEventListener('keydown', e => { keys[e.code] = true;
-  if (e.code === 'KeyE' || e.code === 'Space') toggleHide();
-  if (e.code === 'KeyF' || e.code === 'KeyQ') usePhone();
+  if (e.code === 'KeyE' && !e.repeat) toggleHide();
+  if ((e.code === 'Digit1' || e.code === 'Numpad1') && !e.repeat) usePhone();
   if ((e.code === 'Escape' || e.code === 'KeyP') && state === 'play') pause(); });
 addEventListener('keyup', e => { keys[e.code] = false; });
 function readInput() {
