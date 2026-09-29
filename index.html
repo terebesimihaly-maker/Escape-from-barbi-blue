@@ -414,6 +414,10 @@ function initAudio() {
   if (ac) { if (ac.state !== 'running') ac.resume(); return; }
   const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
   ac = new AC();
+  buildAudioGraph();
+}
+// the master bus with a limiter, the noise buffer and the low drone of the house
+function buildAudioGraph() {
   master = ac.createGain(); master.gain.value = settings.vol;
   const limiter = ac.createDynamicsCompressor(); limiter.threshold.value = -3; limiter.knee.value = 0; limiter.ratio.value = 20;
   limiter.attack.value = 0.001; limiter.release.value = 0.1; master.connect(limiter); limiter.connect(ac.destination);
@@ -786,8 +790,11 @@ function update(dt) {
 }
 
 /* ---------- "I know you're in there" ---------- */
-const CLOSET_LINE = "I know you're in there...";
-const SCENE_LEN = 4.4;
+const CLOSET_LINE = "I know you're in here...";
+// the wardrobe scene, in seconds (it starts at -1.4 with her footsteps coming closer):
+// she walks up to the doors, one door swings open, she leans in to your face, speaks, glitches away, the door creaks shut
+const SC = { open: 0.7, openEnd: 1.4, lean: 1.3, leanEnd: 2.3, speak: 2.2, vanish: 4.8, gone: 5.3, shut: 5.4, end: 6.1 };
+const SCENE_LEN = SC.end;
 function primeVoice() {
   try { if (window.speechSynthesis) { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } } catch (e) {}
 }
@@ -807,7 +814,11 @@ function updateCloset(dt) {
   const sc = closetScene; sc.t += dt;
   if (sc.t < 0) { if (Math.random() < dt * 2.5) sfx.step(false); return; }
   if (!sc.started) { sc.started = true; sfx.sting(); shake = 3; sfx.voiceBed(); if (navigator.vibrate) navigator.vibrate([60, 60, 60]); }
-  if (!sc.spoke && sc.t > 0.6) { sc.spoke = true; speakCreepy(); }
+  if (!sc.creak && sc.t > SC.open) { sc.creak = true; sfx.creak(0.22); }
+  if (!sc.leanSting && sc.t > SC.lean + 0.5) { sc.leanSting = true; sfx.sting(); shake = 4; if (navigator.vibrate) navigator.vibrate(90); }
+  if (!sc.spoke && sc.t > SC.speak) { sc.spoke = true; speakCreepy(); }
+  if (!sc.gone && sc.t > SC.vanish) { sc.gone = true; sfx.buzz(); }
+  if (!sc.shutCreak && sc.t > SC.shut) { sc.shutCreak = true; sfx.creak(0.12); }
   if (sc.t >= SCENE_LEN) {
     closetScene = null; sceneCool = 25;
     const m = monster; m.active = false; m.spawnT = 12; m.relocate = true; m.state = 'wander'; m.path = []; m.huntT = 0;
@@ -1117,6 +1128,22 @@ function standInDoll() {
 function putBarbi(sc) { if (barbi && barbi.obj.parent !== sc) { sc.add(barbi.obj); for (const e of barbi.eyes) if (e.userData.base) e.scale.setScalar(e.userData.base); } }
 function setEyes(a) { if (barbi) for (const e of barbi.eyes) { e.material.opacity = a; e.visible = a > 0.01; } }
 
+// how far the right-hand door (as seen from inside) is open during the wardrobe scene: 0 shut, 1 wide open
+function sceneDoor(t) {
+  const ease = k => k * k * (3 - 2 * k);
+  if (t < SC.open) return 0;
+  if (t < SC.openEnd) return ease((t - SC.open) / (SC.openEnd - SC.open));
+  if (t < SC.shut) return 1;
+  return 1 - ease(clamp((t - SC.shut) / (SC.end - SC.shut - 0.1), 0, 1));
+}
+// where she stands during the scene, in world units in front of the wardrobe's centre (the doors are at -CLOSET_FRONT)
+const SC_STAND = 18, SC_LEAN = 9.5;
+function sceneAlong(t, c) {
+  if (t < 0) { let n = 0; while (n < 2 && !isWall(Math.floor(c.x / T) + c.ox * (n + 1), Math.floor(c.y / T) + c.oy * (n + 1))) n++;
+    return SC_STAND + (-t / 1.4) * n * T; }                                     // walking up to the doors
+  const k = clamp((t - SC.lean) / (SC.leanEnd - SC.lean), 0, 1);
+  return SC_STAND + (SC_LEAN - SC_STAND) * k * k * (3 - 2 * k);                  // stepping in through the open door
+}
 function startScream() {
   monster.screamT = 1.7;
   if (barbi) barbi.anim.play('scream', 0.15, true);
@@ -1125,7 +1152,10 @@ function startScream() {
 function animateMonster(dt) {
   if (!barbi) return;
   const m = monster, a = barbi.anim;
-  if (closetScene && closetScene.t > 0) a.play('peek', 0.25);
+  if (closetScene) {
+    const t = closetScene.t;
+    if (t < 0) { a.play('walk', 0.3); a.setSpeed(2); } else if (t < SC.lean) a.play('peek', 0.35); else a.play('lean', 0.7);
+  }
   else if (m.screamT > 0) a.play('scream', 0.15);
   else if (m.vel < 8) a.play('idle', 0.4);
   else { a.play(m.state === 'chase' ? 'chase' : m.state === 'hunt' ? 'run' : m.state === 'search' ? 'search' : 'walk', 0.3); a.setSpeed(m.vel * S); }
@@ -1441,13 +1471,24 @@ function wardrobeMaterials() {
   d.fillStyle = '#c9a25a'; d.beginPath(); d.arc(118, 300, 5, 0, 7); d.arc(138, 300, 5, 0, 7); d.fill();
   const st = toTex(side), dt = toTex(door);
   const sideMat = new THREE.MeshLambertMaterial({ map: st, bumpMap: st, bumpScale: 2 });
-  return { sideMat, doorMat: new THREE.MeshLambertMaterial({ map: dt, bumpMap: dt, bumpScale: 3 }), geo: new THREE.BoxGeometry(1.15, 2.25, 0.6), crown: new THREE.BoxGeometry(1.25, 0.1, 0.68) };
+  // each door leaf shows its half of the door picture, from both sides
+  const half = off => { const t = dt.clone(); t.repeat.set(0.5, 1); t.offset.set(off, 0); t.needsUpdate = true;
+    return new THREE.MeshLambertMaterial({ map: t, bumpMap: t, bumpScale: 3, side: THREE.DoubleSide }); };
+  return { sideMat, innerMat: new THREE.MeshLambertMaterial({ color: 0x0a0604 }), leafR: half(0), leafL: half(0.5),
+    leafGeo: new THREE.PlaneGeometry(0.575, 2.2), geo: new THREE.BoxGeometry(1.15, 2.25, 0.6), crown: new THREE.BoxGeometry(1.25, 0.1, 0.68) };
 }
 function makeWardrobe(c, wt) {
-  const g = new THREE.Group(), body = new THREE.Mesh(wt.geo, [wt.sideMat, wt.sideMat, wt.sideMat, wt.sideMat, wt.doorMat, wt.sideMat]);
+  const g = new THREE.Group(), body = new THREE.Mesh(wt.geo, [wt.sideMat, wt.sideMat, wt.sideMat, wt.sideMat, wt.innerMat, wt.sideMat]);
   body.position.y = 1.125; const crown = new THREE.Mesh(wt.crown, wt.sideMat); crown.position.y = 2.3;
   body.castShadow = body.receiveShadow = crown.castShadow = true;
   g.add(body, crown);
+  // two doors on hinges at the outer edges. Seen from inside, the door on your right is at local -x.
+  c.doors = [];
+  for (const side of [-1, 1]) {
+    const pivot = new THREE.Group(); pivot.position.set(side * 0.575, 1.125, 0.305);
+    const leaf = new THREE.Mesh(wt.leafGeo, side < 0 ? wt.leafR : wt.leafL); leaf.position.x = -side * 0.2875; leaf.castShadow = true;
+    pivot.add(leaf); g.add(pivot); c.doors.push({ pivot, leaf, side, open: 0 });
+  }
   const back = TILE_M / 2 - 0.3 - 0.01;          // its back against the wall of the dead end, doors facing the way out
   g.position.set(c.x * S - c.ox * back, 0, c.y * S - c.oy * back); g.rotation.y = Math.atan2(c.ox, c.oy);
   return g;
@@ -1548,7 +1589,9 @@ function placeCamera(t) {
   let cx = p.x, cy = p.y, yaw = p.ang, pitch = p.pitch, h = EYE;
   if (p.hidden && p.closet) {                    // inside the wardrobe, looking out through the slats
     const c = p.closet; cx = c.x - c.ox * (CLOSET_FRONT + 5); cy = c.y - c.oy * (CLOSET_FRONT + 5);
-    yaw = Math.atan2(c.oy, c.ox) + p.hideYaw + Math.sin(t * 0.7) * 0.03; pitch = (closetScene && closetScene.t > 0 ? 0.14 : -0.03) + p.hidePitch; h = 1.55 + Math.sin(t * 1.7) * 0.006;
+    const cs = closetScene;
+    yaw = Math.atan2(c.oy, c.ox) + (cs ? 0 : p.hideYaw) + Math.sin(t * 0.7) * 0.03;
+    pitch = cs ? (cs.t > SC.lean ? 0.02 : 0.1) : -0.03 + p.hidePitch; h = 1.55 + Math.sin(t * 1.7) * 0.006;
   } else if (p.moving) { h += Math.sin(stepPhase) * (p.sprinting ? 0.045 : 0.025); yaw += Math.sin(stepPhase * 0.5) * 0.006; }
   const sh = shake * 0.01;
   camera.position.set(cx * S + rnd(-sh, sh), h + rnd(-sh, sh) * 0.6, cy * S + rnd(-sh, sh));
@@ -1564,16 +1607,25 @@ function render3D(t) {
   // her
   if (barbi) {
     putBarbi(scene);
-    const sc = closetScene && closetScene.t > 0;
+    const sc = closetScene && p.closet ? closetScene : null;
     let mx = m.x, my = m.y, ma = m.ang, show = m.active;
-    if (sc && p.closet) { const c = p.closet; mx = c.x + c.ox * 22; my = c.y + c.oy * 22; ma = Math.atan2(-c.oy, -c.ox); show = true; }
+    if (sc) { const c = p.closet, al = sceneAlong(sc.t, c); mx = c.x + c.ox * al; my = c.y + c.oy * al; ma = Math.atan2(-c.oy, -c.ox); show = sc.t < SC.gone;
+      if (sc.t > SC.vanish && sc.t < SC.gone) { show = Math.random() < 0.55; mx += rnd(-3, 3); my += rnd(-3, 3); } }   // glitching away
     barbi.obj.visible = show;
     barbi.obj.position.set(mx * S, 0, my * S); barbi.obj.rotation.y = Math.PI / 2 - ma;
     let eye = 0;
     if (show) { const d = Math.hypot(mx - p.x, my - p.y), toP = Math.atan2(p.y - my, p.x - mx);
-      if (sc) eye = 0.9;
+      if (sc) eye = 0.95;
       else if (d < 420 && los(p.x, p.y, mx, my)) eye = clamp(1 - d / 420, 0, 1) * (0.75 + Math.random() * 0.25) * clamp((Math.cos(angDiff(toP, ma)) + 0.3) * 1.6, 0, 1); }
     setEyes(eye);
+    // her face is right in front of yours when she leans in: the eye glow shrinks to fit
+    const near = sc ? clamp((sc.t - SC.lean) / (SC.leanEnd - SC.lean), 0, 1) : 0;
+    for (const e of barbi.eyes) if (e.userData.base) e.scale.setScalar(e.userData.base * (1 - 0.65 * near));
+  }
+  // wardrobe doors: only the one you're in ever opens (in the scene). From inside, closed doors are drawn as the slats overlay.
+  for (const c of closets) if (c.doors) for (const d of c.doors) {
+    const mine = p.hidden && p.closet === c, k = mine && closetScene && d.side < 0 ? sceneDoor(closetScene.t) : 0;
+    d.pivot.rotation.y = d.side * k * 1.9; d.leaf.visible = !mine || k > 0.12;
   }
   // things on the floor
   for (const f of fuses) if (f.obj) { f.obj.visible = !f.got;
@@ -1615,14 +1667,16 @@ function drawScreenFx(t) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   const sc = closetScene && closetScene.t > 0 ? closetScene : null;
   if (p.hidden) { // looking out between the louvres of the wardrobe doors
-    const per = 34 * DPR, slat = (sc ? 12 : 14) * DPR, off = (ch / 2) % per;
+    const per = 34 * DPR, slat = 14 * DPR, off = (ch / 2) % per;
+    const open = closetScene ? sceneDoor(closetScene.t) : 0, rx = cw / 2 + open * cw * 0.6;   // the right door swings away
     for (let y = off - per; y < ch; y += per) {
       const g = ctx.createLinearGradient(0, y, 0, y + slat);
       g.addColorStop(0, 'rgba(40,24,14,.96)'); g.addColorStop(0.35, 'rgba(22,13,7,.97)'); g.addColorStop(1, 'rgba(6,3,2,.98)');
-      ctx.fillStyle = g; ctx.fillRect(0, y, cw, slat);
-      ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, y + slat, cw, 2 * DPR);   // each slat's shadow
+      ctx.fillStyle = g; ctx.fillRect(0, y, cw / 2, slat); if (rx < cw) ctx.fillRect(rx, y, cw - rx + 1, slat);
+      ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, y + slat, cw / 2, 2 * DPR); if (rx < cw) ctx.fillRect(rx, y + slat, cw - rx + 1, 2 * DPR);
     }
-    ctx.fillStyle = 'rgba(8,4,2,.97)'; ctx.fillRect(cw / 2 - 5 * DPR, 0, 10 * DPR, ch);   // where the two doors meet
+    ctx.fillStyle = 'rgba(8,4,2,.97)'; ctx.fillRect(cw / 2 - 5 * DPR, 0, 10 * DPR, ch);   // the edge of the door that stays shut
+    if (open > 0 && rx < cw) ctx.fillRect(rx - 5 * DPR, 0, 10 * DPR, ch);
     const fr = ctx.createRadialGradient(cw / 2, ch / 2, Math.min(cw, ch) * 0.35, cw / 2, ch / 2, Math.max(cw, ch) * 0.75);
     fr.addColorStop(0, 'rgba(8,4,2,0)'); fr.addColorStop(1, 'rgba(8,4,2,.7)'); ctx.fillStyle = fr; ctx.fillRect(0, 0, cw, ch);
     ctx.fillStyle = 'rgba(160,130,100,.5)'; ctx.font = (12 * DPR) + 'px Georgia'; ctx.textAlign = 'center';
@@ -1652,12 +1706,12 @@ function drawScreenFx(t) {
   }
 }
 function drawClosetLine(t) {
-  const cw = cvs.width, ch = cvs.height, shown = Math.floor(clamp((t - 0.6) / 1.8, 0, 1) * CLOSET_LINE.length);
+  const cw = cvs.width, ch = cvs.height, shown = Math.floor(clamp((t - SC.speak) / 1.6, 0, 1) * CLOSET_LINE.length);
   if (!shown) return;
-  const fs = 22 * DPR, alpha = clamp((SCENE_LEN - t) / 0.6, 0, 1);
+  const fs = 22 * DPR, alpha = clamp((SC.vanish + 0.3 - t) / 0.5, 0, 1);
   ctx.save(); ctx.font = 'italic ' + fs + 'px Georgia, serif'; ctx.textBaseline = 'middle';
   const txt = CLOSET_LINE.slice(0, shown), full = ctx.measureText(CLOSET_LINE).width;
-  let x = cw / 2 - full / 2; const y = ch / 2 - 190 * DPR;
+  let x = cw / 2 - full / 2; const y = ch - 150 * DPR;
   for (const chr of txt) {
     ctx.fillStyle = 'rgba(255,' + (40 + Math.random() * 40 | 0) + ',50,' + alpha + ')';
     ctx.shadowColor = '#f00'; ctx.shadowBlur = 12 * DPR;

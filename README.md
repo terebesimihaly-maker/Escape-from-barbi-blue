@@ -5,7 +5,7 @@ A first-person 3D horror maze for phones and desktop. Find the fuses, unlock the
 - `index.html`: the game (three.js renderer, with all the game logic and synthesized audio in one file)
 - `models/barbi.glb`: her rigged model (made in Blender)
 - `js/barbi-anim.js`: her animations. The model has no animation clips, so they're built in code from the rig's bones:
-  `idle`, `walk` (limping), `search`, `run`, `chase` (arms reaching), `scream`, `lunge` (the kill), `peek` (outside your wardrobe)
+  `idle`, `walk` (limping), `search`, `run`, `chase` (arms reaching), `scream`, `lunge` (the kill), `peek` (outside your wardrobe), `lean` (leaning in through the wardrobe door)
 - `audio/chase.mp3`: her chase song. It's faint when she's far away, gets louder as she gets closer, and plays at full volume when she catches you (a different song can be picked on the title screen)
 - `animations.html`: preview each animation (drag to orbit)
 - `lib/three.min.js`: three.js r186 + GLTFLoader (MIT, see `lib/THREE-LICENSE.txt`)
