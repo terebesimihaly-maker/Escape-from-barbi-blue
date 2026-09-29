@@ -1145,7 +1145,7 @@ function sceneAlong(t, c) {
   return SC_STAND + (SC_LEAN - SC_STAND) * k * k * (3 - 2 * k);                  // stepping in through the open door
 }
 // she moves over to the open door (on your right) while it swings open, and leans in through it
-function sceneSide(t) { const k = clamp((t - SC.open) / (SC.lean + 0.3 - SC.open), 0, 1); return 6.5 * k * k * (3 - 2 * k); }
+function sceneSide(t) { const k = clamp((t - SC.open) / (SC.lean + 0.3 - SC.open), 0, 1); return 9.5 * k * k * (3 - 2 * k); }
 function startScream() {
   monster.screamT = 1.7;
   if (barbi) barbi.anim.play('scream', 0.15, true);
@@ -1634,8 +1634,8 @@ function render3D(t) {
       const e = new THREE.Vector3(); barbi.eyes.forEach(s => e.add(s.parent.getWorldPosition(_v))); e.divideScalar(barbi.eyes.length);
       const dx = e.x - camera.position.x, dy = e.y - camera.position.y, dz = e.z - camera.position.z;
       const yaw = Math.atan2(-dx, -dz), pitch = clamp(Math.atan2(dy, Math.hypot(dx, dz)), -0.9, 0.9), kk = k * k * (3 - 2 * k);
-      // only tilt (not turn): turning would slide her face behind the door that stays shut
-      camera.rotation.y += angDiff(yaw, camera.rotation.y) * kk * 0.15; camera.rotation.x += (pitch - camera.rotation.x) * kk;
+      // mostly tilt, only turn a little: turning fully would slide her face behind the door that stays shut
+      camera.rotation.y += angDiff(yaw, camera.rotation.y) * kk * 0.4; camera.rotation.x += (pitch - camera.rotation.x) * kk;
     }
   }
   // wardrobe doors: only the one you're in ever opens (in the scene). From inside, closed doors are drawn as the slats overlay.
