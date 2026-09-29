@@ -44,6 +44,17 @@
   #dead{background:rgba(0,0,0,.72)}
   #dead h2{color:#ff4b4b;font-size:30px;text-shadow:0 0 16px #a00}
   #note{background:rgba(0,0,0,.8)}
+  #phone{bottom:calc(236px + env(safe-area-inset-bottom));border-color:rgba(120,230,170,.45);color:#bff5d6;background:rgba(10,45,30,.45);font-size:12px}
+  #phone:disabled{opacity:.45;border-color:rgba(160,160,160,.3);color:#999;background:rgba(20,20,20,.4)}
+  #pop{position:fixed;box-sizing:border-box;left:16px;bottom:calc(60px + env(safe-area-inset-bottom));width:min(280px,calc(100% - 140px));
+    transform:translateY(40px);opacity:0;transition:transform .35s,opacity .35s;pointer-events:none;z-index:5;
+    background:#101418;border:2px solid #2c333b;border-radius:28px;padding:18px 16px 22px;box-shadow:0 12px 40px #000;
+    font-family:system-ui,-apple-system,sans-serif;color:#e8edf2}
+  #pop.on{transform:translateY(0);opacity:1}
+  #pop .top{display:flex;justify-content:space-between;font-size:11px;color:#8a95a2;margin-bottom:12px;letter-spacing:.5px}
+  #pop .who{font-size:13px;font-weight:600;margin-bottom:6px;color:#bfc9d4}
+  #pop .bub{display:inline-block;background:#2f7cf6;color:#fff;padding:10px 14px;border-radius:18px 18px 4px 18px;font-size:16px;line-height:1.3}
+  #pop .res{margin-top:12px;font-size:13px;color:#9fe3bb;min-height:1em}
   #paper{background:#d8cdb4;color:#2b1a14;max-width:320px;padding:26px 22px;transform:rotate(-1.6deg);
     box-shadow:0 10px 40px #000,inset 0 0 50px rgba(90,60,20,.45);font:17px/1.55 'Courier New',monospace;text-align:left;white-space:pre-line}
   #paper b{display:block;color:#6a1616;margin-bottom:8px;letter-spacing:2px}
@@ -55,7 +66,9 @@
 
 <div id="hud" class="hidden"><span id="hFloor">Floor 1</span><button id="pause">II</button><span id="hFuse">⚡ 0/3</span></div>
 <div id="stam" class="hidden"><i></i></div>
+<button id="phone" class="btn hidden">PHONE</button>
 <button id="hide" class="btn hidden">HIDE</button>
+<div id="pop"><div class="top"><span>Messages</span><span>now</span></div><div class="who">You</div><div class="bub">Eljössz velem edzeni?</div><div class="res" id="popRes"></div></div>
 <button id="run" class="btn hidden">RUN</button>
 <div id="msg"></div>
 
@@ -64,7 +77,7 @@
   <p>She was a porcelain doll once. Blue glass eyes. Someone left her out in the rain&hellip; and she grew.</p>
   <p>Find the fuses. Unlock the door. Don't let her catch you.</p>
   <button class="big" id="play">Enter the house</button>
-  <p class="tip">Left side: drag to move &middot; RUN: sprint (she hears it) &middot; HIDE in wardrobes<br>
+  <p class="tip">Left side: drag to move &middot; RUN: sprint (she hears it) &middot; HIDE in wardrobes &middot; PHONE: once a minute, send her a text<br>
     Headphones on. Silent mode off.<br><span id="best"></span></p>
 </div>
 
@@ -279,6 +292,10 @@ const sfx = {
     const n = noise(), bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.setValueAtTime(2600, t);
     bp.frequency.exponentialRampToValueAtTime(500, t + 1.5); n.connect(bp); bp.connect(ws); n.start(t); n.stop(t + 1.8);
     lfo.start(t); lfo.stop(t + 1.8); },
+  buzz() { if (!ac) return; const t = ac.currentTime;
+    [0, 0.25].forEach(o => { const osc = ac.createOscillator(), g = ac.createGain(); osc.type = 'square'; osc.frequency.value = 150;
+      env(g, t + o, 0.01, 0.07, 0.18); osc.connect(g); out(g); osc.start(t + o); osc.stop(t + o + 0.3); });
+    if (navigator.vibrate) navigator.vibrate([120, 80, 120]); },
   creak(v) { if (!ac) return; const t = ac.currentTime, o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
     o.type = 'sawtooth'; o.frequency.setValueAtTime(rnd(90, 140), t); o.frequency.linearRampToValueAtTime(rnd(50, 80), t + 0.6);
     f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 12; env(g, t, 0.05, v, 0.6);
@@ -288,6 +305,7 @@ const sfx = {
 /* ---------- game state ---------- */
 let state = 'title', floorIdx = 0, fuses = [], notes = [], closets = [], decals = [], exit = null;
 let player, monster, fusesGot = 0, powerOn = false, runTime = 0, huntTimer = 0, creakTimer = 5;
+let phoneCool = 0, popT = 0;
 let shake = 0, deadT = 0, flicker = 1, flickTarget = 1, flickT = 0, hbTimer = 0, stepTimer = 0;
 let musicTimer = 0, musicI = 0, hideTarget = null, hideCool = 0, breathShown = false, deathReason = '';
 let titleEyes = null, titleT = 0;
@@ -336,7 +354,7 @@ function startFloor(i) {
   monster = { ...center(m0), ang: 0, state: 'wander', path: [], repath: 0, last: null, seenT: 99,
     searchT: 0, huntT: 0, target: null, knowsCloset: false, active: false, spawnT: 4, anim: 0 };
 
-  fusesGot = 0; powerOn = false; huntTimer = rnd(45, 65) - i * 8; hideTarget = null; breathShown = false;
+  fusesGot = 0; powerOn = false; huntTimer = rnd(45, 65) - i * 8; hideTarget = null; breathShown = false; phoneCool = 0; popT = 0; $('pop').classList.remove('on');
   shake = 0; deadT = 0;
   $('hFloor').textContent = 'Floor ' + (i + 1);
   updateFuseHud();
@@ -345,7 +363,7 @@ function startFloor(i) {
   showMsg(i === 0 ? 'Find ' + F.fuses + ' fuses to unlock the front door.' : F.name + '. Find ' + F.fuses + ' fuses.', 3.5);
 }
 function updateFuseHud() { $('hFuse').textContent = (powerOn ? '🔓 ' : '⚡ ') + fusesGot + '/' + fuses.length; }
-function setHud(on) { ['hud', 'stam', 'run'].forEach(id => show(id, on)); if (!on) show('hide', false); }
+function setHud(on) { ['hud', 'stam', 'run', 'phone'].forEach(id => show(id, on)); if (!on) show('hide', false); }
 
 let msgTimer = 0;
 function showMsg(t, dur) { const m = $('msg'); m.textContent = t; m.style.opacity = 1; msgTimer = dur || 2.5; }
@@ -372,6 +390,23 @@ const setSprint = v => { input.sprint = v; runBtn.classList.toggle('on', v); };
 runBtn.addEventListener('pointerdown', e => { e.preventDefault(); setSprint(true); });
 ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => runBtn.addEventListener(ev, () => setSprint(false)));
 $('hide').addEventListener('pointerdown', e => { e.preventDefault(); toggleHide(); });
+$('phone').addEventListener('pointerdown', e => { e.preventDefault(); usePhone(); });
+
+// the phone: one text a minute. If she's chasing you, she drops everything and leaves for 15 seconds.
+function usePhone() {
+  if (state !== 'play' || phoneCool > 0) return;
+  phoneCool = 60; sfx.buzz();
+  const m = monster, chasing = m.active && (m.state === 'chase' || m.state === 'hunt');
+  $('popRes').textContent = '';
+  $('pop').classList.add('on'); popT = 3.5;
+  setTimeout(() => { if (state !== 'play') return;
+    if (chasing && monster === m && m.active) {
+      m.active = false; m.spawnT = 15; m.relocate = true; m.state = 'wander'; m.path = []; m.huntT = 0; m.knowsCloset = false;
+      $('popRes').textContent = 'Seen ✓✓ ... she stopped and walked away.';
+      showMsg('The music box goes quiet. She left. You have 15 seconds.', 3); sfx.sting();
+    } else $('popRes').textContent = 'Delivered';
+  }, 900);
+}
 
 addEventListener('keydown', e => { keys[e.code] = true;
   if (e.code === 'KeyE' || e.code === 'Space') toggleHide();
@@ -414,12 +449,14 @@ function pause() { if (state !== 'play') return; state = 'paused'; show('paused'
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 
 function die(reason) {
+  $('pop').classList.remove('on');
   state = 'dead'; deadT = 0; deathReason = reason; setHud(false); setSprint(false);
   joy.id = null; joy.x = joy.y = 0;
   sfx.scream(1); sfx.sting();
   if (navigator.vibrate) navigator.vibrate([300, 80, 500]);
 }
 function nextFloor() {
+  $('pop').classList.remove('on');
   if (floorIdx >= FLOORS.length - 1) {
     state = 'win'; setHud(false);
     $('wTime').textContent = 'Time: ' + fmtTime(runTime);
@@ -438,6 +475,9 @@ function update(dt) {
   if (msgTimer > 0) { msgTimer -= dt; if (msgTimer <= 0) $('msg').style.opacity = 0; }
   shake = Math.max(0, shake - dt * 12);
   hideCool -= dt;
+  if (popT > 0) { popT -= dt; if (popT <= 0) $('pop').classList.remove('on'); }
+  if (phoneCool > 0) { phoneCool = Math.max(0, phoneCool - dt); const b = $('phone');
+    b.disabled = phoneCool > 0; b.textContent = phoneCool > 0 ? Math.ceil(phoneCool) + 's' : 'PHONE'; }
   updatePlayer(dt);
   if (state !== 'play') return;
   updateMonster(dt);
@@ -511,7 +551,12 @@ function randomCellNear(pt, r) {
 function updateMonster(dt) {
   const m = monster, p = player;
   if (!m.active) { m.spawnT -= dt;
-    if (m.spawnT <= 0) { m.active = true; showMsg('Somewhere in the house, a music box starts playing.', 3); }
+    if (m.spawnT <= 0) {
+      if (m.relocate) { m.relocate = false;
+        const far = CELLS.map(center).filter(c => Math.hypot(c.x - p.x, c.y - p.y) > T * 8);
+        const c = far.length ? far[Math.random() * far.length | 0] : center(CELLS[Math.random() * CELLS.length | 0]);
+        m.x = c.x; m.y = c.y; m.target = null; }
+      m.active = true; showMsg('Somewhere in the house, a music box starts playing.', 3); }
     return; }
   const dx = p.x - m.x, dy = p.y - m.y, d = Math.hypot(dx, dy);
   const sees = !p.hidden && d < 360 && los(m.x, m.y, p.x, p.y);
