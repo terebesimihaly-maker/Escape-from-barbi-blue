@@ -40,6 +40,9 @@
   .big{margin-top:18px;padding:14px 38px;border:1px solid rgba(134,168,255,.6);background:rgba(10,14,35,.6);color:#cfd8ff;
     font-size:17px;letter-spacing:5px;text-transform:uppercase;border-radius:3px}
   .small{margin-top:10px;background:none;border:none;color:#7d7890;font-size:14px;letter-spacing:3px;text-transform:uppercase;padding:10px}
+  .song{display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:center;align-items:center;margin-top:14px;font-size:13px;color:#8fa3d9;letter-spacing:1px}
+  .song label,.song button{background:none;border:1px solid rgba(134,168,255,.35);color:#b8c6ee;border-radius:3px;padding:8px 12px;font:inherit;cursor:pointer}
+  .song span{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tip{font-size:12px!important;color:#6e6a80!important;letter-spacing:1px;margin-top:22px}
   #dead{background:rgba(0,0,0,.72)}
   #dead h2{color:#ff4b4b;font-size:30px;text-shadow:0 0 16px #a00}
@@ -79,6 +82,9 @@
   <button class="big" id="play">Enter the house</button>
   <p class="tip">Left side: drag to move &middot; RUN: sprint (she hears it) &middot; HIDE in wardrobes &middot; PHONE: every 45s, send her a text<br>
     Headphones on. Silent mode off.<br><span id="best"></span></p>
+  <div class="song"><label for="songFile">Monster song&hellip;</label><span id="songName">Music box</span>
+    <button id="songClear" class="hidden">Use music box</button>
+    <input type="file" id="songFile" accept="audio/*,video/mp4,.mp3,.m4a,.mp4,.wav" hidden></div>
 </div>
 
 <div id="trans" class="screen hidden" style="background:#000">
@@ -313,6 +319,38 @@ const sfx = {
     o.connect(f); f.connect(g); out(g); o.start(t); o.stop(t + 0.8); },
 };
 
+/* ---------- monster song ---------- */
+// Optional: the player can pick an audio/video file from their own device to be her sound instead of the
+// music box. It is kept only in this browser's storage (IndexedDB) and never leaves the device.
+let songEl = null, songSrc = null, songBus = null, songOn = false, songBlob = null, songFileName = '';
+function ensureSongGraph() {
+  if (!songEl || songSrc || !ac) return;
+  songSrc = ac.createMediaElementSource(songEl); songBus = ac.createGain(); songBus.gain.value = 0;
+  songSrc.connect(songBus); songBus.connect(master);
+}
+function setSongLevel(v, fast) { if (songBus) songBus.gain.setTargetAtTime(v, ac.currentTime, fast ? 0.05 : 0.3); }
+function startSong() { if (!songOn || !songEl) return; ensureSongGraph(); setSongLevel(0, true); songEl.play().catch(() => {}); }
+function stopSong() { if (!songEl) return; setSongLevel(0, true); songEl.pause(); }
+function idb() { return new Promise((res, rej) => { const r = indexedDB.open('bb_song', 1);
+  r.onupgradeneeded = () => r.result.createObjectStore('s'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+async function saveSong() { try { const db = await idb(); db.transaction('s', 'readwrite').objectStore('s').put({ blob: songBlob, name: songFileName }, 'song'); } catch (e) {} }
+async function clearSavedSong() { try { const db = await idb(); db.transaction('s', 'readwrite').objectStore('s').delete('song'); } catch (e) {} }
+async function loadSavedSong() { try { const db = await idb();
+  const v = await new Promise((res, rej) => { const r = db.transaction('s').objectStore('s').get('song'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  if (v && v.blob && !songOn) applySong(v.blob, v.name); } catch (e) {} }
+function applySong(blob, name) {
+  if (!songEl) { songEl = new Audio(); songEl.loop = true; songEl.preload = 'auto'; songEl.setAttribute('playsinline', ''); }
+  if (songEl.src) URL.revokeObjectURL(songEl.src);
+  songBlob = blob; songFileName = name; songEl.src = URL.createObjectURL(blob); songOn = true;
+  $('songName').textContent = name; show('songClear', true);
+}
+$('songFile').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  applySong(f, f.name); saveSong(); e.target.value = '';
+});
+$('songClear').onclick = () => { stopSong(); clearSavedSong(); songOn = false; $('songName').textContent = 'Music box'; show('songClear', false); };
+loadSavedSong();
+
 /* ---------- game state ---------- */
 let state = 'title', floorIdx = 0, fuses = [], notes = [], closets = [], decals = [], exit = null;
 let player, monster, fusesGot = 0, powerOn = false, runTime = 0, huntTimer = 0, creakTimer = 5;
@@ -370,7 +408,7 @@ function startFloor(i) {
   $('hFloor').textContent = 'Floor ' + (i + 1);
   updateFuseHud();
   setHud(true);
-  state = 'play';
+  state = 'play'; startSong();
   showMsg(i === 0 ? 'Find ' + F.fuses + ' fuses to unlock the front door.' : F.name + '. Find ' + F.fuses + ' fuses.', 3.5);
 }
 function updateFuseHud() { $('hFuse').textContent = (powerOn ? '🔓 ' : '⚡ ') + fusesGot + '/' + fuses.length; }
@@ -446,7 +484,7 @@ function toggleHide() {
 function exitHide() { closetScene = null; const p = player; p.hidden = false; p.closet = null; hideCool = 0.3; sfx.creak(0.1); $('hide').textContent = 'HIDE'; breathShown = false; }
 
 /* ---------- screens ---------- */
-function toTitle() { state = 'title'; setHud(false); ['dead', 'win', 'trans', 'paused', 'note'].forEach(s => show(s, false)); show('title', true); loadBest(); }
+function toTitle() { stopSong(); state = 'title'; setHud(false); ['dead', 'win', 'trans', 'paused', 'note'].forEach(s => show(s, false)); show('title', true); loadBest(); }
 function loadBest() { try { const b = localStorage.getItem('bb_best'); $('best').textContent = b ? 'Best escape: ' + fmtTime(+b) : ''; } catch (e) {} }
 const fmtTime = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
 $('play').onclick = () => { initAudio(); primeVoice(); show('title', false); runTime = 0; startFloor(0); };
@@ -455,12 +493,13 @@ $('menu1').onclick = toTitle; $('menu2').onclick = () => { if (ac) ac.resume(); 
 $('tGo').onclick = () => { initAudio(); show('trans', false); startFloor(floorIdx + 1); };
 $('again').onclick = () => { show('win', false); toTitle(); };
 $('pause').onclick = pause;
-$('resume').onclick = () => { show('paused', false); if (ac) ac.resume(); state = 'play'; };
+$('resume').onclick = () => { show('paused', false); if (ac) ac.resume(); state = 'play'; if (songOn && songEl) songEl.play().catch(() => {}); };
 $('note').onclick = () => { show('note', false); state = 'play'; };
-function pause() { if (state !== 'play') return; state = 'paused'; show('paused', true); setSprint(false); if (ac) ac.suspend(); }
+function pause() { if (state !== 'play') return; state = 'paused'; show('paused', true); setSprint(false); if (songEl) songEl.pause(); if (ac) ac.suspend(); }
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 
 function die(reason) {
+  stopSong();
   closetScene = null;
   $('pop').classList.remove('on');
   state = 'dead'; deadT = 0; deathReason = reason; setHud(false); setSprint(false);
@@ -469,6 +508,7 @@ function die(reason) {
   if (navigator.vibrate) navigator.vibrate([300, 80, 500]);
 }
 function nextFloor() {
+  stopSong();
   $('pop').classList.remove('on');
   if (floorIdx >= FLOORS.length - 1) {
     state = 'win'; setHud(false);
@@ -651,8 +691,13 @@ function updateMonster(dt) {
 }
 
 function updateAudio(dt) {
-  const m = monster, p = player; if (!m.active) return;
+  const m = monster, p = player;
+  if (!m.active) { if (songOn) setSongLevel(0); return; }
   const dx = m.x - p.x, d = Math.hypot(dx, m.y - p.y);
+  if (songOn) { // her song instead of the music box: quiet far away, loud up close, full volume in a chase
+    const near = d < 650 ? Math.pow(1 - d / 650, 1.5) : 0;
+    setSongLevel(m.state === 'chase' && !closetScene ? 1 : 0.9 * near);
+  }
   // The music box is her sound: it gets louder as she gets closer, and while she chases you
   // it always plays at full volume (faster and out of tune), however far away she is.
   const chasing = m.state === 'chase' && !closetScene;
@@ -660,7 +705,7 @@ function updateAudio(dt) {
     if (musicTimer <= 0) {
       musicTimer = chasing ? 0.24 : 0.42;
       const f = MELODY[musicI++ % MELODY.length], near = d < 520 ? Math.pow(1 - d / 520, 2) : 0;
-      if (f) sfx.note(f * (chasing ? 0.94 : 1) * (1 + rnd(-0.012, 0.012)), chasing ? Math.max(0.3, near * 0.4) : near * 0.25, chasing ? dx / 600 : dx / 300); } }
+      if (f && !songOn) sfx.note(f * (chasing ? 0.94 : 1) * (1 + rnd(-0.012, 0.012)), chasing ? Math.max(0.3, near * 0.4) : near * 0.25, chasing ? dx / 600 : dx / 300); } }
   const c = clamp(1 - d / 420, 0, 1);
   hbTimer -= dt;
   if (hbTimer <= 0 && c > 0.05) { sfx.thump(0.15 + 0.55 * c); hbTimer = 1.1 - 0.75 * c; if (c > 0.55 && navigator.vibrate) navigator.vibrate(40); }
