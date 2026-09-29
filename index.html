@@ -83,6 +83,7 @@
   <p class="tip">Left side: drag to move &middot; RUN: sprint (she hears it) &middot; HIDE in wardrobes &middot; PHONE: every 45s, send her a text<br>
     Headphones on. Silent mode off.<br><span id="best"></span></p>
   <div class="song"><label for="songFile">Monster song&hellip;</label><span id="songName">Music box</span>
+    <button id="songTest" class="hidden">&#9654; Test</button>
     <button id="songClear" class="hidden">Use music box</button>
     <input type="file" id="songFile" accept="audio/*,video/mp4,.mp3,.m4a,.mp4,.wav" hidden></div>
 </div>
@@ -321,34 +322,52 @@ const sfx = {
 
 /* ---------- monster song ---------- */
 // Optional: the player can pick an audio/video file from their own device to be her sound instead of the
-// music box. It is kept only in this browser's storage (IndexedDB) and never leaves the device.
-let songEl = null, songSrc = null, songBus = null, songOn = false, songBlob = null, songFileName = '';
-function ensureSongGraph() {
-  if (!songEl || songSrc || !ac) return;
-  songSrc = ac.createMediaElementSource(songEl); songBus = ac.createGain(); songBus.gain.value = 0;
-  songSrc.connect(songBus); songBus.connect(master);
-}
+// music box. The file is decoded in memory, kept only in this browser's storage (IndexedDB), and never
+// leaves the device.
+let songBuf = null, songNode = null, songBus = null, songOn = false, songBlob = null, songFileName = '', songTesting = false;
+function songGraph() { if (!songBus && ac) { songBus = ac.createGain(); songBus.gain.value = 0; songBus.connect(master); } }
 function setSongLevel(v, fast) { if (songBus) songBus.gain.setTargetAtTime(v, ac.currentTime, fast ? 0.05 : 0.3); }
-function startSong() { if (!songOn || !songEl) return; ensureSongGraph(); setSongLevel(0, true); songEl.play().catch(() => {}); }
-function stopSong() { if (!songEl) return; setSongLevel(0, true); songEl.pause(); }
+function playSongNode() {
+  stopSongNode(); songGraph();
+  songNode = ac.createBufferSource(); songNode.buffer = songBuf; songNode.loop = true; songNode.connect(songBus); songNode.start();
+}
+function stopSongNode() { if (songNode) { try { songNode.stop(); } catch (e) {} songNode.disconnect(); songNode = null; } }
+function startSong() { stopTest(); if (!songOn || !songBuf || !ac) return; playSongNode(); setSongLevel(0, true); }
+function stopSong() { stopTest(); if (songBus) setSongLevel(0, true); stopSongNode(); }
+function stopTest() { if (!songTesting) return; songTesting = false; $('songTest').innerHTML = '&#9654; Test'; stopSongNode(); }
+$('songTest').onclick = () => {
+  initAudio(); if (!ac || !songBuf) return;
+  if (songTesting) { stopTest(); return; }
+  songTesting = true; $('songTest').innerHTML = '&#9632; Stop'; playSongNode(); setSongLevel(0.9, true);
+};
+function decode(buf) { return new Promise((res, rej) => { const pr = ac.decodeAudioData(buf, res, rej); if (pr && pr.catch) pr.catch(rej); }); }
+async function applySong(blob, name) {
+  initAudio(); if (!ac) { $('songName').textContent = "This browser can't play audio"; return; }
+  stopSong(); songOn = false; songBuf = null; show('songTest', false);
+  $('songName').textContent = 'Loading ' + name + '…'; show('songClear', true);
+  try {
+    songBuf = await decode(await new Response(blob).arrayBuffer());
+    songBlob = blob; songFileName = name; songOn = true;
+    const d = Math.round(songBuf.duration);
+    $('songName').textContent = '✓ ' + name + ' (' + Math.floor(d / 60) + ':' + String(d % 60).padStart(2, '0') + ')';
+    show('songTest', true); return true;
+  } catch (e) {
+    $('songName').textContent = "✗ Can't play this file. Try an MP3.";
+    return false;
+  }
+}
 function idb() { return new Promise((res, rej) => { const r = indexedDB.open('bb_song', 1);
   r.onupgradeneeded = () => r.result.createObjectStore('s'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 async function saveSong() { try { const db = await idb(); db.transaction('s', 'readwrite').objectStore('s').put({ blob: songBlob, name: songFileName }, 'song'); } catch (e) {} }
 async function clearSavedSong() { try { const db = await idb(); db.transaction('s', 'readwrite').objectStore('s').delete('song'); } catch (e) {} }
 async function loadSavedSong() { try { const db = await idb();
   const v = await new Promise((res, rej) => { const r = db.transaction('s').objectStore('s').get('song'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
-  if (v && v.blob && !songOn) applySong(v.blob, v.name); } catch (e) {} }
-function applySong(blob, name) {
-  if (!songEl) { songEl = new Audio(); songEl.loop = true; songEl.preload = 'auto'; songEl.setAttribute('playsinline', ''); }
-  if (songEl.src) URL.revokeObjectURL(songEl.src);
-  songBlob = blob; songFileName = name; songEl.src = URL.createObjectURL(blob); songOn = true;
-  $('songName').textContent = name; show('songClear', true);
-}
-$('songFile').addEventListener('change', e => {
-  const f = e.target.files && e.target.files[0]; if (!f) return;
-  applySong(f, f.name); saveSong(); e.target.value = '';
+  if (v && v.blob && !songOn) await applySong(v.blob, v.name); } catch (e) {} }
+$('songFile').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
+  if (await applySong(f, f.name)) saveSong();
 });
-$('songClear').onclick = () => { stopSong(); clearSavedSong(); songOn = false; $('songName').textContent = 'Music box'; show('songClear', false); };
+$('songClear').onclick = () => { stopSong(); clearSavedSong(); songOn = false; songBuf = null; $('songName').textContent = 'Music box'; show('songClear', false); show('songTest', false); };
 loadSavedSong();
 
 /* ---------- game state ---------- */
@@ -493,9 +512,9 @@ $('menu1').onclick = toTitle; $('menu2').onclick = () => { if (ac) ac.resume(); 
 $('tGo').onclick = () => { initAudio(); show('trans', false); startFloor(floorIdx + 1); };
 $('again').onclick = () => { show('win', false); toTitle(); };
 $('pause').onclick = pause;
-$('resume').onclick = () => { show('paused', false); if (ac) ac.resume(); state = 'play'; if (songOn && songEl) songEl.play().catch(() => {}); };
+$('resume').onclick = () => { show('paused', false); if (ac) ac.resume(); state = 'play'; };
 $('note').onclick = () => { show('note', false); state = 'play'; };
-function pause() { if (state !== 'play') return; state = 'paused'; show('paused', true); setSprint(false); if (songEl) songEl.pause(); if (ac) ac.suspend(); }
+function pause() { if (state !== 'play') return; state = 'paused'; show('paused', true); setSprint(false); if (ac) ac.suspend(); }
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 
 function die(reason) {
