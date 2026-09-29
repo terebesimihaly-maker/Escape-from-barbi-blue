@@ -32,7 +32,51 @@
   .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
     padding:24px 16px;box-sizing:border-box;z-index:10}
   .screen p{max-width:360px;line-height:1.5;color:#a9a3b8;font-size:15px}
-  #title{background:radial-gradient(ellipse at 50% 40%,rgba(30,40,90,.35),rgba(0,0,0,.2) 60%,transparent)}
+  /* main menu: on a phone the title is at the top, she stands in the middle, the buttons are at the bottom;
+     on a wide screen the menu is a column on the left and she stands on the right */
+  #title{justify-content:space-between;padding:calc(34px + env(safe-area-inset-top)) 16px calc(26px + env(safe-area-inset-bottom));
+    background:linear-gradient(rgba(0,0,0,.7),transparent 28%,transparent 55%,rgba(0,0,0,.8))}
+  .menu-top,.menu-bottom{width:100%;max-width:380px;display:flex;flex-direction:column;align-items:center}
+  .tag{font-style:italic;margin:8px 0 0}
+  nav{display:flex;flex-direction:column;align-items:stretch;width:100%;gap:2px}
+  nav .big{margin:0 0 10px;position:relative;overflow:hidden}
+  nav .big:not(:disabled):hover,nav .big:not(:disabled):focus-visible{background:rgba(40,60,140,.55);border-color:#9fb8ff;color:#fff;box-shadow:0 0 24px rgba(80,120,255,.45)}
+  .mi{display:block;background:none;border:none;border-left:2px solid transparent;color:#aab6de;font:15px Georgia,serif;letter-spacing:4px;
+    text-transform:uppercase;padding:11px 14px;text-decoration:none;text-align:center;transition:color .2s,border-color .2s,background .2s}
+  .mi:hover,.mi:focus-visible{color:#fff;border-left-color:#86a8ff;background:linear-gradient(90deg,rgba(80,110,220,.22),transparent);outline:none}
+  #best{margin:12px 0 0;font-size:13px;letter-spacing:2px;color:#8fa3d9}
+  #best:empty,#loadMsg:empty{display:none}
+  #loadMsg{margin:10px 0 0;font-size:12px;color:#c98a8a}
+  @media (min-aspect-ratio: 1/1) and (min-width: 700px) {
+    #title{justify-content:center;align-items:flex-start;text-align:left;padding-left:max(7vw,32px);gap:34px;
+      background:linear-gradient(90deg,rgba(0,0,0,.82),rgba(0,0,0,.5) 38%,transparent 62%)}
+    .menu-top,.menu-bottom{align-items:flex-start;max-width:420px}
+    .mi{text-align:left}
+    nav{max-width:320px}
+  }
+  /* how to play / settings */
+  #panel{background:rgba(0,0,0,.72);z-index:12}
+  .card{box-sizing:border-box;width:100%;max-width:460px;max-height:100%;overflow:auto;text-align:left;padding:24px 22px;
+    background:rgba(10,12,28,.92);border:1px solid rgba(134,168,255,.3);border-radius:6px;box-shadow:0 10px 50px #000}
+  .card h2{text-align:center;margin-bottom:14px}
+  .card p{max-width:none;font-size:14px}
+  .card .big{display:block;margin:18px auto 0}
+  .keys{list-style:none;padding:0;margin:14px 0;display:grid;gap:9px;font-size:14px;color:#c4c8dc}
+  .keys li{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+  .keys span{margin-left:6px}
+  kbd{display:inline-block;min-width:16px;padding:3px 8px;border:1px solid rgba(200,210,255,.45);border-bottom-width:3px;border-radius:5px;
+    background:rgba(20,24,50,.8);color:#dfe6ff;font:600 12px/1.3 system-ui,sans-serif;text-align:center}
+  .hint{color:#8f8aa3!important;font-size:13px!important}
+  .pc .touch-only,body:not(.pc) .pc-only{display:none}
+  .row{display:flex;align-items:center;gap:12px;margin:14px 0;font-size:14px;color:#c4c8dc}
+  .row > span{flex:0 0 120px}
+  .row.col{flex-direction:column;align-items:stretch}
+  .row.col > span{flex:none}
+  .row input[type=range]{flex:1;accent-color:#86a8ff;min-width:0}
+  .row output{width:44px;text-align:right;color:#8fa3d9;font-size:13px}
+  .seg{display:flex;flex:1;gap:6px}
+  .seg button{flex:1;background:none;border:1px solid rgba(134,168,255,.35);color:#b8c6ee;border-radius:3px;padding:8px 6px;font:13px system-ui,sans-serif}
+  .seg button.on{background:rgba(90,120,255,.4);color:#fff;border-color:#9fb8ff}
   h1{font-size:clamp(34px,11vw,64px);margin:0 0 6px;font-weight:400;letter-spacing:4px;line-height:1.05;color:#86a8ff;
     text-shadow:0 0 18px rgba(80,120,255,.8),0 0 2px #fff;animation:flick 5s infinite}
   h1 small{display:block;font-size:.38em;letter-spacing:10px;color:#b9a9c9;text-shadow:none}
@@ -42,7 +86,7 @@
     font-size:17px;letter-spacing:5px;text-transform:uppercase;border-radius:3px}
   .big:disabled{opacity:.55;cursor:default}
   .small{margin-top:10px;background:none;border:none;color:#7d7890;font-size:14px;letter-spacing:3px;text-transform:uppercase;padding:10px}
-  .song{display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:center;align-items:center;margin-top:14px;font-size:13px;color:#8fa3d9;letter-spacing:1px}
+  .song{display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:flex-start;align-items:center;margin-top:6px;font-size:13px;color:#8fa3d9;letter-spacing:1px}
   .song label,.song button{background:none;border:1px solid rgba(134,168,255,.35);color:#b8c6ee;border-radius:3px;padding:8px 12px;font:inherit;cursor:pointer}
   .song span{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tip{font-size:12px!important;color:#6e6a80!important;letter-spacing:1px;margin-top:22px}
@@ -83,18 +127,58 @@
 <div id="msg"></div>
 
 <div id="title" class="screen">
-  <h1><small>ESCAPE FROM</small>BARBI BLUE</h1>
-  <p>She was a porcelain doll once. Blue glass eyes. Someone left her out in the rain&hellip; and she grew.</p>
-  <p>Find the fuses. Unlock the door. Don't let her catch you.</p>
-  <button class="big" id="play">Enter the house</button>
-  <p id="loadMsg" class="tip" style="color:#c98a8a!important"></p>
-  <p class="tip">Left side: drag to walk &middot; Right side: drag to look around &middot; RUN: sprint (she hears it) &middot; HIDE in wardrobes &middot; PHONE: every 45s, send her a text<br>
-    Computer: WASD to move, mouse to look (Esc frees the cursor), Shift to run, E to hide, 1 for the phone<br>
-    Headphones on. Silent mode off.<br><span id="best"></span></p>
-  <div class="song"><label for="songFile">Monster song&hellip;</label><span id="songName">Chase song</span>
-    <button id="songTest" class="hidden">&#9654; Test</button>
-    <button id="songClear" class="hidden">Use chase song</button>
-    <input type="file" id="songFile" accept="audio/*,video/mp4,.mp3,.m4a,.mp4,.wav" hidden></div>
+  <div class="menu-top">
+    <h1><small>ESCAPE FROM</small>BARBI BLUE</h1>
+    <p class="tag">She was a porcelain doll once. Blue glass eyes. Someone left her out in the rain&hellip; and she grew.</p>
+  </div>
+  <div class="menu-bottom">
+    <nav>
+      <button class="big" id="play">Enter the house</button>
+      <button class="mi" data-panel="how">How to play</button>
+      <button class="mi" data-panel="settings">Settings</button>
+      <a class="mi" href="animations.html">Her animations</a>
+    </nav>
+    <p id="best"></p>
+    <p id="loadMsg"></p>
+  </div>
+</div>
+
+<div id="panel" class="screen hidden">
+  <div class="card">
+    <section data-panel="how">
+      <h2>How to play</h2>
+      <p>Find every fuse on the floor. When the last one goes in, the lights come back and the front door unlocks, and she hears it. Get to the door.</p>
+      <ul class="keys pc-only">
+        <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>walk</span></li>
+        <li><kbd>Mouse</kbd><span>look around (click to lock the cursor, <kbd>Esc</kbd> frees it and pauses)</span></li>
+        <li><kbd>Shift</kbd><span>run (she hears running)</span></li>
+        <li><kbd>E</kbd><span>hide in a wardrobe, and get out again</span></li>
+        <li><kbd>1</kbd><span>phone: text her (every 45 s)</span></li>
+      </ul>
+      <ul class="keys touch-only">
+        <li><kbd>Left side</kbd><span>drag to walk</span></li>
+        <li><kbd>Right side</kbd><span>drag to look around</span></li>
+        <li><kbd>RUN</kbd><span>hold to sprint (she hears running)</span></li>
+        <li><kbd>HIDE</kbd><span>get into a wardrobe when you're next to one</span></li>
+        <li><kbd>PHONE</kbd><span>text her (every 45 s)</span></li>
+      </ul>
+      <p class="hint">Her song gets louder the closer she is. If you can see her blue eyes, she can see you. If she's chasing you, a text makes her stop and leave for 15 seconds. Don't let her see you climb into a wardrobe.</p>
+      <p class="hint">Headphones on. Silent mode off.</p>
+    </section>
+    <section data-panel="settings">
+      <h2>Settings</h2>
+      <label class="row"><span>Look sensitivity</span><input type="range" id="setSens" min="0.3" max="2.5" step="0.05"><output id="outSens"></output></label>
+      <label class="row"><span>Volume</span><input type="range" id="setVol" min="0" max="1" step="0.05"><output id="outVol"></output></label>
+      <div class="row"><span>Graphics</span><div class="seg"><button data-q="high">High</button><button data-q="low">Low (faster)</button></div></div>
+      <div class="row col"><span>Her song</span>
+        <div class="song"><label for="songFile">Pick a song&hellip;</label><span id="songName">Chase song</span>
+          <button id="songTest" class="hidden">&#9654; Test</button>
+          <button id="songClear" class="hidden">Use chase song</button>
+          <input type="file" id="songFile" accept="audio/*,video/mp4,.mp3,.m4a,.mp4,.wav" hidden></div>
+      </div>
+    </section>
+    <button class="big" id="panelBack">Back</button>
+  </div>
 </div>
 
 <div id="trans" class="screen hidden" style="background:#000">
@@ -145,11 +229,21 @@ function resize() {
   W = innerWidth; H = innerHeight;
   cvs.width = Math.round(W * DPR); cvs.height = Math.round(H * DPR);
   if (!renderer) return;
-  renderer.setPixelRatio(Math.min(DPR, LOWQ ? 1.5 : 2)); renderer.setSize(W, H, false);
+  applyQuality(); renderer.setSize(W, H, false);
   // keep about 80 degrees of view sideways, in portrait and landscape
   const asp = W / H, fov = clamp(2 * Math.atan(Math.tan(40 * Math.PI / 180) / asp) * 180 / Math.PI, 58, 95);
   camera.aspect = asp; camera.fov = fov; camera.updateProjectionMatrix();
-  titleCam.aspect = asp; titleCam.fov = asp < 1 ? 58 : 40; titleCam.updateProjectionMatrix();
+  titleCam.aspect = asp; titleCam.fov = asp < 1 ? 50 : 40;
+  // wide screens: the menu is on the left, so she is moved to the right of the picture
+  if (asp >= 1 && W >= 700) titleCam.setViewOffset(W, H, -W * 0.2, 0, W, H); else titleCam.clearViewOffset();
+  titleCam.updateProjectionMatrix();
+}
+function applyQuality() {
+  if (!renderer) return;
+  const hi = settings.quality !== 'low';
+  renderer.setPixelRatio(hi ? Math.min(DPR, LOWQ ? 1.5 : 2) : 1);
+  renderer.setSize(W, H, false);
+  flash.castShadow = hi;
 }
 
 const grain = document.createElement('canvas'); grain.width = grain.height = 128;
@@ -164,6 +258,32 @@ const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const angDiff = (a, b) => { let d = (a - b) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
 const lerpAngle = (a, b, k) => a - angDiff(a, b) * k;
+/* ---------- settings (kept on this device) ---------- */
+const settings = { sens: 1, vol: 0.9, quality: 'high' };
+try { Object.assign(settings, JSON.parse(localStorage.getItem('bb_settings') || '{}')); } catch (e) {}
+const saveSettings = () => { try { localStorage.setItem('bb_settings', JSON.stringify(settings)); } catch (e) {} };
+function applySettings() {
+  $('setSens').value = settings.sens; $('outSens').textContent = Number(settings.sens).toFixed(2) + '×';
+  $('setVol').value = settings.vol; $('outVol').textContent = Math.round(settings.vol * 100) + '%';
+  document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.q === settings.quality));
+  if (typeof master !== 'undefined' && master) master.gain.value = settings.vol;
+  if (typeof applyQuality === 'function') applyQuality();
+}
+$('setSens').oninput = e => { settings.sens = +e.target.value; applySettings(); saveSettings(); };
+$('setVol').oninput = e => { settings.vol = +e.target.value; applySettings(); saveSettings(); };
+document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { settings.quality = b.dataset.q; applySettings(); saveSettings(); });
+// the menu's "How to play" and "Settings" panels
+function openPanel(name) {
+  document.querySelectorAll('#panel section').forEach(sec => sec.classList.toggle('hidden', sec.dataset.panel !== name));
+  show('panel', true); $('panelBack').focus();
+}
+const closePanel = () => { show('panel', false); stopTest(); };
+document.querySelectorAll('nav [data-panel]').forEach(b => b.onclick = () => openPanel(b.dataset.panel));
+$('panelBack').onclick = closePanel;
+$('panel').addEventListener('click', e => { if (e.target.id === 'panel') closePanel(); });
+let titleHover = false;   // hovering "Enter the house": she notices
+['pointerenter', 'focus'].forEach(ev => $('play').addEventListener(ev, () => { titleHover = true; }));
+['pointerleave', 'blur'].forEach(ev => $('play').addEventListener(ev, () => { titleHover = false; }));
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
 /* ---------- content ---------- */
@@ -290,7 +410,7 @@ function initAudio() {
   if (ac) { if (ac.state !== 'running') ac.resume(); return; }
   const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
   ac = new AC();
-  master = ac.createGain(); master.gain.value = 0.9;
+  master = ac.createGain(); master.gain.value = settings.vol;
   const limiter = ac.createDynamicsCompressor(); limiter.threshold.value = -3; limiter.knee.value = 0; limiter.ratio.value = 20;
   limiter.attack.value = 0.001; limiter.release.value = 0.1; master.connect(limiter); limiter.connect(ac.destination);
   noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
@@ -506,7 +626,7 @@ function lookBy(dx, dy) {
   if (p.hidden) { p.hideYaw = clamp(p.hideYaw + dx, -0.7, 0.7); p.hidePitch = clamp(p.hidePitch - dy, -0.4, 0.4); }
   else { p.ang += dx; p.pitch = clamp(p.pitch - dy, -1.1, 1.1); }
 }
-document.addEventListener('mousemove', e => { if (locked()) lookBy(e.movementX * MOUSE_SENS, e.movementY * MOUSE_SENS); });
+document.addEventListener('mousemove', e => { if (locked()) lookBy(e.movementX * MOUSE_SENS * settings.sens, e.movementY * MOUSE_SENS * settings.sens); });
 // left side of the screen: a joystick to walk; right side (or a mouse drag, if the cursor isn't locked): look around
 cvs.addEventListener('pointerdown', e => {
   if (state !== 'play') return;
@@ -518,7 +638,7 @@ cvs.addEventListener('pointerdown', e => {
 addEventListener('pointermove', e => {
   if (e.pointerId === look.id) {
     const dx = e.clientX - look.x, dy = e.clientY - look.y; look.x = e.clientX; look.y = e.clientY;
-    lookBy(dx * LOOK_SENS, dy * LOOK_SENS);
+    lookBy(dx * LOOK_SENS * settings.sens, dy * LOOK_SENS * settings.sens);
     return;
   }
   if (e.pointerId !== joy.id) return;
@@ -553,6 +673,10 @@ function usePhone() {
 }
 
 addEventListener('keydown', e => { keys[e.code] = true;
+  if (state === 'title') {
+    if (e.code === 'Escape' && !$('panel').classList.contains('hidden')) closePanel();
+    else if (e.code === 'Enter' && $('panel').classList.contains('hidden') && !$('play').disabled && document.activeElement.tagName !== 'BUTTON' && document.activeElement.tagName !== 'A') $('play').click();
+  }
   if (e.code === 'KeyE' && !e.repeat) toggleHide();
   if ((e.code === 'Digit1' || e.code === 'Numpad1') && !e.repeat) usePhone();
   if ((e.code === 'Escape' || e.code === 'KeyP') && state === 'play') pause(); });
@@ -830,7 +954,7 @@ const S = 0.045, TILE_M = T * S, WALL_H = 3.0, EYE = 1.62, M_SCALE = 1.38;
 const LOWQ = matchMedia('(pointer: coarse)').matches;
 const FLASH_I = 30;
 let renderer = null, scene, camera, flash, aura, exitLight, dustPts, glowTex, level = null;
-let titleScene, titleCam, titleLight, barbi = null, deathCam = null;
+let titleScene, titleCam, titleLight, titleBulb, titleBulbLight, barbi = null, deathCam = null;
 let dust = [], prints = [], stepPhase = 0;
 const mkCanvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
 function toTex(c, rep) {
@@ -878,10 +1002,28 @@ function init3D() {
   titleScene.add(new THREE.HemisphereLight(0x33406a, 0x080406, 0.6));
   titleLight = new THREE.SpotLight(0x86a8ff, 40, 12, 0.45, 0.7, 1.2); titleLight.position.set(0.6, 3.6, 1.2);
   titleLight.target.position.set(0, 0.8, -0.3); titleScene.add(titleLight, titleLight.target);
-  const tf = new THREE.Mesh(new THREE.PlaneGeometry(6, 30), new THREE.MeshLambertMaterial({ color: 0x2a211d }));
+  // a hallway of the nursery: wallpaper, floorboards, a ceiling and a failing bulb above her
+  const F = FLOORS[0], len = 30;
+  const fc = mkCanvas(320, 320), fg = fc.getContext('2d'); fg.setTransform(4, 0, 0, 4, 0, 0);
+  for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) paintFloor(fg, F, x, y);
+  const ft = toTex(fc, true); ft.repeat.set(2.2 / (TILE_M * 2), len / (TILE_M * 2));
+  const tf = new THREE.Mesh(new THREE.PlaneGeometry(2.2, len), new THREE.MeshLambertMaterial({ map: ft, color: new THREE.Color().setScalar(1.8) }));
   tf.rotation.x = -Math.PI / 2; titleScene.add(tf);
-  for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(30, WALL_H), new THREE.MeshLambertMaterial({ color: 0x2a1c26 }));
+  const wt = wallTexture(F); wt.repeat.set(len / TILE_M, 1);
+  for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(len, WALL_H), new THREE.MeshLambertMaterial({ map: wt }));
     w.position.set(s * 1.1, WALL_H / 2, 0); w.rotation.y = -s * Math.PI / 2; titleScene.add(w); }
+  const ct = ceilingTexture(F); ct.repeat.set(2, len / TILE_M);
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(2.2, len), new THREE.MeshLambertMaterial({ map: ct }));
+  ceil.rotation.x = Math.PI / 2; ceil.position.y = WALL_H; titleScene.add(ceil);
+  const end = new THREE.Mesh(new THREE.PlaneGeometry(2.2, WALL_H), new THREE.MeshLambertMaterial({ map: wallTexture(F) }));
+  end.position.set(0, WALL_H / 2, -6); titleScene.add(end);
+  const pm = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.56), new THREE.MeshLambertMaterial({ map: portraitTexture(true), emissiveMap: portraitEyes(), emissive: 0xffffff, emissiveIntensity: 2.5 }));
+  pm.position.set(-1.085, 1.75, 1.2); pm.rotation.y = Math.PI / 2; titleScene.add(pm);
+  titleBulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8), new THREE.MeshBasicMaterial({ color: 0xfff0d0 }));
+  titleBulb.position.set(0, WALL_H - 0.35, -1.6); titleScene.add(titleBulb);
+  const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.3, 4), new THREE.MeshBasicMaterial({ color: 0x111111 }));
+  cord.position.set(0, WALL_H - 0.15, -1.6); titleScene.add(cord);
+  titleBulbLight = new THREE.PointLight(0xffd9a0, 6, 7, 1.4); titleBulbLight.position.copy(titleBulb.position).y -= 0.1; titleScene.add(titleBulbLight);
 }
 
 function glowTexture() {
@@ -919,7 +1061,7 @@ function setupBarbi(model, anim) {
     for (const [col, size, peak] of [[0x1a4dff, 0.19, 1], [0x5aa8ff, 0.06, 1]]) {
       const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, blending: THREE.AdditiveBlending,
         transparent: true, depthWrite: false, depthTest: false, fog: false }));
-      s.scale.setScalar(size / k); s.position.set(0, 0.025 / k, 0); s.renderOrder = 10; s.userData.peak = peak;
+      s.scale.setScalar(size / k); s.position.set(0, 0.025 / k, 0); s.renderOrder = 10; s.userData.base = size / k;
       b.add(s); eyes.push(s);
     }
   }
@@ -936,7 +1078,7 @@ function standInDoll() {
   for (const s of [-1, 1]) { const e = new THREE.Object3D(); e.name = s < 0 ? 'eyeL' : 'eyeR'; e.position.set(s * 0.06, 1.92, 0.16); g.add(e); }
   return g;
 }
-function putBarbi(sc) { if (barbi && barbi.obj.parent !== sc) sc.add(barbi.obj); }
+function putBarbi(sc) { if (barbi && barbi.obj.parent !== sc) { sc.add(barbi.obj); for (const e of barbi.eyes) if (e.userData.base) e.scale.setScalar(e.userData.base); } }
 function setEyes(a) { if (barbi) for (const e of barbi.eyes) { e.material.opacity = a; e.visible = a > 0.01; } }
 
 function startScream() {
@@ -1544,12 +1686,18 @@ function renderTitle(dt) {
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cw, ch);
   const three = renderer && barbi;
   if (three) {   // her, standing at the end of a hallway, lit by a failing bulb
-    putBarbi(titleScene); barbi.obj.visible = true; barbi.obj.position.set(0, 0, -2.4); barbi.obj.rotation.y = 0;
+    putBarbi(titleScene); barbi.obj.visible = true; barbi.obj.position.set(0, 0, -2.2); barbi.obj.rotation.y = 0;
     barbi.anim.play('idle', 0.3); barbi.anim.update(dt);
-    titleCam.position.set(Math.sin(titleT * 0.13) * 0.25, 1.5, 6.2); titleCam.lookAt(0, 1.3, -2);
-    if (titleFlick > 0) titleFlick -= dt; else if (Math.random() < dt * 0.5) titleFlick = rnd(0.05, 0.4);
-    titleLight.intensity = titleFlick > 0 ? (Math.random() < 0.5 ? 2 : 10) : 40;
-    setEyes(0.8 + Math.random() * 0.2);
+    const portrait = W < H, cz = portrait ? 4.2 : 5.6;
+    titleCam.position.set(Math.sin(titleT * 0.13) * 0.2, 1.5, cz); titleCam.lookAt(0, portrait ? 1.2 : 1.3, -2);
+    // the bulb over her keeps failing; when you point at "Enter the house" it goes mad and her eyes flare
+    if (titleFlick > 0) titleFlick -= dt; else if (Math.random() < dt * (titleHover ? 6 : 0.5)) titleFlick = rnd(0.05, titleHover ? 0.15 : 0.4);
+    const on = titleFlick > 0 ? (Math.random() < 0.5 ? 0.05 : 0.25) : 1;
+    titleLight.intensity = 40 * on; titleBulbLight.intensity = 6 * on;
+    titleBulb.material.color.setScalar(0.25 + 0.75 * on);
+    titleLight.color.setHex(titleHover ? 0xa8b8ff : 0x86a8ff);
+    setEyes(titleHover ? 1 : 0.75 + Math.random() * 0.2);
+    for (const e of barbi.eyes) e.scale.setScalar(e.userData.base * (titleHover ? 1.6 + Math.random() * 0.3 : 1));
     renderer.render(titleScene, titleCam);
   } else { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cw, ch); }
   for (let i = 0; i < 6; i++) {   // slow drifting fog
@@ -1587,7 +1735,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 init3D();
-addEventListener('resize', resize); resize();
+addEventListener('resize', resize); resize(); applySettings();
 loadBarbi();
 loadBest();
 requestAnimationFrame(frame);
