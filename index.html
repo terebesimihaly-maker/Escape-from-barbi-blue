@@ -90,7 +90,7 @@
         style="width:64px;background:rgba(10,14,35,.6);border:1px solid rgba(134,168,255,.35);color:#cfd8ff;border-radius:3px;padding:8px;font:inherit;text-align:center">
 </span>
     <button id="songTest">&#9654; Hear chase music</button>
-    <input type="file" id="songFile" accept="audio/*" hidden></div>
+    <input type="file" id="songFile" accept="audio/*,.mp3,.m4a,.aac,.wav" hidden></div>
 </div>
 
 <div id="trans" class="screen hidden" style="background:#000">
@@ -425,14 +425,32 @@ function stopChaseMusic() {
   if (songEl) songEl.pause();
 }
 function startSong() { if (songOn && songEl) { ensureSongGraph(); songEl.play().catch(() => {}); } }
-$('songFile').addEventListener('change', e => {
-  const f = e.target.files && e.target.files[0]; if (!f) return;
+// The picked song is kept in this browser's own storage (IndexedDB) so it only has to be picked once.
+// It never leaves the device.
+let songBlob = null, songFileName = '';
+function idb() { return new Promise((res, rej) => { const r = indexedDB.open('bb_song', 1);
+  r.onupgradeneeded = () => r.result.createObjectStore('s'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+async function saveSong() { try { const db = await idb();
+  db.transaction('s', 'readwrite').objectStore('s').put({ blob: songBlob, name: songFileName, start: songStart }, 'song'); } catch (e) {} }
+async function clearSavedSong() { try { const db = await idb(); db.transaction('s', 'readwrite').objectStore('s').delete('song'); } catch (e) {} }
+async function loadSavedSong() { try { const db = await idb();
+  const v = await new Promise((res, rej) => { const r = db.transaction('s').objectStore('s').get('song'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  if (v && v.blob && !songOn) applySong(v.blob, v.name, v.start || 0); } catch (e) {} }
+const fmtStart = t => Math.floor(t / 60) + ':' + (t % 60).toFixed(1).padStart(4, '0');
+function applySong(blob, name, start) {
   if (!songEl) { songEl = new Audio(); songEl.loop = true; songEl.preload = 'auto'; songEl.setAttribute('playsinline', ''); }
   if (songEl.src) URL.revokeObjectURL(songEl.src);
-  songEl.src = URL.createObjectURL(f); songOn = true;
-  $('songName').textContent = f.name; show('songClear', true); show('songOpts', true); e.target.value = '';
+  songBlob = blob; songFileName = name; songEl.src = URL.createObjectURL(blob); songOn = true;
+  songStart = start; $('songStart').value = fmtStart(start);
+  $('songName').textContent = name; show('songClear', true); show('songOpts', true);
+}
+$('songFile').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  applySong(f, f.name, parseTime($('songStart').value)); saveSong(); e.target.value = '';
 });
 $('songStart').addEventListener('input', e => { songStart = parseTime(e.target.value); });
+$('songStart').addEventListener('change', () => { if (songOn) saveSong(); });
+loadSavedSong();
 $('songTest').onclick = () => {
   initAudio(); if (!ac) return;
   if (previewing) { stopChaseMusic(); return; }
@@ -441,7 +459,7 @@ $('songTest').onclick = () => {
   // original theme: the title-screen loop drives updateChaseMusic while previewing
 };
 function stopPreview() { if (!previewing) return; previewing = false; $('songTest').textContent = '\u25B6 Hear chase music'; }
-$('songClear').onclick = () => { stopChaseMusic(); songOn = false; if (songEl) songEl.pause(); $('songName').textContent = 'Original theme'; show('songClear', false); show('songOpts', false); };
+$('songClear').onclick = () => { stopChaseMusic(); clearSavedSong(); songOn = false; if (songEl) songEl.pause(); $('songName').textContent = 'Original theme'; show('songClear', false); show('songOpts', false); };
 
 /* ---------- game state ---------- */
 let state = 'title', floorIdx = 0, fuses = [], notes = [], closets = [], decals = [], exit = null;
