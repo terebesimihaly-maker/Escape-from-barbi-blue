@@ -703,7 +703,9 @@ function toggleHide() {
   else if (m.active && sceneCool <= 0) closetScene = { t: -1.4, spoke: false };
   $('hide').textContent = 'LEAVE';
 }
-function exitHide() { closetScene = null; const p = player; p.hidden = false; p.closet = null; hideCool = 0.3; sfx.creak(0.1); $('hide').textContent = 'HIDE'; breathShown = false; }
+function exitHide() { closetScene = null; const p = player, c = p.closet;
+  if (c) { p.x = c.x + c.ox * (CLOSET_FRONT + 14); p.y = c.y + c.oy * (CLOSET_FRONT + 14); p.ang = Math.atan2(c.oy, c.ox); p.pitch = 0; }   // step out in front of the doors
+  p.hidden = false; p.closet = null; hideCool = 0.3; sfx.creak(0.1); $('hide').textContent = 'HIDE'; breathShown = false; }
 
 /* ---------- screens ---------- */
 function toTitle() { stopSong(); state = 'title'; setHud(false); ['dead', 'win', 'trans', 'paused', 'note'].forEach(s => show(s, false)); show('title', true); loadBest(); }
@@ -828,8 +830,10 @@ function updatePlayer(dt) {
     const spd = (p.sprinting ? 170 : p.exhausted ? 80 : 105) * mag, fw = -input.y / mag, st = input.x / mag;
     const ca = Math.cos(p.ang), sa = Math.sin(p.ang), mx = ca * fw - sa * st, my = sa * fw + ca * st;
     const dx = mx * spd * dt, dy = my * spd * dt;
-    if (!blocked(p.x + dx, p.y, 11) && !closetBlocked(p.x + dx, p.y, 11)) p.x += dx;
-    if (!blocked(p.x, p.y + dy, 11) && !closetBlocked(p.x, p.y + dy, 11)) p.y += dy;
+    // (a wardrobe only blocks you walking into it: if you're somehow already inside its space, you can always get out)
+    const inCloset = closetBlocked(p.x, p.y, 11);
+    if (!blocked(p.x + dx, p.y, 11) && (inCloset || !closetBlocked(p.x + dx, p.y, 11))) p.x += dx;
+    if (!blocked(p.x, p.y + dy, 11) && (inCloset || !closetBlocked(p.x, p.y + dy, 11))) p.y += dy;
     stepTimer -= dt * spd / (p.sprinting ? 55 : 45); stepPhase += dt * spd * 0.12;
     if (stepTimer <= 0) { stepTimer = 1; sfx.step(p.sprinting); }
   }
