@@ -1,0 +1,296 @@
+/* Barbi Blue animations.
+   The model (models/barbi.glb) is rigged but has no animation clips, so they are built here from code:
+   each clip is a function of time that returns a pose, and the pose is sampled into THREE.AnimationClips.
+   Pose angles are in degrees, in the model's own space at rest (she faces +Z, +X is her left, +Y is up):
+     x > 0 bends the spine/head forward, and swings a hanging arm or leg backwards (x < 0 = forwards)
+     y turns (twist), z tilts sideways (for the left side z > 0 lifts an arm out; the right side is mirrored).
+   Usage: const anim = BarbiAnim.build(THREE, gltf.scene); anim.play('walk'); anim.update(dt); */
+(function () {
+'use strict';
+
+const D = Math.PI / 180;
+const sin = Math.sin, cos = Math.cos, TAU = Math.PI * 2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const smooth = (a, b, t) => { t = clamp((t - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+// a short bump around time c (width w): used for twitches and head snaps
+const spike = (t, c, w) => { const k = (t - c) / w; return Math.abs(k) >= 1 ? 0 : (1 - k * k) * (1 - k * k); };
+// deterministic wobble (tremble) in -1..1
+const wob = (t, f, k) => sin(t * f + k) * 0.6 + sin(t * f * 2.13 + k * 1.7) * 0.4;
+
+/* A pose is filled in by the clip functions through this small API. */
+class Pose {
+  constructor() { this.r = {}; this.root = [0, 0, 0]; }
+  rot(b, x, y, z) { const o = this.r[b] || (this.r[b] = [0, 0, 0]); o[0] += x; o[1] += y || 0; o[2] += z || 0; return this; }
+  // same motion on both sides, mirrored (x stays, y and z flip for the right side)
+  sym(b, x, y, z) { this.rot(b + '.L', x, y, z); this.rot(b + '.R', x, -(y || 0), -(z || 0)); return this; }
+  side(b, s, x, y, z) { return s > 0 ? this.rot(b + '.L', x, y, z) : this.rot(b + '.R', x, -(y || 0), -(z || 0)); }
+  move(x, y, z) { this.root[0] += x; this.root[1] += y; this.root[2] += z; return this; }
+  // spread a bend over the spine so it curves instead of hinging
+  spine(x, y, z) { const w = [0.14, 0.2, 0.22, 0.22, 0.22];
+    ['spine05', 'spine04', 'spine03', 'spine02', 'spine01'].forEach((b, i) => this.rot(b, x * w[i], (y || 0) * w[i], (z || 0) * w[i])); return this; }
+  neck(x, y, z) { ['neck01', 'neck02', 'neck03'].forEach(b => this.rot(b, x / 3, (y || 0) / 3, (z || 0) / 3)); return this; }
+  // curl the fingers of one hand (0 = open, 1 = fist, negative = splayed), spread fans them out
+  hand(s, curl, spread) {
+    for (let f = 2; f <= 5; f++) {
+      const fan = (f - 3.5) * (spread || 0);
+      this.side('finger' + f + '-1', s, 0, 0, -curl * 55).side('finger' + f + '-1', s, fan, 0, 0);
+      this.side('finger' + f + '-2', s, 0, 0, -curl * 70).side('finger' + f + '-3', s, 0, 0, -curl * 50);
+    }
+    this.side('finger1-2', s, 0, 0, -curl * 25).side('finger1-3', s, 0, 0, -curl * 30);
+    return this;
+  }
+}
+
+/* ---------- the clips ---------- */
+// Legs for a walk/run cycle. ph: 0..TAU. amp: thigh swing, knee: extra knee bend in the swing, limp: right leg drags.
+function legs(P, ph, amp, knee, limp) {
+  for (const s of [1, -1]) {
+    const p = s > 0 ? ph : ph + Math.PI, a = s < 0 ? amp * (1 - limp * 0.35) : amp;
+    const swing = Math.max(0, cos(p));                      // 1 in the middle of the swing forward
+    const th = -a * sin(p);                                 // thigh: negative = forward
+    const kn = 6 + knee * Math.pow(swing, 1.4) * (s < 0 ? 1 - limp * 0.6 : 1);
+    P.side('upperleg01', s, th, 0, -2);
+    P.side('lowerleg01', s, kn, 0, 0);
+    P.side('foot', s, -th * 0.35 - kn * 0.4 + (s < 0 ? limp * 18 * swing : 0), 0, 0);  // the limp foot drags its toes
+  }
+}
+
+const CLIPS = {
+  // standing: slow breathing, her head hangs to one side, and every few seconds it snaps the other way
+  idle: { dur: 4, loop: true, fn(t, P) {
+    const ph = t / 4 * TAU, br = sin(ph * 2);
+    const snap = spike(t, 2.75, 0.18);
+    P.spine(8 + br * 2.5, 0, 0).neck(10, 0, 0);
+    P.rot('head', 6 + sin(ph) * 3, sin(ph) * 6 - snap * 25, 20 + sin(ph) * 4 - snap * 42);
+    P.sym('clavicle', 0, 0, -4 + br * 1.5);
+    P.sym('upperarm01', -3, 0, 3).sym('lowerarm01', -10, 0, 0);
+    P.rot('upperarm01.L', sin(ph + 1) * 3, 0, 0).rot('upperarm01.R', sin(ph + 2.4) * 3, 0, 0);
+    P.hand(1, 0.35 + 0.15 * sin(t * 5), 4).hand(-1, 0.4 + 0.2 * spike(t, 1.3, 0.3), 4);
+    P.sym('upperleg01', -3, 0, 0).sym('lowerleg01', 6, 0, 0).sym('foot', -3, 0, 0);
+    P.move(sin(ph) * 0.012, -0.012 + br * 0.004, 0);
+  } },
+
+  // wandering: a hunched, limping walk; the right foot drags and the head lolls and twitches
+  walk: { dur: 1.0, loop: true, speed: 2.6, fn(t, P) {
+    const ph = t / 1.0 * TAU;
+    legs(P, ph, 25, 42, 1);
+    P.move(sin(ph) * 0.03, -0.03 + 0.03 * cos(ph * 2), 0);
+    P.rot('root', 0, sin(ph) * 7, sin(ph) * 3);
+    P.spine(22 + cos(ph * 2) * 2, -sin(ph) * 9, -sin(ph) * 3).neck(12, 0, 0);
+    P.rot('head', 4, sin(ph) * 5, 20 + sin(ph * 2) * 4 - spike(t, 0.62, 0.07) * 26);
+    P.sym('upperarm01', 3, 0, 2).rot('upperarm01.L', 14 * sin(ph - 0.5), 0, 0).rot('upperarm01.R', -9 * sin(ph - 0.5), 0, 0);
+    P.sym('lowerarm01', -12, 0, 0).rot('lowerarm01.L', -6 * Math.max(0, -sin(ph - 1)), 0, 0);
+    P.hand(1, 0.4, 5).hand(-1, 0.55, 5);
+  } },
+
+  // searching: a slower walk, head sweeping left and right, looking for you
+  search: { dur: 2.4, loop: true, speed: 3.1, fn(t, P) {
+    const ph = t / 1.2 * TAU, look = sin(t / 2.4 * TAU);
+    legs(P, ph, 22, 38, 0.6);
+    P.move(sin(ph) * 0.025, -0.035 + 0.025 * cos(ph * 2), 0);
+    P.rot('root', 0, sin(ph) * 5 + look * 8, 0);
+    P.spine(16, look * 18 - sin(ph) * 6, 0).neck(6, look * 18, 0);
+    P.rot('head', 2 + spike(t, 1.2, 0.1) * 12, look * 38, 14 - look * 8);
+    P.sym('upperarm01', 2, 0, 2).rot('upperarm01.L', 10 * sin(ph - 0.5), 0, 0).rot('upperarm01.R', -10 * sin(ph - 0.5), 0, 0);
+    P.sym('lowerarm01', -18, 0, 0).hand(1, 0.3, 6).hand(-1, 0.3, 6);
+  } },
+
+  // chasing: sprinting at you, bent forward, both arms reaching for your face, fingers spread
+  chase: { dur: 0.62, loop: true, speed: 6, fn(t, P) { run(t, P, 0.62, 1); } },
+  // hunting (running to where she heard you): the same run, arms flailing instead of reaching
+  run: { dur: 0.62, loop: true, speed: 5, fn(t, P) { run(t, P, 0.62, 0); } },
+
+  // the scream: she stops, bends, then throws her head back with her arms spread, shaking
+  scream: { dur: 2.0, loop: false, fn(t, P) {
+    const wind = smooth(0, 0.3, t) * (1 - smooth(0.3, 0.5, t)), out = smooth(0.3, 0.55, t) * (1 - smooth(1.55, 2.0, t));
+    const sh = out * wob(t, 55, 0), sh2 = out * wob(t, 47, 2);
+    P.spine(22 * wind - 16 * out + sh * 2, 0, sh2 * 2).neck(15 * wind - 22 * out, 0, 0);
+    P.rot('head', 10 * wind - 18 * out + sh * 5, sh2 * 6, 18 * (1 - out) + sh * 4);
+    P.rot('jaw', 4 + 30 * out + sh2 * 3, 0, 0);
+    P.sym('clavicle', 0, 0, 10 * out);
+    P.sym('upperarm01', -10 * wind + 25 * out, 0, -12 * wind + 58 * out + sh * 4);
+    P.sym('lowerarm01', -35 * wind - 12 * out, 0, 0);
+    P.hand(1, 0.6 * wind - 0.4 * out, 6 + 10 * out).hand(-1, 0.6 * wind - 0.4 * out, 6 + 10 * out);
+    P.sym('upperleg01', -8 * wind - 6 * out, 0, 3 * out).sym('lowerleg01', 16 * wind + 10 * out, 0, 0).sym('foot', -8 * wind - 4 * out, 0, 0);
+    P.move(0, -0.06 * wind - 0.04 * out, -0.04 * out);
+  } },
+
+  // the kill: a quick crouch, then she lunges into your face, clawing, mouth wide open
+  lunge: { dur: 1.2, loop: false, fn(t, P) {
+    const crouch = smooth(0, 0.1, t) * (1 - smooth(0.1, 0.22, t)), go = smooth(0.1, 0.26, t);
+    const sh = go * wob(t, 60, 1);
+    P.spine(15 * crouch + 32 * go, sh * 3, sh * 2).neck(-22 * go, 0, 0);
+    P.rot('head', 8 * crouch - 12 * go + sh * 6, sh * 8, 22 * go + sh * 5);
+    P.rot('jaw', 36 * go + sh * 4, 0, 0);
+    P.sym('clavicle', 0, 0, 12 * go);
+    P.sym('upperarm01', -10 * crouch - 88 * go, 0, 12 * go + sh * 5).sym('lowerarm01', -30 * crouch - 12 * go, 0, 0);
+    P.sym('wrist', -25 * go, 0, 0);
+    P.hand(1, 0.5 * crouch + 0.55 * go, 14 * go).hand(-1, 0.5 * crouch + 0.6 * go, 14 * go);
+    P.sym('upperleg01', -25 * crouch - 30 * go, 0, 0).sym('lowerleg01', 45 * crouch + 25 * go, 0, 0).sym('foot', -20 * crouch, 0, 0);
+    P.move(0, -0.14 * crouch - 0.06 * go, 0.3 * go);
+  } },
+
+  // outside your wardrobe: leaning in close, head tilted almost sideways, tapping the door with her fingers
+  peek: { dur: 3.2, loop: true, fn(t, P) {
+    const ph = t / 3.2 * TAU, snap = spike(t, 2.1, 0.12);
+    P.spine(34 + sin(ph) * 3, sin(ph) * 5, 0).neck(10, 0, 0);
+    P.rot('head', 8 + snap * 10, sin(ph) * 8 + snap * 20, 36 + sin(ph * 2) * 5 - snap * 12);
+    P.rot('jaw', 3 + 3 * Math.max(0, sin(ph * 3)), 0, 0);
+    P.side('upperarm01', -1, -62, 0, -12).side('lowerarm01', -1, -48, 0, 0).side('wrist', -1, -20, 0, 0);
+    P.hand(-1, 0.25 + 0.35 * Math.max(0, sin(t * 9)), 6);
+    P.side('upperarm01', 1, 6, 0, -8).side('lowerarm01', 1, -12, 0, 0).hand(1, 0.45, 4);
+    P.sym('upperleg01', -12, 0, 0).sym('lowerleg01', 16, 0, 0).sym('foot', -6, 0, 0);
+    P.move(0, -0.035, 0.04);
+  } },
+};
+
+function run(t, P, dur, reach) {
+  const ph = t / dur * TAU, flail = 1 - reach;
+  legs(P, ph, 40, 85, 0.2);
+  P.move(sin(ph) * 0.03, -0.05 + 0.05 * Math.abs(cos(ph)), 0);
+  P.rot('root', 0, sin(ph) * 8, 0);
+  P.spine(30 + cos(ph * 2) * 3, -sin(ph) * 10, 0).neck(-10 - 10 * reach, sin(ph) * 3, 0);
+  P.rot('head', -4 * reach + wob(t, 23, 0) * 4, wob(t, 17, 1) * 5, 14 + wob(t, 13, 2) * 5);
+  P.rot('jaw', 6 + 10 * reach, 0, 0);
+  // reaching: both arms forward, alternating a little; flailing: big uneven swings
+  P.sym('upperarm01', -78 * reach, 0, -14 * reach - 6 * flail);
+  P.rot('upperarm01.L', 12 * sin(ph) * (reach + flail * 3), 0, 0).rot('upperarm01.R', -12 * sin(ph) * (reach + flail * 3.4), 0, 0);
+  P.sym('lowerarm01', -14 * reach - 40 * flail, 0, 0);
+  P.hand(1, reach ? -0.15 : 0.5, 14 * reach).hand(-1, reach ? -0.15 : 0.5, 14 * reach);
+}
+
+/* ---------- model prep ---------- */
+// The top and shorts sit a few millimetres above the skin, so once she bends the skin pokes through them.
+// Games solve this by deleting the skin that clothes cover: a short ray goes out from each skin vertex along
+// its normal, and a skin triangle is dropped when all three of its corners are under cloth.
+function hideCoveredSkin(THREE, root) {
+  const meshes = {}; root.traverse(o => { if (o.isMesh) meshes[o.name] = o; });
+  const body = meshes.Body, cloth = [meshes.Top, meshes.Shorts].filter(Boolean);
+  if (!body || !cloth.length) return 0;
+  const tris = [];
+  for (const c of cloth) {
+    const pos = c.geometry.attributes.position, ix = c.geometry.index;
+    const n = ix ? ix.count : pos.count, g = k => ix ? ix.getX(k) : k;
+    for (let k = 0; k < n; k += 3) {
+      const a = new THREE.Vector3().fromBufferAttribute(pos, g(k)), b = new THREE.Vector3().fromBufferAttribute(pos, g(k + 1)), d = new THREE.Vector3().fromBufferAttribute(pos, g(k + 2));
+      const box = new THREE.Box3().setFromPoints([a, b, d]).expandByScalar(0.05);
+      tris.push({ a, b, d, box });
+    }
+  }
+  const bg = body.geometry, bp = bg.attributes.position, bn = bg.attributes.normal;
+  const covered = new Uint8Array(bp.count), ray = new THREE.Ray(), p = new THREE.Vector3(), nn = new THREE.Vector3(), hit = new THREE.Vector3();
+  const all = new THREE.Box3(); tris.forEach(t => all.union(t.box));
+  for (let i = 0; i < bp.count; i++) {
+    p.fromBufferAttribute(bp, i); if (!all.containsPoint(p)) continue;
+    nn.fromBufferAttribute(bn, i).normalize();
+    ray.set(p.clone().addScaledVector(nn, -0.004), nn);
+    for (const t of tris) {
+      if (!t.box.containsPoint(p)) continue;
+      if (ray.intersectTriangle(t.a, t.b, t.d, false, hit) && hit.distanceTo(p) < 0.045) { covered[i] = 1; break; }
+    }
+  }
+  const ix = bg.index, keep = [];
+  let dropped = 0;
+  for (let k = 0; k < ix.count; k += 3) {
+    const a = ix.getX(k), b = ix.getX(k + 1), c = ix.getX(k + 2);
+    if (covered[a] && covered[b] && covered[c]) { dropped++; continue; }
+    keep.push(a, b, c);
+  }
+  bg.setIndex(keep);
+  // and draw the clothes slightly in front, for whatever small overlap is left
+  for (const c of cloth) { const m = c.material; m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; }
+  return dropped;
+}
+
+// The hair is weighted 100% to the head bone, so when she tilts her head the whole sheet of hair swings out
+// like a board. Here the lower part of the hair is handed over to the upper back, so it hangs instead.
+function relaxHair(THREE, root) {
+  root.traverse(o => {
+    if (!o.isSkinnedMesh || !/^Hair/.test(o.name)) return;
+    const bones = o.skeleton.bones, find = n => bones.findIndex(b => b.name === n);
+    const head = find('head'), neck = find('neck02'), back = find('spine01');
+    if (head < 0 || neck < 0 || back < 0) return;
+    const pos = o.geometry.attributes.position, si = o.geometry.attributes.skinIndex, sw = o.geometry.attributes.skinWeight;
+    for (let i = 0; i < pos.count; i++) {
+      const y = pos.getY(i), wh = smooth(1.2, 1.46, y), wn = (1 - wh) * smooth(1.0, 1.3, y) * 0.6, wb = 1 - wh - wn;
+      si.setXYZW(i, head, neck, back, 0); sw.setXYZW(i, wh, wn, wb, 0);
+    }
+    si.needsUpdate = sw.needsUpdate = true;
+  });
+}
+
+/* ---------- sampling poses into clips ---------- */
+function build(THREE, root) {
+  hideCoveredSkin(THREE, root);
+  relaxHair(THREE, root);
+  const bones = {};
+  root.traverse(o => { if (o.isBone) bones[o.name] = o; });
+  // GLTFLoader strips '.' from node names ('upperarm01.L' -> 'upperarm01L')
+  const B = n => bones[n.replace(/[\[\].:\/]/g, '')];
+  const rootBone = B('root');
+  root.updateMatrixWorld(true);
+  const inv = root.getWorldQuaternion(new THREE.Quaternion()).invert();
+  const rest = new Map();
+  for (const b of Object.values(bones)) {
+    const pw = b.parent.getWorldQuaternion(new THREE.Quaternion()).premultiply(inv);
+    rest.set(b, { q: b.quaternion.clone(), p: b.position.clone(), pw, pwi: pw.clone().invert() });
+  }
+  const eu = new THREE.Euler(), rq = new THREE.Quaternion(), tq = new THREE.Quaternion();
+  // local rotation for a model-space offset, applied in the frame the parent had at rest
+  const localQ = (b, a) => { const R = rest.get(b); rq.setFromEuler(eu.set(a[0] * D, a[1] * D, a[2] * D));
+    return tq.copy(R.pwi).multiply(rq).multiply(R.pw).multiply(R.q); };
+
+  function sample(name, def) {
+    const fps = 30, n = Math.max(2, Math.round(def.dur * fps)), times = [], poses = [];
+    for (let i = 0; i <= n; i++) { const t = def.dur * i / n; const P = new Pose(); def.fn(def.loop && i === n ? 0 : t, P); times.push(t); poses.push(P); }
+    const used = new Set(); poses.forEach(P => Object.keys(P.r).forEach(k => used.add(k)));
+    const tracks = [];
+    for (const k of used) {
+      const b = B(k); if (!b) continue;
+      const vals = [];
+      poses.forEach(P => localQ(b, P.r[k] || [0, 0, 0]).toArray(vals, vals.length));
+      tracks.push(new THREE.QuaternionKeyframeTrack(b.name + '.quaternion', times, vals));
+    }
+    if (rootBone) { const rp = rest.get(rootBone).p, vals = [];
+      poses.forEach(P => vals.push(rp.x + P.root[0], rp.y + P.root[1], rp.z + P.root[2]));
+      tracks.push(new THREE.VectorKeyframeTrack(rootBone.name + '.position', times, vals)); }
+    return new THREE.AnimationClip(name, def.dur, tracks);
+  }
+
+  const mixer = new THREE.AnimationMixer(root), actions = {}, clips = {};
+  for (const [name, def] of Object.entries(CLIPS)) {
+    clips[name] = sample(name, def);
+    const a = mixer.clipAction(clips[name]);
+    if (!def.loop) { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
+    actions[name] = a;
+  }
+  let cur = null, curName = '';
+  // crossfade to a clip. Looping clips keep their phase if already playing.
+  function play(name, fade, restart) {
+    const a = actions[name]; if (!a) return;
+    if (curName === name && !restart) return;
+    fade = fade === undefined ? 0.3 : fade;
+    a.enabled = true; a.setEffectiveWeight(1); a.setEffectiveTimeScale(a.timeScale || 1);
+    if (restart || !a.isRunning()) a.reset();
+    a.play();
+    if (cur && cur !== a) cur.crossFadeTo(a, fade, false); else a.fadeIn(fade);
+    cur = a; curName = name;
+  }
+  // match the playback speed to how fast she actually moves (so her feet don't slide)
+  function setSpeed(metersPerSec) {
+    const def = CLIPS[curName]; if (!cur || !def || !def.speed) { if (cur) cur.timeScale = 1; return; }
+    cur.timeScale = clamp(metersPerSec / def.speed, 0.45, 1.8);
+  }
+  return {
+    mixer, actions, clips, bones: B, play, setSpeed,
+    get current() { return curName; },
+    get finished() { return !!cur && !CLIPS[curName].loop && cur.time >= CLIPS[curName].dur - 1e-3; },
+    update(dt) { mixer.update(dt); },
+    // jump straight to a moment of a clip (for the viewer and screenshots)
+    pose(name, t) { mixer.stopAllAction(); const a = actions[name]; a.reset(); a.play(); a.setEffectiveWeight(1); cur = a; curName = name; mixer.setTime(t); },
+    names: Object.keys(CLIPS),
+  };
+}
+
+window.BarbiAnim = { build, hideCoveredSkin, CLIPS };
+})();

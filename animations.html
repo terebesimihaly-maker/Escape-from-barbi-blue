@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Barbi Blue animations</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b0c12;color:#cfd8ff;font:14px system-ui,sans-serif;overflow:hidden;touch-action:none}
+  canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+  #ui{position:fixed;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+    background:linear-gradient(transparent,rgba(0,0,0,.7))}
+  button{background:rgba(20,25,50,.7);color:#cfd8ff;border:1px solid rgba(134,168,255,.4);border-radius:4px;padding:9px 14px;font:inherit;cursor:pointer}
+  button.on{background:rgba(90,120,255,.5)}
+  #top{position:fixed;top:0;left:0;right:0;padding:12px 16px;display:flex;justify-content:space-between;color:#8fa3d9}
+  a{color:#8fa3d9}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="top"><span id="st">Loading…</span><a href="./">Back to the game</a></div>
+<div id="ui"></div>
+<script src="lib/three.min.js"></script>
+<script src="js/barbi-anim.js"></script>
+<script>
+(async () => {
+  // ?clip=walk&t=0.3&cam=side renders one frozen frame (used for testing); otherwise it's interactive
+  const q = new URLSearchParams(location.search), still = q.has('t');
+  const cvs = document.getElementById('c');
+  const renderer = new THREE.WebGLRenderer({ canvas: cvs, antialias: true, preserveDrawingBuffer: still });
+  renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  const scene = new THREE.Scene(); scene.background = new THREE.Color(0x14151f);
+  scene.add(new THREE.HemisphereLight(0xc8d4ff, 0x2a2024, 1.6));
+  const key = new THREE.DirectionalLight(0xfff0e0, 2.2); key.position.set(2, 4, 3); scene.add(key);
+  const rim = new THREE.DirectionalLight(0x6f8cff, 2); rim.position.set(-3, 2, -3); scene.add(rim);
+  const grid = new THREE.GridHelper(8, 16, 0x334, 0x223); scene.add(grid);
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.05, 50);
+  const gltf = await new THREE.GLTFLoader().loadAsync('models/barbi.glb');
+  const model = gltf.scene; scene.add(model);
+  const anim = BarbiAnim.build(THREE, model);
+  let yaw = 0.5, pitch = 0.12, dist = 4.2, lookY = 0.85;
+  const cams = { front: [0, 0.1, 4.2, 0.85], side: [Math.PI / 2, 0.1, 4.2, 0.85], back: [Math.PI, 0.1, 4.2, 0.85],
+    q: [0.7, 0.25, 4.4, 0.85], face: [0.35, 0.05, 1.3, 1.42], top: [0.6, 0.9, 4.6, 0.8] };
+  if (cams[q.get('cam')]) [yaw, pitch, dist, lookY] = cams[q.get('cam')];
+  function size() { const w = innerWidth, h = innerHeight; renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.setSize(w, h, false);
+    camera.aspect = w / h; camera.fov = w < h ? 50 : 35; camera.updateProjectionMatrix(); }
+  addEventListener('resize', size); size();
+  function place() { camera.position.set(Math.sin(yaw) * Math.cos(pitch) * dist, lookY + Math.sin(pitch) * dist, Math.cos(yaw) * Math.cos(pitch) * dist); camera.lookAt(0, lookY, 0); }
+
+  const st = document.getElementById('st');
+  if (still) {
+    anim.pose(q.get('clip') || 'idle', +q.get('t')); place(); renderer.render(scene, camera);
+    st.textContent = (q.get('clip') || 'idle') + ' @ ' + q.get('t') + 's'; document.getElementById('ui').remove(); window.done = true; return;
+  }
+  const ui = document.getElementById('ui'), btns = {};
+  function pick(n) { anim.play(n, 0.25, true); for (const k in btns) btns[k].classList.toggle('on', k === n); st.textContent = n + (BarbiAnim.CLIPS[n].loop ? ' (loop)' : ' (once — tap again to replay)'); }
+  for (const n of anim.names) { const b = document.createElement('button'); b.textContent = n; b.onclick = () => pick(n); ui.appendChild(b); btns[n] = b; }
+  pick(q.get('clip') || 'idle');
+  let drag = null;
+  cvs.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY }; });
+  addEventListener('pointermove', e => { if (!drag) return; yaw -= (e.clientX - drag.x) * 0.01; pitch = Math.max(-0.3, Math.min(1.2, pitch + (e.clientY - drag.y) * 0.006)); drag = { x: e.clientX, y: e.clientY }; });
+  addEventListener('pointerup', () => { drag = null; });
+  addEventListener('wheel', e => { dist = Math.max(1, Math.min(9, dist * (1 + Math.sign(e.deltaY) * 0.1))); });
+  let last = performance.now();
+  (function frame(now) { const dt = Math.min(0.05, (now - last) / 1000); last = now; anim.update(dt); place(); renderer.render(scene, camera); requestAnimationFrame(frame); })(last);
+})().catch(e => { document.getElementById('st').textContent = 'Could not load the model: ' + e.message; });
+</script>
+</body>
+</html>
