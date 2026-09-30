@@ -11,7 +11,7 @@ const MP = { on: false, host: false, peer: null, conns: new Map(), hostConn: nul
 const PEER_PREFIX = 'escape-barbi-blue-', MAX_PLAYERS = 4, SEND_HZ = 15, DOWN_TIME = 50, REVIVE_TIME = 3;
 // rejoining: a player who drops keeps their place for AWAY_TIME seconds and reconnects by themselves (for RECONNECT_FOR seconds);
 // after closing the page, the menu offers "Rejoin" for 10 minutes (the lobby code and their player id are kept on the device)
-const AWAY_TIME = 90, RECONNECT_FOR = 70, REJOIN_KEY = 'bb_rejoin', REJOIN_MAX = 10 * 60 * 1000;
+const AWAY_TIME = 90, RECONNECT_FOR = 70, REJOIN_KEY = 'bb_rejoin', REJOIN_MAX = 10 * 60 * 1000, SILENT_MS = 15000;
 const newPid = () => Array.from({ length: 8 }, () => 'abcdefghijklmnopqrstuvwxyz0123456789'[Math.random() * 36 | 0]).join('');
 function saveRejoin() { if (MP.host || !MP.code || !MP.pid) return; try { localStorage.setItem(REJOIN_KEY, JSON.stringify({ code: MP.code, pid: MP.pid, t: Date.now() })); } catch (e) {} }
 function loadRejoin() {
@@ -327,6 +327,9 @@ function clientHandle(m) {
       if (m.id !== MP.myId) showMsg(m.t === 'away' ? nameOf(m.id) + ' lost the connection. Waiting for them to come back…' : nameOf(m.id) + ' is back.', 3);
       break; }
     case 'resync': {                                  // back in after losing the connection: the floor as it is now
+      // still on that floor (only the connection dropped): just catch up on what happened; after a reload: the whole floor
+      const same = MP.inGame && grid && floorIdx === m.d.i && grid.map(r => r.join('')).join('') === m.d.rows.join('') && (state === 'play' || state === 'trans');
+      if (same) { m.got.forEach((g, k) => { if (g) applyFuse(k); }); if (m.power && !powerOn) { powerOn = true; updateFuseHud(); } break; }
       clientHandle({ t: 'floor', d: m.d });
       m.got.forEach((g, k) => { if (g && fuses[k]) { fuses[k].got = true; fusesGot++; } });
       powerOn = !!m.power; updateFuseHud(); runTime = m.rt || 0;
@@ -542,14 +545,17 @@ function mpTick(dt) {
     const everyone = [player, ...[...MP.others.values()].filter(o => !o.away)];
     if (!MP.overSent && everyone.every(q => q.down || q.dead)) { MP.overSent = true; setTimeout(() => { if (MP.on && MP.host) hostEmit({ t: 'over' }); }, 2500); }
   }
+  // our own game was frozen for a while (a hidden tab, a busy phone): that silence was ours, don't blame the others for it
+  const now = performance.now(), frozen = MP.tickAt && now - MP.tickAt > 2000; MP.tickAt = now;
+  if (frozen) { MP.lastW = MP.lastW && now; for (const o of MP.others.values()) o.heardAt = now; }
   if (MP.host && MP.lobby) for (const pl of MP.lobby.players) {
     if (pl.away && (pl.awayT -= dt) <= 0) { hostDrop(pl.id, true); continue; }   // gone for good
-    // silent for 8 seconds (a locked phone, a dead connection the browser hasn't noticed yet): away
+    // silent for 15 seconds (a locked phone, a dead connection the browser hasn't noticed yet): away
     const o = MP.others.get(pl.id);
-    if (o && !pl.away && MP.lobby.started && performance.now() - (o.heardAt || performance.now()) > 8000) { pl.away = true; pl.awayT = AWAY_TIME; hostEmit({ t: 'away', id: pl.id }); hostSendLobby(); }
+    if (o && !pl.away && MP.lobby.started && now - (o.heardAt || now) > SILENT_MS) { pl.away = true; pl.awayT = AWAY_TIME; hostEmit({ t: 'away', id: pl.id }); hostSendLobby(); }
   }
-  // (and the other way round: nothing from the owner for 8 seconds, so reconnect)
-  if (!MP.host && !MP.reconnecting && MP.lastW && performance.now() - MP.lastW > 8000) { MP.lastW = 0; const c = MP.hostConn; MP.hostConn = null; try { c && c.close(); } catch (e) {} clientLost(); }
+  // (and the other way round: nothing from the owner for 15 seconds, so reconnect)
+  if (!MP.host && !MP.reconnecting && MP.lastW && now - MP.lastW > SILENT_MS) { MP.lastW = 0; const c = MP.hostConn; MP.hostConn = null; try { c && c.close(); } catch (e) {} clientLost(); }
   if (!MP.host && !MP.reconnecting && (MP.rejoinT = (MP.rejoinT || 0) - dt) <= 0) { MP.rejoinT = 5; saveRejoin(); }
   if (MP.reconnecting) $('reconnTxt').textContent = 'Reconnecting… ' + Math.max(0, Math.ceil(RECONNECT_FOR - (performance.now() - MP.reconnecting.t0) / 1000)) + ' s';
   MP.sendT -= dt;
