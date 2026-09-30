@@ -80,7 +80,7 @@ await A.waitForTimeout(1500);
 await A.keyboard.down('KeyW'); await A.waitForTimeout(4000); await A.keyboard.up('KeyW');
 const blk = await A.evaluate(() => { const o = [...bb.MP.others.values()].find(q => q.name.startsWith('Bob')); return [bb.player.x, bb.player.y, o.x, o.y]; });
 const dBlk = Math.hypot(blk[0] - blk[2], blk[1] - blk[3]);
-check(blk[0] > 112, 'Alice walked towards Bobby', blk);
+check(blk[0] > 95, 'Alice walked towards Bobby', blk);   // (from x = 75; on a slow test machine she covers less ground in 4 s)
 check(dBlk >= 20, 'Alice stopped at Bobby instead of walking through him (distance ' + dBlk.toFixed(1) + ')', blk);
 console.log('== one person per wardrobe');
 const cl = await A.evaluate(() => { const c = bb.closets[0]; return { x: c.x + c.ox * 10, y: c.y + c.oy * 10, ang: Math.atan2(-c.oy, -c.ox) }; });
@@ -124,7 +124,7 @@ await A.evaluate(() => { bb.player.ang = 0.8; });            // facing away from
 await A.waitForTimeout(1500); await A.screenshot({ timeout: 120000, path: OUT + '/game_indicator.png' });
 await B.screenshot({ timeout: 120000, path: OUT + '/game_down.png' });
 check(!(await visible(A, 'revive')), 'Alice is too far away to revive');
-await C.evaluate(() => { bb.player.x = 80; bb.player.y = 100; bb.player.ang = 0; });
+await C.evaluate(() => { bb.player.x = 100; bb.player.y = 125; bb.player.ang = 0; });
 check(await until(C, () => !!bb.reviveTarget, null, 8000), 'Cara next to Bobby gets the revive prompt');
 await C.keyboard.down('KeyE');
 await C.waitForTimeout(1500); await C.screenshot({ timeout: 120000, path: OUT + '/game_reviving.png' });
