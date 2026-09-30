@@ -48,7 +48,7 @@ Playing together, the lobby owner picks the floor (from the ones they've opened)
 The game loads its files over HTTP, so open it from a web server (e.g. GitHub Pages, or `python3 -m http.server` locally), not by double-clicking the file.
 
 Controls: left side of the screen, drag to walk. Right side, drag to look. RUN, HIDE, and PHONE buttons; in a wardrobe, hold BREATH; playing together, 📍 pings and 💬 sends a quick message.
-Computer: click to lock the cursor, then WASD to move and the mouse to look. Shift runs, E hides, 1 uses the phone, Space (in a wardrobe) holds your breath, Q pings, 2 to 7 send quick messages, F3 shows the performance overlay, Esc frees the cursor and pauses.
+Computer: click to lock the cursor, then WASD to move and the mouse to look. Shift or Ctrl runs, E hides, 1 uses the phone, Space (in a wardrobe) holds your breath, Q pings, 2 to 7 send quick messages, F3 shows the performance overlay, Esc frees the cursor and pauses.
 
 Torn notes: every floor has four, and three of them lie somewhere on it (which three, and where, changes every game). The HUD shows this floor's (📜 1/3); every note you read counts once, forever: the floor list shows how many of all 20 you've found.
 

@@ -11,7 +11,7 @@ const MP = { on: false, host: false, peer: null, conns: new Map(), hostConn: nul
 const PEER_PREFIX = 'escape-barbi-blue-', MAX_PLAYERS = 4, SEND_HZ = 15, REVIVE_TIME = 3;   // (time to revive: DIFFS[].down)
 // rejoining: a player who drops keeps their place for AWAY_TIME seconds and reconnects by themselves (for RECONNECT_FOR seconds);
 // after closing the page, the menu offers "Rejoin" for 10 minutes (the lobby code and their player id are kept on the device)
-const AWAY_TIME = 90, RECONNECT_FOR = 70, REJOIN_KEY = 'bb_rejoin', REJOIN_MAX = 10 * 60 * 1000, SILENT_MS = 15000;
+const JOIN_WAIT = 30000, AWAY_TIME = 90, RECONNECT_FOR = 70, REJOIN_KEY = 'bb_rejoin', REJOIN_MAX = 10 * 60 * 1000, SILENT_MS = 15000;
 const newPid = () => Array.from({ length: 8 }, () => 'abcdefghijklmnopqrstuvwxyz0123456789'[Math.random() * 36 | 0]).join('');
 function saveRejoin() { if (MP.host || !MP.code || !MP.pid) return; try { localStorage.setItem(REJOIN_KEY, JSON.stringify({ code: MP.code, pid: MP.pid, t: Date.now() })); } catch (e) {} }
 function loadRejoin() {
@@ -27,11 +27,31 @@ let myName = '';
 try { myName = cleanName(localStorage.getItem('bb_name')); } catch (e) {}
 if (!myName) myName = 'Player ' + (10 + Math.random() * 89 | 0);
 function saveName(n) { myName = cleanName(n) || myName; try { localStorage.setItem('bb_name', myName); } catch (e) {} }
+// How two browsers find a way to each other. STUN servers tell each browser its public address; that's enough for most
+// home networks. Some can't be reached directly at all (internet providers that share one address between many
+// customers, strict routers and firewalls): for those the connection has to go through a relay (a TURN server).
+// TURN_API: a free Metered account's credentials link (https://<app>.metered.live/api/v1/turn/credentials?apiKey=...).
+// Without it there's no relay, and players on such networks can't join.
+// (?turn=<that link> in the page address works too, for trying one out)
+const TURN_API = new URLSearchParams(location.search).get('turn') || '';
+const STUN = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }];
+let iceList = null;
+async function iceReady() {
+  if (iceList) return iceList;
+  let relay = [];
+  if (TURN_API) try {
+    const ab = new AbortController(), t = setTimeout(() => ab.abort(), 4000);
+    const r = await fetch(TURN_API, { signal: ab.signal }); clearTimeout(t);
+    const j = r.ok ? await r.json() : null; if (Array.isArray(j)) relay = j;
+  } catch (e) { console.warn('No relay (TURN) server:', e); }
+  return (iceList = STUN.concat(relay));
+}
+const hasRelay = () => !!(iceList && iceList.some(s => /^turns?:/.test([].concat(s.urls)[0] || '')));
 // ?peer=host:port uses your own PeerJS server instead of the public one (for testing)
 function peerOptions() {
   const q = new URLSearchParams(location.search).get('peer');
   if (q) { const [host, port] = q.split(':'); return { host, port: +port || 9000, path: '/', secure: false, config: { iceServers: [] }, debug: 0 }; }
-  return { debug: 0, config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] } };
+  return { debug: 0, config: { iceServers: iceList || STUN } };
 }
 const mpStatus = t => { $('mpStatus').textContent = t || ''; };
 function netError(err) {
@@ -65,11 +85,11 @@ function leaveMP(quiet) {
 }
 
 // ---- the host side
-function createLobby() {
+async function createLobby() {
   if (!window.peerjs) { mpStatus('Playing together could not load.'); return; }
   leaveMP(true); saveName($('mpName').value);
   const code = String(100000 + Math.floor(Math.random() * 900000));
-  mpStatus('Creating a lobby…');
+  mpStatus('Creating a lobby…'); await iceReady();
   const peer = new peerjs.Peer(PEER_PREFIX + code, peerOptions()); MP.peer = peer;
   peer.on('open', id => {
     Object.assign(MP, { on: true, host: true, myId: id, code, overSent: false });
@@ -84,6 +104,12 @@ function createLobby() {
   });
   peer.on('disconnected', () => { if (MP.on && MP.peer === peer && !MP.leaving) try { peer.reconnect(); } catch (e) {} });
 }
+// coming back to the game's tab (after sharing the code in another window, say): make sure the matchmaking server still
+// has the lobby owner (a tab in the background can lose it), or nobody new can find the lobby
+document.addEventListener('visibilitychange', () => {
+  const peer = MP.peer; if (document.hidden || !MP.on || !peer || peer.destroyed || MP.leaving) return;
+  if (peer.disconnected) try { peer.reconnect(); } catch (e) {}
+});
 function hostAccept(conn) {
   conn.on('open', () => {
     if (!MP.lobby) { conn.close(); return; }
@@ -181,20 +207,32 @@ function joinLobby(r) {
   leaveMP(true); saveName($('mpName').value);
   mpStatus(r ? 'Rejoining…' : 'Connecting…'); MP.kicked = false; MP.rejected = ''; MP.hostLeft = false;
   // your player id in this lobby (the same one when you rejoin, so the owner knows it's you)
-  const pid = r ? r.pid : newPid(), t0 = performance.now(), wait = r ? RECONNECT_FOR * 1000 : 15000;
-  let joined = false, peer = null;
-  const fail = t => { if (joined) return; clearTimeout(timer); leaveMP(true); if (r) clearRejoin(); mpStatus(t); };
-  const timer = setTimeout(() => fail(r ? "Couldn't rejoin. The game may be over." : "Couldn't reach that lobby. Check the code and try again."), wait);
+  const pid = r ? r.pid : newPid(), t0 = performance.now(), wait = r ? RECONNECT_FOR * 1000 : JOIN_WAIT;
+  let joined = false, peer = null, stage = 'server', conn = null, tries = 0;
+  const fail = t => { if (joined) return; clearTimeout(timer); clearInterval(tick); leaveMP(true); if (r) clearRejoin(); mpStatus(t); MP.joinFail = t; };
+  // why it didn't work, as far as we can tell: the matchmaking server, the connection between the two computers, or the owner's game
+  const why = () => stage === 'server' ? "Couldn't reach the matchmaking server. Check your internet connection and try again." :
+    stage === 'owner' ? "The lobby owner's computer answered, but their game didn't. Is their game still open, on the lobby screen?" :
+    r ? "Couldn't rejoin. The game may be over." :
+    "Couldn't connect to the lobby owner's computer. Check the code. If it's right, one of your networks blocks direct connections" +
+      (hasRelay() ? ', even through the relay.' : ' (some internet providers, routers and firewalls do). Try another network, or a phone hotspot.');
+  const timer = setTimeout(() => fail(why()), wait);
+  // a countdown, and a fresh attempt every 10 seconds while the two computers still haven't connected
+  const tick = setInterval(() => { if (joined || MP.peer !== peer) { clearInterval(tick); return; }
+    const el = Math.floor((performance.now() - t0) / 1000);
+    mpStatus((r ? 'Rejoining… ' : 'Connecting… ') + Math.max(0, Math.ceil(wait / 1000 - el)) + ' s' + (stage === 'net' ? ' (reaching the lobby owner)' : ''));
+    if (stage === 'net' && conn && !conn.open && el >= 10 * (tries + 1) && performance.now() - t0 < wait - 4000) { tries++; const old = conn; MP.hostConn = null; try { old.close(); } catch (e) {} conn = openHostConn(peer, code, onIn, onConnFail); }
+  }, 1000);
+  const onIn = () => {                                   // (first message from the owner: we're in)
+    if (joined) return; joined = true; clearTimeout(timer); clearInterval(tick);
+    Object.assign(MP, { on: true, host: false, code }); mpStatus(''); saveRejoin(); updateRejoinBtn();
+    loadPlayerTemplate(); if (!MP.lobby || !MP.lobby.started) showLobby();  // (rejoining a game in progress: the owner sends the floor)
+  };
+  // (a rejection is final; a connection that fails to open is tried again by the countdown above)
+  const onConnFail = t => { if (MP.rejected) fail(MP.rejected); else stage = t === 'owner' ? 'owner' : 'net'; };
   const start = () => {
     peer = new peerjs.Peer(PEER_PREFIX + code + '-' + pid, peerOptions()); MP.peer = peer; MP.pid = pid; MP.code = code;
-    peer.on('open', id => {
-      MP.myId = id;
-      openHostConn(peer, code, () => {                    // (first message from the owner: we're in)
-        if (joined) return; joined = true; clearTimeout(timer);
-        Object.assign(MP, { on: true, host: false, code }); mpStatus(''); saveRejoin(); updateRejoinBtn();
-        loadPlayerTemplate(); if (!MP.lobby || !MP.lobby.started) showLobby();  // (rejoining a game in progress: the owner sends the floor)
-      }, why => fail(why));
-    });
+    peer.on('open', id => { MP.myId = id; stage = 'net'; conn = openHostConn(peer, code, onIn, onConnFail); });
     peer.on('error', err => {
       // rejoining right after dropping out: the server may still hold your old id for a minute. Try again.
       if (err.type === 'unavailable-id' && !joined && performance.now() - t0 < wait - 3000) { try { peer.destroy(); } catch (e) {} setTimeout(() => { if (MP.peer === peer) start(); }, 3000); return; }
@@ -203,21 +241,21 @@ function joinLobby(r) {
     });
     peer.on('disconnected', () => { if (MP.peer === peer && !MP.leaving && joined) try { peer.reconnect(); } catch (e) {} });
   };
-  start();
+  iceReady().then(() => { if (!MP.peer && !joined) start(); });
 }
 // a data connection to the lobby owner (used to join, and again to reconnect)
 function openHostConn(peer, code, onIn, onFail) {
   const conn = peer.connect(PEER_PREFIX + code, { reliable: true }); MP.hostConn = conn;
   let inside = false;
-  conn.on('open', () => send(conn, { t: 'hello', name: myName }));
+  conn.on('open', () => { send(conn, { t: 'hello', name: myName }); if (onFail) onFail('owner'); });
   conn.on('data', d => {
     if (MP.hostConn !== conn) return;
     if (d && d.t === 'reject') { MP.rejected = d.why; if (onFail) onFail(d.why); return; }
     if (!inside && d && (d.t === 'lobby' || d.t === 'resync')) { inside = true; if (d.t === 'lobby') MP.lobby = d.lobby; onIn(); stopReconnect(); }
     if (inside) clientHandle(d);
   });
-  conn.on('close', () => { if (MP.hostConn !== conn) return; if (!inside && onFail) onFail(MP.rejected || "Couldn't join that lobby."); else if (inside) clientLost(); });
-  conn.on('error', () => { if (MP.hostConn === conn && !inside && onFail) onFail(MP.rejected || "Couldn't join that lobby."); });
+  conn.on('close', () => { if (MP.hostConn !== conn) return; if (!inside && onFail) onFail('closed'); else if (inside) clientLost(); });
+  conn.on('error', () => { if (MP.hostConn === conn && !inside && onFail) onFail('error'); });
   return conn;
 }
 // the connection to the owner dropped: keep trying for a while (the game waits for you), then give up

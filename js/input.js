@@ -113,12 +113,17 @@ addEventListener('keydown', e => { keys[e.code] = true;
   }
   if ((e.code === 'Escape' || e.code === 'KeyP') && state === 'play') pause(); });
 addEventListener('keyup', e => { keys[e.code] = false; });
+// Ctrl runs too, but Ctrl+W closes a browser tab and no website can stop that. So while you're in a game, the browser asks
+// "Leave site?" first instead of just closing it
+addEventListener('beforeunload', e => { if (state === 'play' || state === 'paused' || state === 'note' || (MP.on && MP.inGame)) { e.preventDefault(); e.returnValue = ''; } });
+// (the window losing focus, e.g. that question popping up, mustn't leave a key held down)
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 function readInput() {
   let kx = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
   let ky = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0);
   if (kx || ky) { const d = Math.hypot(kx, ky); input.x = kx / d; input.y = ky / d; }
   else { input.x = joy.x; input.y = joy.y; }
-  input.sprintKey = !!(keys.ShiftLeft || keys.ShiftRight);
+  input.sprintKey = !!(keys.ShiftLeft || keys.ShiftRight || keys.ControlLeft || keys.ControlRight);   // (Shift or Ctrl runs)
   input.turn = (keys.ArrowRight ? 1 : 0) - (keys.ArrowLeft ? 1 : 0);
 }
 
