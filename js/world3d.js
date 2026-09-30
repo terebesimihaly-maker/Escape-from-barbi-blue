@@ -52,6 +52,8 @@ function init3D() {
   camera.add(flash); camera.add(flash.target);
   flash.castShadow = true; const sm = LOWQ ? 1024 : 2048; flash.shadow.mapSize.set(sm, sm); flash.shadow.radius = 2.5;
   flashCookie = flashlightCookie(); flash.map = flashCookie;
+  { const i = new Image(); i.onload = () => { const t = new THREE.CanvasTexture(i); t.colorSpace = THREE.SRGBColorSpace; flash.map = flashCookie = t; };   // (the real beam pattern: tools/blender/flashlight_cookie.py)
+    i.src = 'textures/flashlight_cookie.webp'; }
   flash.shadow.camera.near = 0.25; flash.shadow.camera.far = 22; flash.shadow.bias = -0.0006; flash.shadow.normalBias = 0.03;
   aura = new THREE.PointLight(0x8595c8, 1.2, 4.5, 1.4); camera.add(aura);     // a little light around you, even in the wardrobe
   exitLight = new THREE.PointLight(0x50ff90, 0, 9, 1.3); scene.add(exitLight);
