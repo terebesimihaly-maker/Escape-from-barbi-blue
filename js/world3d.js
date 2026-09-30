@@ -149,7 +149,9 @@ function setupBarbi(model, anim) {
   if (anim) model.scale.setScalar(M_SCALE);
   model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false;
     // a little darker and less shiny, so the flashlight doesn't turn her white up close
-    if (anim && o.material && o.material.color) { o.material.color.multiplyScalar(0.72); if (o.material.roughness !== undefined) o.material.roughness = Math.max(o.material.roughness, 0.72); } } });
+    if (anim && o.material && o.material.color) { o.material.color.multiplyScalar(0.72); if (o.material.roughness !== undefined) o.material.roughness = Math.max(o.material.roughness, 0.72);
+      // her light top: darker still and fully matte, or up close in the flashlight it turns into a white blur
+      if (o.name === 'Top') { o.material.color.multiplyScalar(0.5); o.material.roughness = 0.95; if (o.material.metalness !== undefined) o.material.metalness = 0; } } } });
   // her eyes glow: if you can see them, she can see you
   const eyes = [];
   for (const n of ['eyeL', 'eyeR']) {
