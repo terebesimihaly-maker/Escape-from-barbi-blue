@@ -119,7 +119,7 @@ const sfx = {
   hum(at) { if (!ac) return; const t = ac.currentTime, g = ac.createGain(); env(g, t, 0.15, 0.05, 0.8); out3d(g, at.x, at.y, at.h, 1.3);
     [120, 240, 361].forEach((f, i) => { const o = ac.createOscillator(); o.type = i ? 'sine' : 'sawtooth'; o.frequency.value = f; const og = ac.createGain(); og.gain.value = [0.5, 0.3, 0.12][i]; o.connect(og); og.connect(g); o.start(t); o.stop(t + 1); }); },
   // her footsteps: heavy and bare, from where she is (the dragging foot scrapes when she walks)
-  herStep(x, y, run, drag) { if (!ac) return; const t = ac.currentTime, g = ac.createGain(); out3d(g, x, y, 0.05);
+  herStep(x, y, run, drag, vol) { if (!ac || vol === 0) return; const t = ac.currentTime, g = ac.createGain(); if (vol !== undefined) g.gain.value = vol; out3d(g, x, y, 0.05);
     const o = ac.createOscillator(), og = ac.createGain(); o.frequency.setValueAtTime(95, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.16);
     env(og, t, 0.004, run ? 0.5 : 0.3, 0.2); o.connect(og); og.connect(g); o.start(t); o.stop(t + 0.3);
     const s = noise(), f = ac.createBiquadFilter(), sg = ac.createGain(); f.type = 'bandpass'; f.frequency.value = floorKind(FLOORS[floorIdx]) === 'concrete' ? 800 : 420; f.Q.value = 1.1;
@@ -182,6 +182,28 @@ const sfx = {
     [[700, 1100], [1900, 2600]].forEach(([a, b]) => { const n = noise(), bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 6;
       bp.frequency.setValueAtTime(a, t); bp.frequency.linearRampToValueAtTime(b, t + 0.35); bp.frequency.linearRampToValueAtTime(a * 0.9, t + 0.8);
       n.connect(bp); bp.connect(g); n.start(t); n.stop(t + 1.1); }); },
+  // a loose floorboard: a loud, long groan and a crack, from the board (js/stealth.js)
+  board(at, v) { if (!ac) return; const t = ac.currentTime, g = ac.createGain(); env(g, t, 0.02, 0.5 * v, 0.9); outAt(g, { x: at.x, y: at.y, h: 0.05 }, 0.5);
+    const o = ac.createOscillator(), f = ac.createBiquadFilter(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(rnd(150, 190), t); o.frequency.linearRampToValueAtTime(rnd(260, 320), t + 0.25); o.frequency.linearRampToValueAtTime(rnd(80, 110), t + 0.8);
+    f.type = 'bandpass'; f.frequency.value = 1300; f.Q.value = 9; o.connect(f); f.connect(g); o.start(t); o.stop(t + 1);
+    const n = noise(), bp = ac.createBiquadFilter(), ng = ac.createGain(); bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 1.2;
+    env(ng, t, 0.002, 0.5 * v, 0.07); n.connect(bp); bp.connect(ng); ng.connect(g); n.start(t); n.stop(t + 0.12); },
+  // your own breathing, in the wardrobe (in and out through the nose)
+  inhale(v) { if (!ac) return; const t = ac.currentTime;
+    [[0, 0.9, 700], [1.2, 1.1, 500]].forEach(([o, len, f]) => { const n = noise(), bp = ac.createBiquadFilter(), g = ac.createGain();
+      bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 0.8;
+      g.gain.setValueAtTime(0.0001, t + o); g.gain.exponentialRampToValueAtTime(v, t + o + len * 0.45); g.gain.exponentialRampToValueAtTime(0.0001, t + o + len);
+      n.connect(bp); bp.connect(g); out(g); n.start(t + o); n.stop(t + o + len + 0.05); }); },
+  // out of breath: a sharp, loud gasp
+  gasp() { if (!ac) return; const t = ac.currentTime, n = noise(), bp = ac.createBiquadFilter(), g = ac.createGain();
+    bp.type = 'bandpass'; bp.frequency.setValueAtTime(900, t); bp.frequency.linearRampToValueAtTime(2200, t + 0.35); bp.Q.value = 1.4;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.08); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+    n.connect(bp); bp.connect(g); out(g); n.start(t); n.stop(t + 0.6); },
+  // a teammate's ping: a soft two-note chime from where it points (js/team.js)
+  ping(at, hi) { if (!ac) return; const t = ac.currentTime;
+    (hi ? [988, 740] : [660, 880]).forEach((f, i) => { const o = ac.createOscillator(), g = ac.createGain(); o.type = 'sine'; o.frequency.value = f;
+      env(g, t + i * 0.11, 0.005, 0.12, 0.35); o.connect(g); if (at) out3d(g, at.x, at.y, 1.2, 0.4); else out(g); o.start(t + i * 0.11); o.stop(t + i * 0.11 + 0.5); }); },
   creak(v, at) { if (!ac) return; const t = ac.currentTime, o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
     o.type = 'sawtooth'; o.frequency.setValueAtTime(rnd(90, 140), t); o.frequency.linearRampToValueAtTime(rnd(50, 80), t + 0.6);
     f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 12; env(g, t, 0.05, v, 0.6);
@@ -253,10 +275,11 @@ loadSavedSong();
 function updateAudio(dt) {
   const m = monster, p = player;
   if (!m.active) { if (songOn) setSongLevel(0); return; }
-  const dx = m.x - p.x, d = Math.hypot(dx, m.y - p.y);
+  // (while she pretends to have left, everything about her goes quiet: js/monster.js, js/stealth.js)
+  const dx = m.x - p.x, d = Math.hypot(dx, m.y - p.y), loud = 1 - herQuiet();
   if (songOn) { // her song: faint when she's far away, louder and louder the closer she gets
     const near = d < 900 ? Math.pow(1 - d / 900, 1.6) : 0;
-    setSongLevel(closetScene && closetScene.t > 0 ? 1 : 0.05 + 0.95 * near);
+    setSongLevel(closetScene && closetScene.t > 0 ? 1 : (0.05 + 0.95 * near) * loud);
     if (songPan) songPan.pan.setTargetAtTime(closetScene ? 0 : relPan(m.x, m.y) * 0.65, ac.currentTime, 0.1);
   }
   // The music box is her sound: it gets louder as she gets closer, and while she chases you
@@ -266,8 +289,8 @@ function updateAudio(dt) {
     if (musicTimer <= 0) {
       musicTimer = chasing ? 0.24 : 0.42;
       const f = MELODY[musicI++ % MELODY.length], near = d < 520 ? Math.pow(1 - d / 520, 2) : 0;
-      if (f && !songOn) sfx.note(f * (chasing ? 0.94 : 1) * (1 + rnd(-0.012, 0.012)), chasing ? Math.max(0.3, near * 0.4) : near * 0.25, { x: m.x, y: m.y, h: 1.9 }); } }
-  const c = clamp(1 - d / 420, 0, 1);
+      if (f && !songOn) sfx.note(f * (chasing ? 0.94 : 1) * (1 + rnd(-0.012, 0.012)), (chasing ? Math.max(0.3, near * 0.4) : near * 0.25) * loud, { x: m.x, y: m.y, h: 1.9 }); } }
+  const c = clamp(1 - d / 420, 0, 1) * loud;
   hbTimer -= dt;
   if (hbTimer <= 0 && c > 0.05) { sfx.thump(0.15 + 0.55 * c); hbTimer = 1.1 - 0.75 * c; if (c > 0.55 && navigator.vibrate) navigator.vibrate(40); }
 }

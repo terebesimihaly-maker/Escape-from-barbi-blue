@@ -38,7 +38,7 @@ document.addEventListener('mousemove', e => {
 // left side of the screen: a joystick to walk; right side (or a mouse drag, if the cursor isn't locked): look around
 cvs.addEventListener('pointerdown', e => {
   if (state !== 'play') return;
-  if (MP.on && player.dead) { MP.spec++; return; }       // out of the game: tap to watch another teammate
+  if (MP.on && player.dead) { MP.spec++; return; }       // out of the game: tap to watch another teammate (js/team.js: WARN them)
   if (e.pointerType === 'mouse' && canLock) { lockMouse(); return; }
   if (e.pointerType === 'mouse' || e.clientX > W * 0.45) {
     if (look.id === null) { look.id = e.pointerId; look.x = e.clientX; look.y = e.clientY; }
@@ -65,6 +65,13 @@ runBtn.addEventListener('pointerdown', e => { e.preventDefault(); setSprint(true
 $('hide').addEventListener('pointerdown', e => { e.preventDefault(); toggleHide(); });
 $('phone').addEventListener('pointerdown', e => { e.preventDefault(); usePhone(); });
 $('revive').addEventListener('pointerdown', e => { e.preventDefault(); reviveHeld = true; });
+// in a wardrobe: hold BREATH (js/stealth.js)
+$('breath').addEventListener('pointerdown', e => { e.preventDefault(); breathHeld = true; });
+['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => $('breath').addEventListener(ev, () => { breathHeld = false; }));
+// playing together: ping, emotes, and (out of the game) warning the others (js/team.js)
+$('pingBtn').addEventListener('pointerdown', e => { e.preventDefault(); doPing(); });
+$('warnBtn').addEventListener('pointerdown', e => { e.preventDefault(); warnTeam(); });
+$('emoteBtn').addEventListener('pointerdown', e => { e.preventDefault(); showEmoteBar($('emoteBar').classList.contains('hidden')); });
 ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => $('revive').addEventListener(ev, () => { reviveHeld = false; }));
 
 // the phone: one text a minute. If she's chasing you, she drops everything and leaves for 15 seconds.
@@ -80,13 +87,15 @@ function usePhone() {
   setTimeout(() => { if (state !== 'play') return;
     if (chasing && monster === m && m.active) {
       m.active = false; m.spawnT = 15; m.relocate = true; m.state = 'wander'; m.path = []; m.huntT = 0; m.knowsCloset = false;
-      $('popRes').textContent = 'Seen ✓✓ ... she stopped and walked away.';
+      $('popRes').textContent = 'Seen ✓✓ ... she stopped and walked away.'; unlock('phone');
       showMsg('The music box goes quiet. She left. You have 15 seconds.', 3); sfx.sting();
     } else $('popRes').textContent = 'Delivered';
   }, 900);
 }
 
 addEventListener('keydown', e => { keys[e.code] = true;
+  if (e.code === 'F3') { e.preventDefault(); setPerf(!settings.perf); return; }          // the performance overlay (js/extras.js)
+  if (e.code === 'Space' && state === 'play') e.preventDefault();                        // (Space holds your breath: it mustn't press a button)
   if (!e.repeat && (e.code === 'KeyE' || e.code === 'Space' || e.code === 'Enter') && !$('note').classList.contains('hidden')) { closeNote(); return; }
   if (state === 'title') {
     if (e.code === 'Escape' && !$('panel').classList.contains('hidden')) closePanel();
@@ -94,6 +103,14 @@ addEventListener('keydown', e => { keys[e.code] = true;
   }
   if (e.code === 'KeyE' && !e.repeat && !reviveTarget) toggleHide();   // next to a downed teammate, E revives instead
   if ((e.code === 'Digit1' || e.code === 'Numpad1') && !e.repeat) usePhone();
+  if (MP.on && state === 'play' && !e.repeat) {                                          // playing together (js/team.js)
+    const n = /^(Digit|Numpad)([2-7])$/.exec(e.code);
+    if (n) doEmote(+n[2] - 2);
+    if (e.code === 'KeyQ') doPing();
+    if (e.code === 'KeyG' && player.dead) warnTeam();
+    if (player.dead && (e.code === 'ArrowLeft' || e.code === 'KeyA')) MP.spec--;       // out of the game: watch someone else
+    if (player.dead && (e.code === 'ArrowRight' || e.code === 'KeyD')) MP.spec++;
+  }
   if ((e.code === 'Escape' || e.code === 'KeyP') && state === 'play') pause(); });
 addEventListener('keyup', e => { keys[e.code] = false; });
 function readInput() {
@@ -123,17 +140,17 @@ function toggleHide() {
   if (puzzleTarget !== null && !hideTarget) { openPuzzle(puzzleTarget); return; }   // (the button says USE next to a puzzle)
   if (!hideTarget) return;
   if (closetTaken(hideTarget)) { lockedOut(); return; }
-  p.hidden = true; p.closet = hideTarget; p.x = hideTarget.x; p.y = hideTarget.y; hideCool = 0.5; p.hideYaw = p.hidePitch = 0;
+  p.hidden = true; p.closet = hideTarget; p.x = hideTarget.x; p.y = hideTarget.y; hideCool = 0.5; p.hideYaw = p.hidePitch = 0; fstat.hid = true;
   sfx.creak(0.12);
   const m = monster, d = Math.hypot(m.x - p.x, m.y - p.y);
   if (MP.on) { if (MP.host) onPlayerHid(MP.myId, p.x, p.y); }        // (the wardrobe scene is single player only)
-  else if (m.active && m.state === 'chase' && m.seenT < 0.8 && d < 230) m.knowsCloset = true;
+  else if (m.active && m.state === 'chase' && m.seenT < 0.8 && d < 230) { m.knowsCloset = true; m.kcWhy = ''; }
   else if (m.active && sceneCool <= 0) closetScene = { t: -1.4, spoke: false };
   $('hide').textContent = 'LEAVE';
 }
 function exitHide() { closetScene = null; const p = player, c = p.closet;
   if (c) { p.x = c.x + c.ox * (CLOSET_FRONT + 14); p.y = c.y + c.oy * (CLOSET_FRONT + 14); p.ang = Math.atan2(c.oy, c.ox); p.pitch = 0; }   // step out in front of the doors
-  p.hidden = false; p.closet = null; hideCool = 0.3; sfx.creak(0.1); $('hide').textContent = 'HIDE'; breathShown = false; }
+  p.hidden = false; p.closet = null; p.holding = false; breathHeld = false; hideCool = 0.3; sfx.creak(0.1); $('hide').textContent = 'HIDE'; breathShown = false; }
 
 /* ---------- screens ---------- */
 function toTitle() {
@@ -162,12 +179,15 @@ function renderLevels() {
     const t = document.createElement('span'); t.className = 't';
     const nm = document.createElement('b'); nm.textContent = F.name;
     const sub = document.createElement('small');
-    sub.textContent = !open ? 'Locked · escape ' + FLOORS[i - 1].name + ' first' : done ? 'Escaped' + (progress.best[i] ? ' · best ' + fmtTime(progress.best[i]) : '') : i === 0 ? 'Start here' : 'Not escaped yet';
+    const found = NOTE_POOL[i].filter((_, k) => progress.notes.includes(i + '-' + k)).length;
+    sub.textContent = (!open ? 'Locked · escape ' + FLOORS[i - 1].name + ' first' : done ? 'Escaped' + (progress.best[i] ? ' · best ' + fmtTime(progress.best[i]) : '') : i === 0 ? 'Start here' : 'Not escaped yet') +
+      (open ? ' · 📜 ' + found + '/' + NOTE_POOL[i].length : '');
     t.append(nm, sub);
     const st = document.createElement('span'); st.className = 's'; st.textContent = !open ? '🔒' : done ? '✓' : '▶';
     b.append(n, t, st); b.onclick = () => playFloor(i);
     li.appendChild(b); ul.appendChild(li);
   });
+  $('lvNotes').textContent = 'Torn notes found: ' + progress.notes.length + ' of ' + NOTES_TOTAL;
 }
 document.querySelectorAll('#diffSeg button').forEach(b => b.onclick = () => { settings.difficulty = b.dataset.d; saveSettings(); renderLevels(); });
 $('retry').onclick = () => { unlockAudio(); stopSong(); show('dead', false); if (MP.on) { showLobby(); return; } startFloor(floorIdx); lockMouse(); };
@@ -181,9 +201,11 @@ $('resume').onclick = () => { show('paused', false); unlockAudio(); if (MP.on) M
 // a torn note: click anywhere, tap, or press E / Space / Enter to carry on. On a computer the mouse stays captured the whole time
 // (it used to be released too late, or in multiplayer not at all, so there was no cursor to click the note with)
 let noteAt = 0;
-function openNote(text) {
+function openNote(text, count) {
   if (MP.on) MP.menu = true; else state = 'note';                   // (in multiplayer the game keeps going while you read)
-  $('paper').innerHTML = '<b>A TORN NOTE</b>'; $('paper').appendChild(document.createTextNode(text)); show('note', true); noteAt = performance.now();
+  $('paper').innerHTML = '<b>A TORN NOTE</b>'; $('paper').appendChild(document.createTextNode(text));
+  if (count) { const c = document.createElement('small'); c.className = 'count'; c.textContent = count; $('paper').appendChild(c); }
+  show('note', true); noteAt = performance.now();
 }
 function closeNote() {
   if ($('note').classList.contains('hidden') || performance.now() - noteAt < 350) return false;   // (not the click you were already making)
@@ -215,7 +237,7 @@ function die(reason) {
 function nextFloor() {
   stopSong();
   $('pop').classList.remove('on');
-  floorDone(floorIdx, levelTime);                       // (opens the next floor in the menu)
+  floorDone(floorIdx, levelTime); floorAchievements(floorIdx, levelTime);   // (opens the next floor in the menu; js/extras.js)
   if (floorIdx >= FLOORS.length - 1) {
     state = 'win'; setHud(false);
     $('wTime').textContent = 'Time: ' + fmtTime(runTime);

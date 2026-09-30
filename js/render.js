@@ -20,16 +20,33 @@ function placeCamera(t) {
     const cs = closetScene;
     yaw = Math.atan2(c.oy, c.ox) + (cs ? 0 : p.hideYaw) + Math.sin(t * 0.7) * 0.03;
     pitch = cs ? (cs.t > SC.lean ? 0.02 : 0.1) : -0.03 + p.hidePitch; h = 1.55 + Math.sin(t * 1.7) * 0.006;
-  } else if (p.dead && MP.on) {                   // out: watch a teammate who's still standing (tap to switch)
-    const al = [...MP.others.values()].filter(o => !o.down && !o.dead && !o.away), w = al.length ? al[MP.spec % al.length] : null;
+  } else if (p.dead && MP.on) {                   // out: watch a teammate who's still standing (tap, or ← →, to switch)
+    const w = watched();
     if (w) { cx = w.x - Math.cos(w.ang) * 30; cy = w.y - Math.sin(w.ang) * 30; yaw = w.ang; pitch = -0.25; h = 2.3;
-      if (blocked(cx, cy, 2)) { cx = w.x; cy = w.y; h = EYE; pitch = w.pitch; } }
+      if (blocked(cx, cy, 2)) { cx = w.x; cy = w.y; h = EYE; pitch = w.pitch; }
+      // (the camera glides after them, and to whoever you switch to, instead of jumping)
+      const sc = specCam, k = sc.id === w.id ? 1 - Math.exp(-lastDt * 6) : 1 - Math.exp(-lastDt * 3);
+      if (!sc.on || Math.hypot(sc.x - cx, sc.y - cy) > T * 12) Object.assign(sc, { x: cx, y: cy, h, yaw, pitch });
+      sc.on = true; sc.id = w.id; sc.x += (cx - sc.x) * k; sc.y += (cy - sc.y) * k; sc.h += (h - sc.h) * k;
+      sc.yaw = lerpAngle(sc.yaw, yaw, k); sc.pitch += (pitch - sc.pitch) * k;
+      cx = sc.x; cy = sc.y; h = sc.h; yaw = sc.yaw; pitch = sc.pitch; }
     else { h = 0.35; }
   } else if (p.down) { h = 0.32 + Math.sin(t * 1.2) * 0.01; pitch = clamp(pitch, -0.3, 1.1); }   // lying on the floor
   else if (p.moving) { h += Math.sin(stepPhase) * (p.sprinting ? 0.045 : 0.025); yaw += Math.sin(stepPhase * 0.5) * 0.006; }
+  if (!(p.dead && MP.on)) specCam.on = false;
   const sh = calm() ? 0 : shake * 0.01;
+  // very afraid: the picture sways and breathes (js/stealth.js; not with "Calm effects")
+  const fk = calm() || p.dead ? 0 : fearK(), fk2 = fk * fk;
   camera.position.set(cx * S + rnd(-sh, sh), h + rnd(-sh, sh) * 0.6, cy * S + rnd(-sh, sh));
-  camera.rotation.set(pitch, -Math.PI / 2 - yaw, 0);
+  camera.rotation.set(pitch + Math.sin(t * 0.9) * 0.02 * fk2, -Math.PI / 2 - yaw, Math.sin(t * 1.1) * 0.05 * fk2);
+  const fov = (camera.userData.fov || camera.fov) + Math.sin(t * 0.8) * 5 * fk2;
+  if (Math.abs(camera.fov - fov) > 0.01) { if (!camera.userData.fov) camera.userData.fov = camera.fov; camera.fov = fov; camera.updateProjectionMatrix(); }
+}
+const specCam = { on: false, id: '', x: 0, y: 0, h: 0, yaw: 0, pitch: 0 };
+// who you're watching when you're out of the game (MP.spec: tap / ← → to switch)
+function watched() {
+  const al = [...MP.others.values()].filter(o => !o.down && !o.dead && !o.away);
+  return al.length ? al[((MP.spec % al.length) + al.length) % al.length] : null;
 }
 function render3D(t) {
   const p = player, m = monster;
@@ -87,8 +104,8 @@ function render3D(t) {
     o.av.obj.position.set(o.x * S, 0, o.y * S); o.av.obj.rotation.y = Math.PI / 2 - o.ang;
     o.av.update(lastDt, { speed: o.spd * S, sprinting: o.sprinting, down: o.down, dead: o.dead, hidden: o.hidden, away: o.away, pitch: o.pitch, lightOn: settings.quality !== 'low' });
     o.av.setName(o.dead ? o.name + ' ✝' : o.down ? o.name + ' · ' + Math.ceil(o.downLeft) + 's' : o.name, o.down || o.dead); }
-  // things on the floor
-  animatePuzzles(t);
+  // things on the floor, and on the walls
+  animatePuzzles(t); updatePaintings(lastDt);
   for (const n of notes) if (n.obj) n.obj.visible = !n.read;
   const D = level.door;
   if (D) { if (powerOn && !D.open) { D.open = true; D.door.material = D.openMat; }
@@ -142,7 +159,7 @@ function drawScreenFx(t) {
     ctx.fillStyle = 'rgba(160,130,100,.5)'; ctx.font = (12 * DPR) + 'px Georgia'; ctx.textAlign = 'center';
     if (!closetScene) ctx.fillText('hiding · move to leave', cw / 2, ch - 110 * DPR);
   }
-  const d = m.active ? Math.hypot(m.x - p.x, m.y - p.y) : 9999, c = clamp(1 - d / 380, 0, 1);
+  const d = m.active ? Math.hypot(m.x - p.x, m.y - p.y) : 9999, c = clamp(1 - d / 380, 0, 1) * (1 - herQuiet());
   const vg = ctx.createRadialGradient(cw / 2, ch / 2, Math.min(cw, ch) * 0.3, cw / 2, ch / 2, Math.max(cw, ch) * 0.72);
   vg.addColorStop(0, 'rgba(0,0,0,0)');
   vg.addColorStop(1, 'rgba(' + Math.round(110 * c) + ',0,0,' + (0.45 + 0.4 * c * (0.7 + 0.3 * Math.sin(t * 10))) + ')');
@@ -154,7 +171,8 @@ function drawScreenFx(t) {
       ctx.fillStyle = 'rgba(80,255,140,' + (0.35 + 0.2 * Math.sin(t * 5)) + ')';
       ctx.beginPath(); ctx.moveTo(12 * DPR, 0); ctx.lineTo(-6 * DPR, -8 * DPR); ctx.lineTo(-6 * DPR, 8 * DPR); ctx.fill(); ctx.restore(); } }
   if (p.hidden && sc) drawClosetLine(sc.t);
-  if (MP.on) drawTeamFx(t);
+  drawFearFx(t);                                       // (js/stealth.js)
+  if (MP.on) { drawTeamFx(t); drawTeamMarks(t); }      // (js/team.js: pings and emotes)
   drawFuseHint(t);
   drawGrain(0.06);
   if (canLock && !locked() && state === 'play') {

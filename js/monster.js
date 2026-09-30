@@ -4,6 +4,9 @@
      chase  - she sees you
      search - she lost you: first the way you were heading, then the wardrobes near where she lost you
               (stopping at each door to listen: 'check'), stopping now and then to listen, then nearby rooms
+     leave  - she gave up... or so it sounds: she walks off, her footsteps and her song fading as if she's far away
+     lurk   - ...and waits around the corner, silent, for whoever comes out of the wardrobe first
+   She hears someone breathing in a wardrobe right next to her (unless they hold their breath: js/stealth.js).
    (The game is split over several plain scripts that share one scope; index.html loads them in order.) */
 'use strict';
 
@@ -37,13 +40,27 @@ function planSearch(m) {
     .forEach(w => plan.push({ at: { x: w.c.x + w.c.ox * 16, y: w.c.y + w.c.oy * 16 }, closet: w.i }));
   m.plan = plan; m.searchT = 8 + plan.length * 4; m.target = null;
 }
-// she stands at a wardrobe's doors, listening. Is anyone in there?
+// she stands at a wardrobe's doors, listening. Is anyone in there? Holding your breath, you're almost always safe
 function checkWardrobe(m, k, alive) {
   const q = alive.find(q => q.hidden && q.closet === k); m.checked.add(k);
   if (!q) return;
+  if (q.holding) {
+    if (Math.random() < DF().check * 0.15) { downPlayer(q, 'She heard your heart pounding.'); return; }
+    award(q.id, 'breath', 'She listens at the doors... and moves on.'); return; }
   if (!MP.on && q.me && sceneCool <= 0) {                // single player: "I know you're in here..."
     closetScene = { t: 0, spoke: false }; return; }
-  if (Math.random() < DF().check) downPlayer(q, 'She checked the wardrobe.');   // (in multiplayer the others can still revive you)
+  if (Math.random() < Math.min(0.9, DF().check * 1.6)) downPlayer(q, 'She heard you breathing.');   // (in multiplayer the others can still revive you)
+}
+// she gives up the search with someone hiding close by: sometimes she only pretends to leave. She walks off (sounding further
+// and further away) to a spot around a corner, 3 to 5 tiles from their wardrobe and out of its sight, and waits there, silent
+function startFakeLeave(m, q) {
+  const dq = bfsDist(Math.floor(q.x / T), Math.floor(q.y / T)), spots = [];
+  for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) { const k = dq[idx(x, y)];
+    if (k >= 3 && k <= 5 && !los(q.x, q.y, x * T + T / 2, y * T + T / 2)) spots.push([x, y]); }
+  if (!spots.length) return false;
+  m.state = 'leave'; m.target = center(spots[Math.random() * spots.length | 0]); m.fakeT = 20; m.fakeFor = q.id; m.fakeCool = 60;   // (fakeT: in case she somehow can't get there)
+  m.path = []; m.repath = 0; m.plan = []; m.checked.clear(); m.fakes = (m.fakes || 0) + 1;
+  return true;
 }
 
 function updateMonster(dt) {
@@ -82,6 +99,14 @@ function updateMonster(dt) {
       if (d < hear && d < hd) { hd = d; heard = q; } }
     if (heard) { track(heard); m.heard = true; m.listenT = 0; if (m.state !== 'chase') m.state = 'hunt'; }
   }
+  // someone breathing in a wardrobe right next to her: she stops, listens... and goes to open that one
+  m.bh = m.bh || {}; m.fakeCool -= dt;
+  for (const q of alive) {
+    if (!q.hidden || q.holding || q.closet < 0 || m.state === 'chase' || m.state === 'check' || dist(q) > 75 * D.hear) { m.bh[q.id] = 0; continue; }
+    if ((m.bh[q.id] = (m.bh[q.id] || 0) + dt) > 1.8) { const c = closets[q.closet]; m.bh[q.id] = 0; m.fakeFor = null;
+      m.state = 'search'; m.checked.delete(q.closet); m.plan = []; m.listenT = 0; m.searchT = Math.max(m.searchT, 6);
+      m.target = { x: c.x + c.ox * 16, y: c.y + c.oy * 16, closet: q.closet }; }
+  }
   if (m.huntT > 0) { m.huntT -= dt;
     let best = null, bd = 1e9; for (const q of alive) if (!q.hidden) { const d = dist(q); if (d < bd) { bd = d; best = q; } }
     if (best) { track(best); if (m.state !== 'chase') m.state = 'hunt'; } }
@@ -107,7 +132,9 @@ function updateMonster(dt) {
   }
   if (m.state === 'search') { spd = 26 * spdMul; m.searchT -= dt;
     if (m.listenT > 0) { m.listenT -= dt; spd = 0; }            // standing still, listening
-    if (m.searchT <= 0) { m.state = 'wander'; m.target = null; m.plan = []; m.checked.clear(); }
+    const hid = m.searchT <= 0 ? alive.find(q => q.hidden && dist(q) < T * 7) : null;
+    if (hid && m.fakeCool <= 0 && Math.random() < D.fake && startFakeLeave(m, hid)) { /* (she's "leaving") */ }
+    else if (m.searchT <= 0) { m.state = 'wander'; m.target = null; m.plan = []; m.checked.clear(); }
     else {
       if (!m.target || Math.hypot(m.x - m.target.x, m.y - m.target.y) < 8) {
         const done = m.target && m.target.closet !== undefined ? m.target : null;
@@ -120,6 +147,18 @@ function updateMonster(dt) {
       }
       target = m.target || m;
     } }
+  if (m.state === 'leave') {                              // "leaving": walking off, sounding further and further away
+    spd = 30 * spdMul; target = m.target; m.fakeT -= dt; m.quiet = Math.min(1, m.quiet + dt / 4);
+    if (m.fakeT <= 0 || Math.hypot(m.x - m.target.x, m.y - m.target.y) < 10) { m.state = 'lurk'; m.fakeT = rnd(9, 14); m.quiet = 1; }
+  }
+  if (m.state === 'lurk') {                               // ...and waiting around the corner, silent
+    spd = 0; target = m; m.fakeT -= dt;
+    const q = everyone.find(q => q.id === m.fakeFor);
+    if (q) m.ang = lerpAngle(m.ang, Math.atan2(q.y - m.y, q.x - m.x), Math.min(1, dt * 2));
+    if (m.fakeT <= 0) { m.state = 'wander'; m.target = null;             // she really leaves: they didn't fall for it
+      if (q && q.hidden && !q.down) award(q.id, 'notfooled', 'Her footsteps fade for real this time.'); m.fakeFor = null; }
+  }
+  if (m.state !== 'leave' && m.state !== 'lurk' && m.quiet > 0) m.quiet = Math.max(0, m.quiet - dt / 1.5);
   if (m.state === 'wander') {
     if (!m.target || Math.hypot(m.x - m.target.x, m.y - m.target.y) < 8) m.target = center(CELLS[Math.random() * CELLS.length | 0]);
     target = m.target; }
@@ -144,18 +183,18 @@ function updateMonster(dt) {
   const mv = Math.hypot(m.x - m.px, m.y - m.py); m.px = m.x; m.py = m.y;
   m.vel += ((mv < 20 ? mv / dt : 0) - m.vel) * Math.min(1, dt * 8);
   m.sndAcc = (m.sndAcc || 0) + (mv < 20 ? mv : 0);            // her footsteps: every stride walking, every other when she runs
-  if (m.active && m.sndAcc > (m.vel > 60 ? 38 : 17)) { m.sndAcc = 0; sfx.herStep(m.x, m.y, m.vel > 60, m.vel < 60 && m.foot > 0); }
+  if (m.active && m.sndAcc > (m.vel > 60 ? 38 : 17)) { m.sndAcc = 0; sfx.herStep(m.x, m.y, m.vel > 60, m.vel < 60 && m.foot > 0, 1 - herQuiet()); }
   if (mv < 20) { m.stepAcc += mv;
     if (m.stepAcc > 17) { m.stepAcc = 0; m.foot = -m.foot;
       prints.push({ x: m.x + Math.cos(m.ang + 1.57) * 3.5 * m.foot, y: m.y + Math.sin(m.ang + 1.57) * 3.5 * m.foot, a: m.ang, t: 14 });
       if (prints.length > 90) prints.shift(); } }
 
   const dMe = Math.hypot(p.x - m.x, p.y - m.y);
-  if (p.hidden && kcId !== me.id && dMe < 70 && !breathShown) { breathShown = true; showMsg("Don't breathe...", 2.5); }
+  if (p.hidden && kcId !== me.id && dMe < 115 && !breathShown && herQuiet() < 0.5) { breathShown = true; showMsg(canLock ? "She's close. Hold your breath: hold Space." : "She's close. Hold your breath: hold BREATH.", 2.5); }
   if (m.screamT > 0) return;
   for (const q of alive) {
     if (dist(q) < 24 && (!q.hidden || kcId === q.id) && !(q.inv > 0)) {
-      downPlayer(q, q.hidden ? 'She saw you climb into the wardrobe.' : ['She was faster.', 'The song got louder. Then it stopped behind you.', 'Now you get to stay forever.'][Math.random() * 3 | 0]);
+      downPlayer(q, q.hidden ? (m.kcWhy === 'gasp' ? 'She heard you gasp for air.' : 'She saw you climb into the wardrobe.') : ['She was faster.', 'The song got louder. Then it stopped behind you.', 'Now you get to stay forever.'][Math.random() * 3 | 0]);
       return;
     }
   }

@@ -18,6 +18,7 @@ function frame(now) {
   requestAnimationFrame(frame);        // (first, so one bad frame can never freeze the game)
   const ms = now - last, dt = Math.min(0.05, ms / 1000); last = now; lastDt = dt;
   if (state === 'play' && renderer) adaptResolution(ms, dt);
+  if (renderer) renderer.info.reset();                   // (the performance overlay counts this frame's draws: js/extras.js)
   try {
     if (MP.on) mpTick(dt);
     if (state === 'play') { gameT += dt; update(dt); }
@@ -26,12 +27,14 @@ function frame(now) {
     else if (state === 'dead') renderDead(dt);
     else if (state === 'title' || state === 'lobby') renderTitle(dt);
     else { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cvs.width, cvs.height); }
+    if (state !== 'play' && state !== 'note' && state !== 'paused' && fearFilter) setFearFilter(0);   // (the fear tint only in the game)
+    perfFrame(ms);
   } catch (e) {
     // report each different error once (as an uncaught error, so it still shows up in the console and in the tests)
     if (!loopErrors.has(e.message)) { loopErrors.add(e.message); setTimeout(() => { throw e; }); }
   }
 }
-init3D();
+init3D(); renderer.info.autoReset = false;
 addEventListener('resize', resize); resize(); applySettings();
 loadBarbi();
 loadBest(); updateRejoinBtn();

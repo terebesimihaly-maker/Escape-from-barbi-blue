@@ -202,7 +202,7 @@ function animateMonster(dt) {
   else if (scares.app && scares.app.anim) { a.play(scares.app.anim, 0.1); if (scares.app.anim === 'chase') a.setSpeed(7); }
   else if (scares.phantom) a.play('peek', 0.1);                 // the apparition at the end of the corridor (js/scares.js)
   else if (m.screamT > 0) a.play('scream', 0.15);
-  else if (m.state === 'check') a.play('peek', 0.4);             // at a wardrobe's doors, listening
+  else if (m.state === 'check' || m.state === 'lurk') a.play('peek', 0.4);   // at a wardrobe's doors, listening; or waiting around a corner
   else if (m.vel < 8) a.play('idle', 0.4);
   else { a.play(m.state === 'chase' ? 'chase' : m.state === 'hunt' ? 'run' : m.state === 'search' ? 'search' : 'walk', 0.3); a.setSpeed(m.vel * S); }
   a.update(dt);

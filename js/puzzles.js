@@ -347,11 +347,7 @@ function pzFail(msg) {
   if (MP.on) toHost({ t: 'noise' }); else puzzleNoise(player.x, player.y, 'me');
 }
 // (the host, or single player) she heard that
-function puzzleNoise(x, y, id) {
-  const m = monster; if (!m.active) return;
-  if (Math.hypot(m.x - x, m.y - y) > 700 * DF().hear) return;
-  m.last = { x, y }; m.ti = id; if (m.state !== 'chase') m.state = 'hunt';
-}
+function puzzleNoise(x, y, id) { makeNoise(x, y, id, 700 * DF().hear); }   // (js/stealth.js)
 // solved (applyFuse calls this)
 function puzzleSolved(k) { const pz = puzzles[k]; if (!pz) return; pz.solved = true; if (pzOpen && pzOpen.k === k) closePuzzle(); }
 // the hint arrow (js/render.js): the boxes not solved yet

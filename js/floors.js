@@ -3,7 +3,7 @@
 'use strict';
 
 /* ---------- game state ---------- */
-let state = 'title', floorIdx = 0, fuses = [], notes = [], closets = [], decals = [], exit = null;
+let state = 'title', floorIdx = 0, fuses = [], notes = [], closets = [], decals = [], creaks = [], exit = null;
 let player, monster, fusesGot = 0, powerOn = false, runTime = 0, huntTimer = 0, creakTimer = 5;
 let phoneCool = 0, popT = 0, closetScene = null, sceneCool = 0, levelTime = 0, runFrom = 0, lastFuseAt = 0;
 let shake = 0, deadT = 0, flicker = 1, flickTarget = 1, flickT = 0, hbTimer = 0, stepTimer = 0;
@@ -33,7 +33,17 @@ function generateFloor(i, n, diff) {
   for (const p of puzzlesD) used.add(p.cell.join(','));
   const fusesD = puzzlesD.map(p => p.cell.slice());       // (the stations: solving one counts as a "fuse")
   const nc = shuffle(CELLS.filter(c => !used.has(c.join(',')) && dist[idx(c[0], c[1])] > 2));
-  const notesD = nc.slice(0, 2).map(c => { used.add(c.join(',')); return [c[0], c[1], +rnd(-0.6, 0.6).toFixed(2)]; });
+  // torn notes: which three of this floor's four, and where, is different every time
+  const pick = shuffle(NOTE_POOL[i].map((_, k) => k)).slice(0, NOTES_PER_FLOOR);
+  const notesD = nc.slice(0, pick.length).map((c, j) => { used.add(c.join(',')); return [c[0], c[1], +rnd(-0.6, 0.6).toFixed(2), pick[j]]; });
+  // loose floorboards: in the rooms and the corridors between them (never at the start, the door, a wardrobe or a puzzle).
+  // Each lies to one side of its tile, so there is room to step around it
+  const open = [];
+  for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) if (!grid[y][x] && !used.has(x + ',' + y) && (x > 4 || y > 4) && dist[idx(x, y)] > 2) open.push([x, y]);
+  const creaksD = shuffle(open).slice(0, Math.round(CELLS.length / 10 * D.creaks) + i).map(([x, y]) => {
+    const along = isWall(x - 1, y) && isWall(x + 1, y) ? 1 : isWall(x, y - 1) && isWall(x, y + 1) ? 0 : Math.random() < 0.5 ? 1 : 0;   // (lengthwise along a corridor)
+    const side = (Math.random() < 0.5 ? -1 : 1) * rnd(7, 11);
+    return [Math.round(x * T + T / 2 + (along ? side : rnd(-4, 4))), Math.round(y * T + T / 2 + (along ? rnd(-4, 4) : side)), along]; });
 
   const decalsD = [];
   CELLS.forEach(c => { if (Math.random() > 0.35) return;
@@ -48,7 +58,7 @@ function generateFloor(i, n, diff) {
   const spawns = n > 1 ? [[-13, -13], [13, 13], [13, -13], [-13, 13]].map(([ox, oy]) => [T * 2.5 + ox, T * 2.5 + oy]) : [[T * 1.5, T * 1.5]];
   const mc = CELLS.filter(c => dist[idx(c[0], c[1])] > maxD * 0.55 && !(c[0] === far[0] && c[1] === far[1]));
   const m0 = mc.length ? mc[Math.random() * mc.length | 0] : far;
-  return { i, n, rows: grid.map(r => Array.from(r).join('')), exit: far, closets: closetsD, fuses: fusesD, puzzles: puzzlesD, notes: notesD, decals: decalsD,
+  return { i, n, rows: grid.map(r => Array.from(r).join('')), exit: far, closets: closetsD, fuses: fusesD, puzzles: puzzlesD, notes: notesD, decals: decalsD, creaks: creaksD,
     spawns, a0, m0, hunt: huntTime(i, n, D), diff: DIFFS[diff] ? diff : 'medium' };
 }
 function applyFloor(d, slot) {
@@ -59,15 +69,16 @@ function applyFloor(d, slot) {
   closets = d.closets.map(([tx, ty, ox, oy]) => ({ ...center([tx, ty]), ox, oy }));
   fuses = d.fuses.map(([tx, ty]) => ({ tx, ty, ...center([tx, ty]), got: false }));
   applyPuzzles(d.puzzles);
-  notes = d.notes.map(([tx, ty, rot], k) => ({ ...center([tx, ty]), read: false, text: NOTES[d.i * 2 + k], rot }));
+  notes = d.notes.map(([tx, ty, rot, k]) => ({ ...center([tx, ty]), read: false, text: NOTE_POOL[d.i][k], id: d.i + '-' + k, rot }));
+  creaks = (d.creaks || []).map(([x, y, along]) => ({ x, y, along, on: false }));
   decals = d.decals;
   const sp = d.spawns[Math.min(slot, d.spawns.length - 1)];
   player = { x: sp[0], y: sp[1], ang: d.a0, pitch: 0, hideYaw: 0, hidePitch: 0, stam: 1, exhausted: false, hidden: false, closet: null,
-    moving: false, sprinting: false, down: false, dead: false, downLeft: 0, inv: 0 };
+    moving: false, sprinting: false, down: false, dead: false, downLeft: 0, inv: 0, breath: 1, holding: false, gasping: false, fear: 0 };
   monster = { ...center(d.m0), ang: 0, state: 'wander', path: [], repath: 0, last: null, seenT: 99,
     searchT: 0, huntT: 0, target: null, knowsCloset: false, kc: null, ti: null, active: false, spawnT: (d.n > 1 ? 6 : 4) + DF().spawn, anim: 0, stepAcc: 0, foot: 1, screamT: 0, vel: 0,
-    dir: null, plan: [], checked: new Set(), checking: -1, checkT: 0, listenT: 0, heard: false };
-  resetScares(); monster.px = monster.x; monster.py = monster.y; monster.tx = monster.x; monster.ty = monster.y; prints = []; dust = [];
+    dir: null, plan: [], checked: new Set(), checking: -1, checkT: 0, listenT: 0, heard: false, quiet: 0, fakeT: 0, fakeCool: 0, fakeFor: null };
+  resetScares(); resetFloorExtras(); monster.px = monster.x; monster.py = monster.y; monster.tx = monster.x; monster.ty = monster.y; prints = []; dust = [];
 
   fusesGot = 0; powerOn = false; huntTimer = d.hunt; hideTarget = null; breathShown = false; phoneCool = 0; updatePhoneBtn(); popT = 0; closetScene = null; sceneCool = 0; $('pop').classList.remove('on');
   shake = 0; deadT = 0; reviveTarget = null; revP = 0;
@@ -81,7 +92,8 @@ function applyFloor(d, slot) {
 }
 function startFloor(i) { applyFloor(generateFloor(i, 1, settings.difficulty), 0); }
 function updateFuseHud() { $('hFuse').textContent = (powerOn ? '🔓 ' : '🧩 ') + fusesGot + '/' + fuses.length; }
-function setHud(on) { ['hud', 'stam', 'run', 'phone'].forEach(id => show(id, on)); if (!on) show('hide', false); }
+function setHud(on) { ['hud', 'stam', 'run', 'phone', 'fearBar'].forEach(id => show(id, on));
+  if (!on) ['hide', 'breath', 'breathBar', 'pingBtn', 'emoteBtn', 'warnBtn', 'emoteBar'].forEach(id => show(id, false)); lastHid = false; teamBtnState = ''; }
 
 let msgTimer = 0;
 function showMsg(t, dur) { const m = $('msg'); m.textContent = t; m.style.opacity = 1; msgTimer = dur || 2.5; }

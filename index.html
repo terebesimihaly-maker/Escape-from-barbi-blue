@@ -14,13 +14,22 @@
 <canvas id="gl"></canvas>
 <canvas id="c"></canvas>
 
-<div id="hud" class="hidden"><span id="hFloor">Floor 1</span><button id="pause">II</button><span id="hFuse">🧩 0/3</span></div>
+<div id="hud" class="hidden"><span><span id="hFloor">Floor 1</span> <span id="hNote"></span></span><button id="pause">II</button><span id="hFuse">🧩 0/3</span></div>
+<div id="fearBar" class="hidden"><i></i></div>
 <div id="stam" class="hidden"><i></i></div>
+<div id="breathBar" class="hidden"><i></i></div>
+<div id="perf" class="hidden"></div>
+<div id="toast"><b></b><small></small></div>
 <button id="phone" class="btn hidden" data-key="1">PHONE</button>
 <button id="hide" class="btn hidden" data-key="E">HIDE</button>
 <div id="pop"><div class="top"><span>Messages</span><span>now</span></div><div class="who">You</div><div class="bub">Eljössz velem edzeni?</div><div class="res" id="popRes"></div></div>
 <button id="run" class="btn hidden" data-key="Shift">RUN</button>
 <button id="revive" class="btn hidden" data-key="Hold E">REVIVE</button>
+<button id="breath" class="btn hidden" data-key="Hold Space">BREATH</button>
+<button id="pingBtn" class="sq hidden" data-key="Q" aria-label="Ping">📍</button>
+<button id="emoteBtn" class="sq hidden" data-key="2-7" aria-label="Emotes">💬</button>
+<button id="warnBtn" class="btn hidden" data-key="G">WARN</button>
+<div id="emoteBar" class="hidden"></div>
 <div id="downMsg" class="hidden"></div>
 <div id="reconn" class="hidden"><b>Connection lost</b><span id="reconnTxt">Reconnecting…</span><small>The others keep playing. Your place is kept for you.</small><button class="sbtn" id="reconnLeave">Leave</button></div>
 <div id="msg"></div>
@@ -36,6 +45,7 @@
       <button class="mi hidden" id="rejoinBtn">Rejoin game</button>
       <button class="mi" data-panel="mp">Play together</button>
       <button class="mi" data-panel="how">How to play</button>
+      <button class="mi" data-panel="ach">Achievements</button>
       <button class="mi" data-panel="settings">Settings</button>
       <a class="mi" href="animations.html">Her animations</a>
     </nav>
@@ -55,6 +65,9 @@
         <li><kbd>Shift</kbd><span>run (she hears running)</span></li>
         <li><kbd>E</kbd><span>hide in a wardrobe, and get out again</span></li>
         <li><kbd>1</kbd><span>phone: text her (every 45 s)</span></li>
+        <li><kbd>Space</kbd><span>in a wardrobe: hold your breath (not for too long)</span></li>
+        <li><kbd>Q</kbd><kbd>2</kbd>&ndash;<kbd>7</kbd><span>playing together: ping what you look at, quick messages</span></li>
+        <li><kbd>F3</kbd><span>show frames per second and ping</span></li>
       </ul>
       <ul class="keys touch-only">
         <li><kbd>Left side</kbd><span>drag to walk</span></li>
@@ -62,17 +75,27 @@
         <li><kbd>RUN</kbd><span>hold to sprint (she hears running)</span></li>
         <li><kbd>HIDE</kbd><span>get into a wardrobe when you're next to one</span></li>
         <li><kbd>PHONE</kbd><span>text her (it recharges: 35 s on Easy, 45 s on Medium, 60 s on Hard)</span></li>
+        <li><kbd>BREATH</kbd><span>in a wardrobe: hold to hold your breath (not for too long)</span></li>
+        <li><kbd>📍</kbd><kbd>💬</kbd><span>playing together: ping what you look at, quick messages</span></li>
       </ul>
       <p class="hint">Her song gets louder the closer she is. If you can see her blue eyes, she can see you. If she's chasing you, a text makes her stop and leave for 15 seconds. Don't let her see you climb into a wardrobe.</p>
+      <p class="hint">When she stops right outside your wardrobe, hold your breath: she listens. Run out of air and you gasp, and she hears that too. Sometimes her footsteps fade away... and she's still there.</p>
+      <p class="hint">Dark, cracked floorboards creak loudly when you step on them, and she hears it from rooms away. Step around them.</p>
+      <p class="hint">The top bar is your fear. The longer she's near, the more your hands shake, and you start hearing things.</p>
       <p class="hint">Headphones on. Silent mode off.</p>
-      <p class="hint">Playing together: stand next to a downed teammate and hold <b class="pc-only">E</b><b class="touch-only">REVIVE</b> for 3 seconds. The arrow in the top right corner points to them.</p>
+      <p class="hint">Playing together: a downed teammate has 90 seconds. Stand next to them and hold <b class="pc-only">E</b><b class="touch-only">REVIVE</b> for 3 seconds. The arrow in the top right corner points to them. Out of the game you watch the others, and can warn them where she is every 30 seconds.</p>
     </section>
     <section data-panel="levels">
       <h2>The house</h2>
       <div class="row"><span>Difficulty</span><div class="seg" id="diffSeg"><button data-d="easy">Easy</button><button data-d="medium">Medium</button><button data-d="hard">Hard</button></div></div>
       <p class="hint" id="diffHint"></p>
       <ol id="lvList" class="lvlist"></ol>
-      <p class="hint">Escape a floor to open the next one.</p>
+      <p class="hint">Escape a floor to open the next one. <span id="lvNotes"></span></p>
+    </section>
+    <section data-panel="ach">
+      <h2>Achievements</h2>
+      <p class="hint" id="achCount"></p>
+      <ul id="achList" class="achlist"></ul>
     </section>
     <section data-panel="mp">
       <h2>Play together</h2>
@@ -89,7 +112,8 @@
       <label class="row"><span>Volume</span><input type="range" id="setVol" min="0" max="1" step="0.05"><output id="outVol"></output></label>
       <label class="row"><span>Field of view</span><input type="range" id="setFov" min="65" max="110" step="1"><output id="outFov"></output></label>
       <label class="row"><span>Invert looking up and down</span><input type="checkbox" id="setInvert"></label>
-      <label class="row"><span>Calm effects<small>no strobing, no screen shake, gentler flicker</small></span><input type="checkbox" id="setCalm"></label>
+      <label class="row"><span>Calm effects<small>no strobing, no screen shake, gentler flicker, no swaying when afraid</small></span><input type="checkbox" id="setCalm"></label>
+      <label class="row"><span>Show performance<small>frames per second, and ping when playing together (F3)</small></span><input type="checkbox" id="setPerf"></label>
       <div class="row"><span>Graphics</span><div class="seg" id="qSeg"><button data-q="low">Low</button><button data-q="medium">Medium</button><button data-q="high">High</button></div></div>
       <div class="row col"><span>Her song</span>
         <div class="song"><label for="songFile">Pick a song&hellip;</label><span id="songName">Chase song</span>
@@ -169,6 +193,9 @@
 <script src="js/render.js"></script>
 <script src="js/scares.js"></script>
 <script src="js/puzzles.js"></script>
+<script src="js/stealth.js"></script>
+<script src="js/team.js"></script>
+<script src="js/extras.js"></script>
 <script src="js/cinematics.js"></script>
 <script src="js/main.js"></script>
 </body>

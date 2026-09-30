@@ -26,7 +26,7 @@ function inView(x, y, h, cone) {
 function scareCalm() {
   const p = player, m = monster;
   return state === 'play' && !p.hidden && !p.down && !p.dead && !closetScene && !(MP.on && MP.menu) &&
-    !(m.active && (m.state === 'chase' || m.state === 'hunt' || m.state === 'check'));
+    !(m.active && (m.state === 'chase' || m.state === 'hunt' || m.state === 'check' || m.state === 'leave' || m.state === 'lurk'));
 }
 
 /* ---------- the doll ---------- */
@@ -202,7 +202,7 @@ function dropDust(x, y) {
 /* ---------- the director ---------- */
 const SCARES = { doll: [startDoll, updateDoll], phantom: [startPhantom, updatePhantom], ceiling: [startCeiling, updateCeiling],
   dark: [startDark, updateDark], dash: [startDash, updateDash], breath: [startBreath, updateBreath], door: [startDoor, updateDoor] };
-function startScare(k) { if (!SCARES[k][0]()) return false; scares.active = k; scares.log.push(k); return true; }
+function startScare(k) { if (!SCARES[k][0]()) return false; scares.active = k; scares.log.push(k); addFear(0.2); return true; }
 function endScare(counted) { scares.active = null; scares.doll = null; scares.next = counted === false ? rnd(8, 15) : rnd(SCARE_GAP[0], SCARE_GAP[1]); }
 function updateScares(dt) {
   if (!level || state !== 'play') return;

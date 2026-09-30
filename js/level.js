@@ -61,7 +61,24 @@ function floorTexture(F) {
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (!grid[y][x]) paintFloor(g, F, x, y);
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (!grid[y][x]) paintShade(g, x, y);
   for (const d of decals) paintDecal(g, d);
+  for (const b of creaks) paintBoard(g, b);                 // the loose floorboards (js/stealth.js): dark, cracked, nails sticking up
   return toTex(c);
+}
+// a loose floorboard: two short dark planks, cracked, with a black gap around them and nails sticking up. Easy to learn, easy to miss when running
+function paintBoard(g, b) {
+  const k = PT / T, w = 13 * k, l = 24 * k;
+  g.save(); g.translate(b.x * k, b.y * k); if (b.along) g.rotate(Math.PI / 2);
+  g.fillStyle = 'rgba(0,0,0,.85)'; g.fillRect(-l / 2 - 1, -w / 2 - 1, l + 2, w + 2);
+  for (const [y0, sh] of [[-w / 2, '#3a2616'], [0.3, '#2c1c10']]) {
+    g.fillStyle = sh; g.fillRect(-l / 2, y0, l, w / 2 - 0.3);
+    g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 0.35;
+    for (let q = 0; q < 2; q++) { const gy = y0 + 1.2 + q * 2.2; g.beginPath(); g.moveTo(-l / 2, gy); g.bezierCurveTo(-l / 6, gy - 0.8, l / 6, gy + 0.8, l / 2, gy); g.stroke(); }
+  }
+  g.strokeStyle = 'rgba(225,190,140,.55)'; g.lineWidth = 0.5;                  // the crack
+  g.beginPath(); g.moveTo(-l / 2 + 2, -w / 2 + 1.5); g.lineTo(-2, -1); g.lineTo(1.5, 0.8); g.lineTo(l / 2 - 3, w / 2 - 1.2); g.stroke();
+  g.fillStyle = 'rgba(230,220,200,.8)';                                        // nails
+  for (const [x, y] of [[-l / 2 + 1.5, -w / 4], [l / 2 - 1.5, -w / 4], [-l / 2 + 1.5, w / 4], [l / 2 - 1.5, w / 4]]) { g.beginPath(); g.arc(x, y, 0.55, 0, 7); g.fill(); }
+  g.restore();
 }
 // (the floor is painted in a 40-unit design space per tile, PT, and scaled to the real tile size)
 const PT = 40;
@@ -280,9 +297,19 @@ function wallGeometry(faces) {
   geo.setIndex(I);
   return geo;
 }
-// doll portraits (some with glowing eyes) and words written on the walls
+// doll portraits (some with glowing eyes) and words written on the walls. Some portraits are more than paint:
+//   watchers - bigger, with real glass eyes that turn to follow you
+//   changers - look away from one you've been looking at, and when you look back it isn't the same picture any more
 function wallDecor(G, F, faces, doorTiles, skip) {
   const plain = portraitTexture(false), eyed = portraitTexture(true), eyeGlow = portraitEyes();
+  level.paintings = [];
+  const wGeoBig = new THREE.PlaneGeometry(0.66, 0.84), wMat = new THREE.MeshLambertMaterial({ map: portraitTexture('sockets') });
+  const cMat = new THREE.MeshLambertMaterial({ map: portraitTexture('changed') });
+  const eyeGeo = new THREE.SphereGeometry(0.021, 12, 8), irisGeo = new THREE.CircleGeometry(0.0115, 14), pupilGeo = new THREE.CircleGeometry(0.0055, 10);
+  const scleraMat = new THREE.MeshLambertMaterial({ color: 0xd8d4c8 }), irisMat = new THREE.MeshLambertMaterial({ color: 0x2a5bd0, emissive: 0x0a1c50 }),
+    pupilMat = new THREE.MeshBasicMaterial({ color: 0x020203 });
+  const makeEye = (x, y) => { const e = new THREE.Group(), s = new THREE.Mesh(eyeGeo, scleraMat), ir = new THREE.Mesh(irisGeo, irisMat), pu = new THREE.Mesh(pupilGeo, pupilMat);
+    ir.position.z = 0.0205; pu.position.z = 0.0209; e.add(s, ir, pu); e.position.set(x, y, 0.004); e.rotation.order = 'YXZ'; return e; };
   const pGeo = new THREE.PlaneGeometry(0.44, 0.56), wGeo = new THREE.PlaneGeometry(1.2, 0.6);
   const pMat = new THREE.MeshLambertMaterial({ map: plain });
   const eMat = new THREE.MeshLambertMaterial({ map: eyed, emissiveMap: eyeGlow, emissive: 0xffffff, emissiveIntensity: 2.5 });
@@ -292,8 +319,15 @@ function wallDecor(G, F, faces, doorTiles, skip) {
     if (exitFace(f) || (doorTiles && doorTiles.has(f.x + ',' + f.y)) || (skip && skip(f))) return;
     const r = hash(f.x * 7 + f.nx, f.y * 7 + f.nz, 91), cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2, rot = Math.atan2(f.nx, f.nz);
     if (r < F.frames) {
-      const m = new THREE.Mesh(pGeo, hash(f.x, f.y, 98) > 0.55 ? eMat : pMat);
-      m.position.set(cx + f.nx * 0.015, 1.72, cz + f.nz * 0.015); m.rotation.y = rot; G.add(m);
+      // (a few of each per floor: every pair of eyes is extra drawing)
+      const kind = hash(f.x, f.y, 97), nw = level.paintings.filter(q => q.kind === 'watch').length, nc = level.paintings.length - nw;
+      const watch = kind < 0.3 && nw < 6, glow = hash(f.x, f.y, 98) > 0.55;
+      const m = new THREE.Mesh(watch ? wGeoBig : pGeo, watch ? wMat : glow ? eMat : pMat);
+      m.position.set(cx + f.nx * 0.015, watch ? 1.66 : 1.72, cz + f.nz * 0.015); m.rotation.y = rot; G.add(m);
+      if (watch) {               // (eye positions: where the eyes are painted in portraitTexture, scaled to this frame)
+        const eyes = [makeEye(-0.0464, 0.0307), makeEye(0.0464, 0.0307)]; m.add(...eyes);
+        level.paintings.push({ kind: 'watch', mesh: m, eyes, x: (cx + f.nx * 0.3) / S, y: (cz + f.nz * 0.3) / S });
+      } else if (!glow && kind > 0.55 && nc < 6) level.paintings.push({ kind: 'change', mesh: m, mat: cMat, x: (cx + f.nx * 0.3) / S, y: (cz + f.nz * 0.3) / S, seen: false, away: 0, changed: false });
     } else if (r < F.frames + 0.045) {
       const txt = DECAL_WORDS[(hash(f.x, f.y, 92) * DECAL_WORDS.length) | 0];
       const mat = words[txt] || (words[txt] = new THREE.MeshLambertMaterial({ map: wordTexture(txt), transparent: true, depthWrite: false,
@@ -304,6 +338,29 @@ function wallDecor(G, F, faces, doorTiles, skip) {
     }
   });
 }
+// the paintings on every frame: watchers' eyes turn towards you; a changer you looked at, then looked away from, changes
+function updatePaintings(dt) {
+  if (!level || !level.paintings) return;
+  const p = player, cam = camera.position;
+  for (const P of level.paintings) {
+    const d = Math.hypot(P.x - p.x, P.y - p.y) * S;
+    if (P.kind === 'watch') {
+      const near = d < 11; if (P.eyes[0].visible !== near) P.eyes.forEach(e => { e.visible = near; });
+      if (!near) continue;
+      const lp = P.mesh.worldToLocal(_v.copy(cam));
+      for (const e of P.eyes) {
+        const dx = lp.x - e.position.x, dy = lp.y - e.position.y, yaw = clamp(Math.atan2(dx, lp.z), -0.9, 0.9), pitch = clamp(Math.atan2(dy, Math.hypot(dx, lp.z)), -0.6, 0.6);
+        const k = Math.min(1, dt * 5); e.rotation.y += (yaw - e.rotation.y) * k; e.rotation.x += (-pitch - e.rotation.x) * k;
+      }
+      P.look = Math.abs(P.eyes[0].rotation.y) + Math.abs(P.eyes[0].rotation.x);   // (for the tests)
+    } else if (!P.changed || P.pending) {
+      if (d > 8) { P.away = 0; continue; }
+      const seen = inView(P.x, P.y, 1.7, 0.8);
+      if (seen) { if (P.pending) { P.pending = false; sfx.whisper(0.07, { x: P.x, y: P.y, h: 1.7 }); addFear(0.12); } P.seen = true; P.away = 0; }
+      else if (P.seen && (P.away += dt) > 2.5) { P.mesh.material = P.mat; P.changed = true; P.pending = true; }   // (while nobody's looking)
+    }
+  }
+}
 function portraitTexture(glowing) {
   const c = mkCanvas(128, 164), g = c.getContext('2d');
   g.fillStyle = '#7a602a'; g.fillRect(0, 0, 128, 164);
@@ -313,7 +370,15 @@ function portraitTexture(glowing) {
   g.fillStyle = '#b9c6e4'; g.beginPath(); g.ellipse(64, 76, 22, 28, 0, 0, 7); g.fill();          // porcelain face
   g.fillStyle = '#0b0d18'; g.beginPath(); g.moveTo(40, 66); g.quadraticCurveTo(64, 40, 88, 66); g.lineTo(88, 56); g.quadraticCurveTo(64, 30, 40, 56); g.fill();
   g.fillStyle = '#2a4390'; g.beginPath(); g.moveTo(26, 150); g.quadraticCurveTo(64, 96, 102, 150); g.fill();   // blue dress
-  g.fillStyle = glowing ? '#9fe6ff' : '#05060c'; g.beginPath(); g.arc(55, 76, 3.2, 0, 7); g.arc(73, 76, 3.2, 0, 7); g.fill();
+  if (glowing === 'sockets') {                    // (the watcher's real eyes sit in these)
+    g.fillStyle = '#05060c'; g.beginPath(); g.arc(55, 76, 5, 0, 7); g.arc(73, 76, 5, 0, 7); g.fill();
+  } else if (glowing === 'changed') {             // the same doll... wrong: black eyes running down her face, and a grin
+    g.fillStyle = '#000'; g.beginPath(); g.ellipse(55, 76, 5, 6, 0, 0, 7); g.ellipse(73, 76, 5, 6, 0, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,.85)'; g.lineWidth = 2; g.beginPath(); g.moveTo(54, 80); g.lineTo(52, 100); g.moveTo(74, 80); g.lineTo(76, 96); g.stroke();
+    g.fillStyle = '#3a0508'; g.beginPath(); g.moveTo(48, 88); g.quadraticCurveTo(64, 104, 80, 88); g.quadraticCurveTo(64, 96, 48, 88); g.fill();
+    g.strokeStyle = '#d8d0c0'; g.lineWidth = 0.8; for (let x = 52; x < 78; x += 3.5) { g.beginPath(); g.moveTo(x, 89 + Math.abs(64 - x) * -0.08 + 2); g.lineTo(x, 93); g.stroke(); }
+    return toTex(c);
+  } else { g.fillStyle = glowing ? '#9fe6ff' : '#05060c'; g.beginPath(); g.arc(55, 76, 3.2, 0, 7); g.arc(73, 76, 3.2, 0, 7); g.fill(); }
   g.strokeStyle = 'rgba(30,40,80,.8)'; g.lineWidth = 1; g.beginPath(); g.moveTo(70, 56); g.lineTo(74, 66); g.lineTo(71, 74); g.stroke();
   g.fillStyle = '#6a1c24'; g.fillRect(60, 92, 8, 2);
   return toTex(c);

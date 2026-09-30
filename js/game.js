@@ -20,6 +20,8 @@ function update(dt) {
   sceneCool -= dt;
   updatePlayer(dt);
   if (state !== 'play') return;
+  updateStealth(dt);                                   // your breath, loose floorboards, fear (js/stealth.js)
+  updateExtras(dt);                                    // achievements, pings, the performance overlay (js/extras.js, js/team.js)
   if (closetScene) { updateCloset(dt); updateAudio(dt); animateMonster(dt); return; }
   if (!MP.on || MP.host) updateMonster(dt); else updateMonsterClient(dt);     // (in multiplayer only the host runs her AI)
   if (state !== 'play') return;
@@ -28,7 +30,7 @@ function update(dt) {
   updateScares(dt);
 
   // flashlight flicker, worse when she's near
-  const d = Math.hypot(monster.x - player.x, monster.y - player.y), near = monster.active && d < 220;
+  const d = Math.hypot(monster.x - player.x, monster.y - player.y), near = monster.active && d < 220 && herQuiet() < 0.5;
   flickT -= dt;
   if (flickT <= 0) { flickTarget = Math.random() < (near ? 0.4 : 0.1) ? rnd(0.15, 0.6) : 1; flickT = rnd(0.04, near ? 0.2 : 0.9); }
   flicker += (flickTarget - flicker) * Math.min(1, dt * 25);
@@ -48,8 +50,10 @@ function update(dt) {
 let downMsgText = '';
 function updateDownMsg() {
   const p = player; let t = '';
-  if (p.dead && MP.scareT <= 0) { const al = [...MP.others.values()].filter(o => !o.down && !o.dead && !o.away), w = al.length ? al[MP.spec % al.length] : null;
-    t = "You didn't make it<small>" + (w ? 'Watching ' + escapeHtml(w.name) + ' · tap to switch' : 'Nobody is left standing') + '</small>'; }
+  if (p.dead && MP.scareT <= 0) { const w = watched(), n = [...MP.others.values()].filter(o => !o.down && !o.dead && !o.away).length;
+    const doing = w ? (w.hidden ? ' (hiding)' : w.sprinting ? ' (running)' : '') : '';
+    t = "You didn't make it<small>" + (w ? 'Watching ' + escapeHtml(w.name) + doing + (n > 1 ? (canLock ? ' · ← → to switch' : ' · tap to switch') : '') +
+      ' · ' + (team.warnCool > 0 ? 'warn them again in ' + Math.ceil(team.warnCool) + 's' : (canLock ? 'G' : 'WARN') + ': show them where she is') : 'Nobody is left standing') + '</small>'; }
   else if (p.down && MP.scareT <= 0) { const by = [...MP.others.values()].find(o => o.rv === MP.myId);
     t = (by ? escapeHtml(by.name) + ' is reviving you…' : "You're down · " + Math.ceil(p.downLeft) + 's') + '<small>a teammate can get you back up</small>'; }
   if (t !== downMsgText) { downMsgText = t; $('downMsg').innerHTML = t; show('downMsg', !!t); }
@@ -112,10 +116,13 @@ function updatePlayer(dt) {
   if (p.sprinting) { p.stam -= dt / 3; if (p.stam <= 0) { p.stam = 0; p.exhausted = true; showMsg('You are out of breath...', 1.5); } }
   else { p.stam = Math.min(1, p.stam + dt / 5); if (p.exhausted && p.stam > 0.35) p.exhausted = false; }
   if (input.turn) p.ang += input.turn * 2.4 * dt;
+  { const fk = fearK() * (calm() ? 0.5 : 1); if (fk > 0) p.ang += Math.sin(levelTime * 0.6) * 0.3 * fk * fk * dt; }   // (and the view drifts)
   if (p.moving) {
     // joystick up = the way you're looking
     const spd = (p.sprinting ? 170 : p.exhausted ? 80 : 105) * mag, fw = -input.y / mag, st = input.x / mag;
-    const ca = Math.cos(p.ang), sa = Math.sin(p.ang), mx = ca * fw - sa * st, my = sa * fw + ca * st;
+    // very afraid: your hands shake, you don't quite walk where you mean to (js/stealth.js)
+    const fk = fearK() * (calm() ? 0.5 : 1), wob = fk * fk * Math.sin(levelTime * 1.7) * 0.35;
+    const ca = Math.cos(p.ang + wob), sa = Math.sin(p.ang + wob), mx = ca * fw - sa * st, my = sa * fw + ca * st;
     const dx = mx * spd * dt, dy = my * spd * dt;
     // (a wardrobe only blocks you walking into it: if you're somehow already inside its space, you can always get out)
     const inCloset = closetBlocked(p.x, p.y, 11);
@@ -128,7 +135,8 @@ function updatePlayer(dt) {
   updatePuzzles(dt);                                   // the labyrinth box you're next to, and the ball while one is open (js/puzzles.js)
   for (const n of notes) if (!n.read && Math.hypot(n.x - p.x, n.y - p.y) < 20) {
     n.read = true; setSprint(false); joy.id = null; joy.x = joy.y = 0;
-    openNote(n.text); return;
+    const had = progress.notes.length, all = noteFound(n.id); updateNoteHud();
+    openNote(n.text, all > had ? 'Note ' + all + ' of ' + NOTES_TOTAL + ' found' : 'You have read this one before'); noteAchievements(all); return;
   }
   const de = Math.hypot(exit.x - p.x, exit.y - p.y);
   if (de < 18) {

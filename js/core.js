@@ -16,7 +16,7 @@ function resize() {
   applyQuality(); renderer.setSize(W, H, false);
   // keep the chosen field of view sideways (80 degrees unless changed in the settings), in portrait and landscape
   const asp = W / H, fov = clamp(2 * Math.atan(Math.tan(clamp(settings.fov || 80, 65, 110) / 2 * Math.PI / 180) / asp) * 180 / Math.PI, 50, 110);
-  camera.aspect = asp; camera.fov = fov; camera.updateProjectionMatrix();
+  camera.aspect = asp; camera.fov = fov; camera.userData.fov = fov; camera.updateProjectionMatrix();   // (userData.fov: without the fear sway, js/render.js)
   titleCam.aspect = asp; titleCam.fov = asp < 1 ? 38 : 30;
   // wide screens: the menu is on the left, so she is moved to the right of the picture
   if (asp >= 1 && W >= 700) titleCam.setViewOffset(W, H, -W * 0.22, 0, W, H);
@@ -104,41 +104,61 @@ const FLOORS = [
 // difficulty: single player picks it with the floor; together, the lobby owner picks it for everyone.
 // speed/hear: her speed and hearing; sight: how far she sees (units); hunt: seconds added to the time between her screams;
 // spawn: seconds before she wakes; check: the chance she opens a wardrobe she stops at; phone: its cooldown;
-// down: seconds to revive a teammate. (How many puzzles, and how hard they are: js/puzzles.js)
+// down: seconds a downed player has before a teammate must revive them; fake: the chance she only pretends to leave (js/monster.js);
+// breath: how long you can hold your breath in a wardrobe; creaks: how many loose floorboards (per 10 rooms).
+// (How many puzzles, and how hard they are: js/puzzles.js)
 const DIFFS = {
-  easy:   { name: 'Easy', speed: 0.85, hear: 0.75, sight: 300, hunt: 18, spawn: 5, check: 0.12, phone: 35, down: 65,
+  easy:   { name: 'Easy', speed: 0.85, hear: 0.75, sight: 300, hunt: 18, spawn: 5, check: 0.12, phone: 35, down: 90, fake: 0.3, breath: 9, creaks: 0.8,
             text: 'She is slower and hears less. One puzzle less, and smaller, easier ones. The phone recharges faster.' },
-  medium: { name: 'Medium', speed: 1, hear: 1, sight: 360, hunt: 0, spawn: 0, check: 0.3, phone: 45, down: 50,
+  medium: { name: 'Medium', speed: 1, hear: 1, sight: 360, hunt: 0, spawn: 0, check: 0.3, phone: 45, down: 90, fake: 0.5, breath: 7, creaks: 1.2,
             text: 'The house as it was meant to be played.' },
-  hard:   { name: 'Hard', speed: 1.1, hear: 1.3, sight: 430, hunt: -10, spawn: -1, check: 0.5, phone: 60, down: 40,
+  hard:   { name: 'Hard', speed: 1.1, hear: 1.3, sight: 430, hunt: -10, spawn: -1, check: 0.5, phone: 60, down: 90, fake: 0.7, breath: 6, creaks: 1.6,
             text: 'She is faster (you can still outrun her), hears and sees further, and opens wardrobes more often. Bigger, harder puzzles.' },
 };
 let curDiff = 'medium';                                   // (the difficulty of the floor being played)
 const DF = () => DIFFS[curDiff] || DIFFS.medium;
 // progress (kept on this device): the floors you've escaped, and your best time on each. A floor opens once the one before it is escaped.
-const progress = { done: [], best: [] };
+const progress = { done: [], best: [], notes: [], hard: [] };   // notes: every torn note you've found ('floor-number'); hard: floors escaped on Hard
 try { Object.assign(progress, JSON.parse(localStorage.getItem('bb_progress') || '{}')); } catch (e) {}
 const saveProgress = () => { try { localStorage.setItem('bb_progress', JSON.stringify(progress)); } catch (e) {} };
 const unlocked = i => i === 0 || !!progress.done[i - 1];
 function floorDone(i, secs) {
   progress.done[i] = true;
   if (secs > 1 && (!progress.best[i] || secs < progress.best[i])) progress.best[i] = Math.round(secs);
+  if (curDiff === 'hard') progress.hard[i] = true;
   saveProgress();
+}
+// a torn note you've read: counted once, forever (the menu shows how many of all of them you've found)
+function noteFound(id) {
+  if (!progress.notes.includes(id)) { progress.notes.push(id); saveProgress(); }
+  return progress.notes.length;
 }
 // what a floor looks and sounds like underfoot, and what its walls are painted with
 const floorKind = F => F.floor || F.style, wallKind = F => F.walls || F.style;
-const NOTES = [
-  "Day 3.\nThe house keeps getting longer. I hear a music box behind the walls.\nMom says we don't own a music box.",
-  "Don't run unless you have to.\nShe hears running.\nShe hears EVERYTHING.",
-  "If the melody gets close, get in a wardrobe.\nShe doesn't look inside...\nunless she SAW you go in.",
-  "Her eyes glow in the dark.\nIf you can see them,\nshe can see you.",
-  "Solve every puzzle box and the door unlocks.\nBut the lock is loud. It wakes her up.\nBe ready to move.",
-  "I can see the door.\nI can hear her humming right behind m",
-  "The attic ladder was already down.\nSomeone wanted me up here.\nThe sheets move when I'm not looking.",
-  "Wardrobes won't save you forever.\nIf she lost you close by,\nshe checks every one of them.",
-  "Workshop ledger, 1961.\nOrder 12: one porcelain doll, blue glass eyes.\nNever collected.",
-  "She only wants someone to stay.\nThe front door is past the workbenches.\nDon't look at the shelves.",
+// torn notes: four for each floor, three of them are lying somewhere on it (a different three, in different places, every time)
+const NOTE_POOL = [
+  ["Day 3.\nThe house keeps getting longer. I hear a music box behind the walls.\nMom says we don't own a music box.",
+   "Don't run unless you have to.\nShe hears running.\nShe hears EVERYTHING.",
+   "The crib is still warm.\nThere is no baby in this house.\nThere never was.",
+   "I counted the dolls on the shelf. Eleven.\nI counted again. Twelve.\nOne of them is facing me now."],
+  ["If the melody gets close, get in a wardrobe.\nShe doesn't look inside...\nunless she SAW you go in.",
+   "Her eyes glow in the dark.\nIf you can see them,\nshe can see you.",
+   "The paintings in this hall have real eyes.\nI stopped looking at them.\nThey didn't stop looking at me.",
+   "Some floorboards are loose. The dark, cracked ones.\nThey creak so loud she hears it from rooms away.\nStep around them."],
+  ["Solve every puzzle box and the door unlocks.\nBut the lock is loud. It wakes her up.\nBe ready to move.",
+   "I can see the door.\nI can hear her humming right behind m",
+   "When she stops at the wardrobe, hold your breath.\nShe listens for it.\nDon't hold it too long.",
+   "She walked away. I heard her go.\nI waited and waited.\nShe was standing right outside the whole time."],
+  ["The attic ladder was already down.\nSomeone wanted me up here.\nThe sheets move when I'm not looking.",
+   "Wardrobes won't save you forever.\nIf she lost you close by,\nshe checks every one of them.",
+   "My hands keep shaking.\nThe longer she's near, the less I trust my eyes.\nI heard her twice today. She wasn't there.",
+   "Someone left toys up here in a circle.\nIn the middle: a photograph of me.\nTaken tonight."],
+  ["Workshop ledger, 1961.\nOrder 12: one porcelain doll, blue glass eyes.\nNever collected.",
+   "She only wants someone to stay.\nThe front door is past the workbenches.\nDon't look at the shelves.",
+   "Order 12, maker's note:\n'The eyes must follow.\nThe eyes must always follow.'",
+   "If you're reading this, you got further than me.\nDon't stop. Don't look back.\nShe's already behind you."],
 ];
+const NOTES_PER_FLOOR = 3, NOTES_TOTAL = NOTE_POOL.reduce((n, f) => n + f.length, 0);
 const DECAL_WORDS = ['RUN', 'HIDE', 'SHE SEES', 'BLUE', "DON'T", 'LA LA LA', 'NO WAY OUT'];
 const MELODY = [659, 784, 988, 880, 784, 659, 740, 622, 659, 0, 523, 494, 523, 587, 659, 0];
 

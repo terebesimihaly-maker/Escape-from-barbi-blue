@@ -150,6 +150,14 @@ function hostHandle(id, m) {
     case 'exit': hostExit(); break;
     case 'phone': hostPhone(id); break;
     case 'revive': hostRevive(id, String(m.id)); break;
+    case 'gasp': if (MP.inGame) heardGasp(allPlayers().find(q => q.id === id)); break;           // (js/stealth.js)
+    case 'creak': { const b = creaks[m.k | 0], q = meOrOther(id), qx = q && (q === player ? q.x : q.tx), qy = q && (q === player ? q.y : q.ty);   // (where they last said they were)
+      if (b && q && MP.inGame && Math.hypot(qx - b.x, qy - b.y) < 80) { boardNoise(b, id, !!m.r); hostEmit({ t: 'creak', k: m.k | 0, by: id, r: m.r ? 1 : 0 }); }
+      break; }
+    case 'ping': hostPing(id, m); break;                                  // (js/team.js)
+    case 'emote': hostEmote(id, m); break;
+    case 'warn': hostWarn(id); break;
+    case 'pi': send(MP.conns.get(id), { t: 'po', s: m.s }); break;        // (the performance overlay's ping)
   }
 }
 
@@ -365,12 +373,17 @@ function clientHandle(m) {
       break; }
     case 'w': clientWorld(m); break;
     case 'fuseGot': applyFuse(m.k, m.by); break;
+    case 'creak': if (m.by !== MP.myId && creaks[m.k]) sfx.board(creaks[m.k], m.r ? 1 : 0.75); break;   // a teammate stepped on a loose board
+    case 'ping': gotPing(m); break;
+    case 'emote': gotEmote(m); break;
+    case 'ach': if (m.id === MP.myId) { unlock(m.a); if (m.msg) showMsg(m.msg, 2.5); } break;
+    case 'po': { const rt = performance.now() - m.s; if (rt >= 0 && rt < 60000) MP.rtt = MP.rtt ? MP.rtt * 0.6 + rt * 0.4 : rt; break; }
     case 'scream': {
       const d = Math.hypot(monster.x - player.x, monster.y - player.y);
       startScream(); sfx.scream(clamp(1 - d / 700, 0.2, 0.8)); shake = 7;
       showMsg('A scream tears through the house. She knows where you are. HIDE.', 3.5); break; }
     case 'phoned': {
-      if (m.by === MP.myId) $('popRes').textContent = m.ok ? 'Seen ✓✓ ... she stopped and walked away.' : 'Delivered';
+      if (m.by === MP.myId) { $('popRes').textContent = m.ok ? 'Seen ✓✓ ... she stopped and walked away.' : 'Delivered'; if (m.ok) unlock('phone'); }
       if (m.ok) { sfx.sting(); showMsg((m.by === MP.myId ? 'The music box goes quiet' : nameOf(m.by) + ' texted her. The music box goes quiet') + '. She left. 15 seconds.', 3); }
       break; }
     case 'down': {
@@ -387,6 +400,7 @@ function clientHandle(m) {
     case 'revived': {
       const q = meOrOther(m.id); if (!q) break;
       q.down = false; q.dead = false; q.downLeft = 0; q.inv = 3;
+      if (m.by === MP.myId) unlock('angel');
       if (m.id === MP.myId) { player.stam = 0.6; player.exhausted = false; show('downMsg', false); setHud(true); showMsg(nameOf(m.by) + ' got you back up!', 2.5); }
       else showMsg(nameOf(m.by) + ' revived ' + nameOf(m.id) + '.', 2.5);
       sfx.pickup(); break; }
@@ -394,7 +408,7 @@ function clientHandle(m) {
       const o = MP.others.get(m.id); if (o) { removeAvatar(o); MP.others.delete(m.id); }
       showMsg(m.name + ' left the game.', 3); break; }
     case 'next': {
-      floorDone(floorIdx, levelTime);                  // (escaping together opens the next floor for everyone)
+      floorDone(floorIdx, levelTime); floorAchievements(floorIdx, levelTime);   // (escaping together opens the next floor for everyone)
       stopSong(); $('pop').classList.remove('on'); setHud(false); show('downMsg', false); show('revive', false);
       state = 'trans'; setSprint(false);
       const F = FLOORS[m.i];
@@ -403,7 +417,7 @@ function clientHandle(m) {
       let n = 4; const tick = () => { $('tText').textContent = F.text + '  Everyone goes down together in ' + n + '…'; };
       tick(); clearInterval(MP.transTimer); MP.transTimer = setInterval(() => { n--; if (n <= 0 || state !== 'trans') { clearInterval(MP.transTimer); return; } tick(); }, 1000);
       break; }
-    case 'win': floorDone(floorIdx, levelTime); mpEnd(true); break;
+    case 'win': floorDone(floorIdx, levelTime); floorAchievements(floorIdx, levelTime); mpEnd(true); break;
     case 'over': mpEnd(false); break;
   }
 }
@@ -436,7 +450,7 @@ function clientWorld(m) {
   const M = m.m, mo = monster;
   if (M.ac && !mo.active) showMsg('Somewhere in the house, a music box starts playing.', 3);
   if (M.s === 'chase' && M.ti === MP.myId && !(mo.state === 'chase' && mo.ti === MP.myId)) { sfx.sting(); shake = Math.max(shake, 5); if (navigator.vibrate) navigator.vibrate(120); }
-  mo.tx = M.x; mo.ty = M.y; mo.tang = M.a; mo.state = M.s; mo.active = !!M.ac; mo.vel = M.v; mo.screamT = M.sc; mo.ti = M.ti;
+  mo.tx = M.x; mo.ty = M.y; mo.tang = M.a; mo.state = M.s; mo.active = !!M.ac; mo.vel = M.v; mo.screamT = M.sc; mo.ti = M.ti; mo.quiet = M.q || 0;
   if (!mo.seen) { mo.x = mo.tx; mo.y = mo.ty; mo.px = mo.x; mo.py = mo.y; mo.ang = mo.tang; mo.seen = true; }
 }
 // on the joining players' screens she is moved smoothly to where the host says she is
@@ -447,7 +461,7 @@ function updateMonsterClient(dt) {
   m.x += (m.tx - m.x) * k; m.y += (m.ty - m.y) * k; m.ang = lerpAngle(m.ang, m.tang || 0, k);
   const mv = Math.hypot(m.x - m.px, m.y - m.py); m.px = m.x; m.py = m.y;
   m.sndAcc = (m.sndAcc || 0) + (mv < 20 ? mv : 0);            // her footsteps: every stride walking, every other when she runs
-  if (m.active && m.sndAcc > (m.vel > 60 ? 38 : 17)) { m.sndAcc = 0; sfx.herStep(m.x, m.y, m.vel > 60, m.vel < 60 && m.foot > 0); }
+  if (m.active && m.sndAcc > (m.vel > 60 ? 38 : 17)) { m.sndAcc = 0; sfx.herStep(m.x, m.y, m.vel > 60, m.vel < 60 && m.foot > 0, 1 - herQuiet()); }
   if (m.active && mv < 20) { m.stepAcc += mv;
     if (m.stepAcc > 17) { m.stepAcc = 0; m.foot = -m.foot;
       prints.push({ x: m.x + Math.cos(m.ang + 1.57) * 3.5 * m.foot, y: m.y + Math.sin(m.ang + 1.57) * 3.5 * m.foot, a: m.ang, t: 14 });
@@ -462,6 +476,7 @@ function hostPlayerState(id, m) {
   const num = v => Number.isFinite(v) ? v : 0;
   o.tx = clamp(num(m.x), 0, GW * T); o.ty = clamp(num(m.y), 0, GH * T); o.ang = num(m.a); o.pitch = clamp(num(m.p), -1.2, 1.2);
   const wasHidden = o.hidden; o.hidden = !!m.h; o.closet = m.c | 0; o.moving = !!m.mv; o.sprinting = !!m.sp; o.rv = typeof m.rv === 'string' ? m.rv : '';
+  o.holding = !!m.b; o.rt = clamp(m.rt | 0, 0, 99999);                   // (holding their breath; their ping, for the overlay)
   // two players in one wardrobe (they climbed in at the same moment): whoever was there first stays, the other is pushed out
   if (o.hidden && !wasHidden) {
     const k = o.closet, first = (player.hidden && closets.indexOf(player.closet) === k) ||
@@ -473,7 +488,7 @@ function hostPlayerState(id, m) {
 // a player climbed into a wardrobe: if she was chasing that player and saw it happen, she knows where they are
 function onPlayerHid(id, x, y) {
   const mo = monster;
-  if (mo.active && mo.state === 'chase' && mo.ti === id && mo.seenT < 0.8 && Math.hypot(mo.x - x, mo.y - y) < 230) mo.kc = id;
+  if (mo.active && mo.state === 'chase' && mo.ti === id && mo.seenT < 0.8 && Math.hypot(mo.x - x, mo.y - y) < 230) { mo.kc = id; mo.kcWhy = ''; }
 }
 // a player got the ball to the goal: solved for everyone
 function hostSolve(id, k) {
@@ -512,9 +527,9 @@ function hostRevive(by, id) {
 // everyone the monster can go after: you, and your teammates
 function allPlayers() {
   const list = [{ id: MP.myId || 'me', me: true, x: player.x, y: player.y, hidden: player.hidden, moving: player.moving, sprinting: player.sprinting,
-    down: player.down, dead: player.dead, inv: player.inv, closet: player.hidden ? closets.indexOf(player.closet) : -1 }];
+    down: player.down, dead: player.dead, inv: player.inv, closet: player.hidden ? closets.indexOf(player.closet) : -1, holding: player.holding }];
   if (MP.on) for (const o of MP.others.values()) if (!o.away) list.push({ id: o.id, x: o.x, y: o.y, hidden: o.hidden, moving: o.moving, sprinting: o.sprinting, down: o.down, dead: o.dead, inv: o.inv,
-    closet: o.hidden ? o.closet : -1 });
+    closet: o.hidden ? o.closet : -1, holding: !!o.holding });
   return list;
 }
 function downPlayer(q, reason) {
@@ -529,7 +544,7 @@ function downPlayer(q, reason) {
 // you're down: the jumpscare plays over the game (the game keeps running for everyone), then you wait for a revive
 function goDown(reason) {
   const p = player; closePuzzle();
-  if (p.hidden) { p.hidden = false; p.closet = null; $('hide').textContent = 'HIDE'; }
+  if (p.hidden) { p.hidden = false; p.closet = null; p.holding = false; $('hide').textContent = 'HIDE'; }
   prepDeath(); deadT = 0; MP.scareT = 1.8; deathReason = reason;
   setHud(false); show('hud', true); setSprint(false); show('revive', false); show('hide', false);
   joy.id = null; joy.x = joy.y = 0;
@@ -571,18 +586,20 @@ function mpTick(dt) {
   if (!MP.host && !MP.reconnecting && MP.lastW && now - MP.lastW > SILENT_MS) { MP.lastW = 0; const c = MP.hostConn; MP.hostConn = null; try { c && c.close(); } catch (e) {} clientLost(); }
   if (!MP.host && !MP.reconnecting && (MP.rejoinT = (MP.rejoinT || 0) - dt) <= 0) { MP.rejoinT = 5; saveRejoin(); }
   if (MP.reconnecting) $('reconnTxt').textContent = 'Reconnecting… ' + Math.max(0, Math.ceil(RECONNECT_FOR - (performance.now() - MP.reconnecting.t0) / 1000)) + ' s';
+  pingHost(dt);
   MP.sendT -= dt;
   if (MP.sendT > 0) return;
   MP.sendT = 1 / SEND_HZ;
   const r1 = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100, p = player;
   const cl = p.closet ? closets.indexOf(p.closet) : -1, rv = reviveTarget && revP > 0 ? reviveTarget.id : '';
-  if (!MP.host) { send(MP.hostConn, { t: 'st', x: r1(p.x), y: r1(p.y), a: r2(p.ang), p: r2(p.pitch), h: p.hidden ? 1 : 0, c: cl, mv: p.moving ? 1 : 0, sp: p.sprinting ? 1 : 0, rv }); return; }
+  if (!MP.host) { send(MP.hostConn, { t: 'st', x: r1(p.x), y: r1(p.y), a: r2(p.ang), p: r2(p.pitch), h: p.hidden ? 1 : 0, c: cl, mv: p.moving ? 1 : 0, sp: p.sprinting ? 1 : 0, rv,
+    b: p.holding ? 1 : 0, rt: Math.round(MP.rtt || 0) }); return; }
   const ps = [{ id: MP.myId, x: r1(p.x), y: r1(p.y), a: r2(p.ang), p: r2(p.pitch), h: p.hidden ? 1 : 0, c: cl, mv: p.moving ? 1 : 0, sp: p.sprinting ? 1 : 0,
     dn: p.down ? 1 : 0, dd: p.dead ? 1 : 0, dl: r1(p.downLeft), rv }];
   for (const o of MP.others.values()) ps.push({ id: o.id, x: r1(o.tx), y: r1(o.ty), a: r2(o.ang), p: r2(o.pitch), h: o.hidden ? 1 : 0, c: o.closet, mv: o.moving ? 1 : 0,
     sp: o.sprinting ? 1 : 0, dn: o.down ? 1 : 0, dd: o.dead ? 1 : 0, dl: r1(o.downLeft), rv: o.rv, aw: o.away ? 1 : 0 });
   const m = monster;
-  broadcast({ t: 'w', ps, m: { x: r1(m.x), y: r1(m.y), a: r2(m.ang), s: m.state, ac: m.active ? 1 : 0, v: r1(m.vel), sc: r2(m.screamT), ti: m.ti } });
+  broadcast({ t: 'w', ps, m: { x: r1(m.x), y: r1(m.y), a: r2(m.ang), s: m.state, ac: m.active ? 1 : 0, v: r1(m.vel), sc: r2(m.screamT), ti: m.ti, q: r2(m.quiet || 0) } });
 }
 // teammates are solid: you can't walk through them (you can always move away from one you overlap)
 function mateBlocked(x, y) {

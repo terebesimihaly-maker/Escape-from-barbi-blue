@@ -14,6 +14,9 @@ A first-person 3D horror maze for phones and desktop. Solve the puzzles, unlock 
   - `js/world3d.js`, `js/level.js`, `js/render.js`: the 3D world, building a floor, drawing a frame
   - `js/scares.js`: the jump scares
   - `js/puzzles.js`: the puzzles (a different kind on every floor)
+  - `js/stealth.js`: holding your breath, loose floorboards, fear
+  - `js/team.js`: pings, emotes, watching and warning from beyond (playing together)
+  - `js/extras.js`: achievements, the torn notes you've collected, the performance overlay
   - `js/cinematics.js`: the death screen and the title screen; `js/main.js`: the main loop and start-up
 - `js/house.js`: dresses each floor: skirting, rails and crown molding, framed doorways, lamps that really light the rooms (a few flicker or are dead), rugs and a runner carpet, porcelain dolls whose heads turn when you look away, teddy bears, side tables, grandfather clocks, basement pipes, crates, barrels and puddles, the attic's sheet-covered furniture, trunks and cobwebs, the workshop's workbenches, shelves of doll heads, dress forms and dolls hanging on strings, and a flashlight beam you can see in the air
 - `models/barbi.glb`: her rigged model (made in Blender)
@@ -33,16 +36,20 @@ A first-person 3D horror maze for phones and desktop. Solve the puzzles, unlock 
 
 **Enter the house** shows the five floors: The Nursery, The Doll Hallway, The Basement, The Attic and The Workshop. A floor opens once you've escaped the one before it (your progress and best time per floor are kept on this device). Pick **Easy**, **Medium** or **Hard** above the list:
 
-- Easy: she's slower, hears and sees less, rarely opens wardrobes; one puzzle less, smaller boards; the phone recharges in 35 s; 65 s to revive a teammate
-- Medium: the house as it was meant to be played (45 s phone, 50 s to revive)
-- Hard: she's faster (a sprint still gets away from her), hears and sees further, opens wardrobes more often, screams more; bigger boards, more holes, longer melodies; 60 s phone; 40 s to revive
+- Easy: she's slower, hears and sees less, rarely opens wardrobes, rarely pretends to leave; one puzzle less, smaller boards; fewer loose boards; you can hold your breath for 9 s; the phone recharges in 35 s
+- Medium: the house as it was meant to be played (45 s phone, 7 s breath)
+- Hard: she's faster (a sprint still gets away from her), hears and sees further, opens wardrobes more often, screams more, often pretends to leave; bigger boards, more holes, longer melodies; more loose boards; 6 s breath; 60 s phone
+
+On every difficulty a downed teammate has 90 seconds (1:30) to be revived.
 
 Playing together, the lobby owner picks the floor (from the ones they've opened) and the difficulty for everyone; escaping a floor together opens the next one for all of you.
 
 The game loads its files over HTTP, so open it from a web server (e.g. GitHub Pages, or `python3 -m http.server` locally), not by double-clicking the file.
 
-Controls: left side of the screen, drag to walk. Right side, drag to look. RUN, HIDE, and PHONE buttons.
-Computer: click to lock the cursor, then WASD to move and the mouse to look. Shift runs, E hides, 1 uses the phone, Esc frees the cursor and pauses.
+Controls: left side of the screen, drag to walk. Right side, drag to look. RUN, HIDE, and PHONE buttons; in a wardrobe, hold BREATH; playing together, 📍 pings and 💬 sends a quick message.
+Computer: click to lock the cursor, then WASD to move and the mouse to look. Shift runs, E hides, 1 uses the phone, Space (in a wardrobe) holds your breath, Q pings, 2 to 7 send quick messages, F3 shows the performance overlay, Esc frees the cursor and pauses.
+
+Torn notes: every floor has four, and three of them lie somewhere on it (which three, and where, changes every game). The HUD shows this floor's (📜 1/3); every note you read counts once, forever: the floor list shows how many of all 20 you've found.
 
 ## The puzzles
 
@@ -61,6 +68,10 @@ The game doesn't stop while you play: she can come. Later floors and Hard have b
 - She wanders slowly, listening. Walking she hears close by; sprinting she hears from far away. When she sees you, she runs at you.
 - If she only hears you, she runs to where you're *going*, to cut you off.
 - When she loses you she first goes the way you were heading, then checks the wardrobes near where she lost you: she stops at the doors and listens, and sometimes opens them. Hide further away. Now and then she stops completely and listens (she hears further then).
+- **Hold your breath.** In a wardrobe, hold Space (or BREATH) and she can't hear you. When she stops at your doors, holding it keeps you almost always safe; breathing, she can hear you (and if she walks past close by for a couple of seconds, she comes to open that one). Hold it too long and you gasp for air: if she's near, she knows exactly which wardrobe you're in.
+- **She pretends to leave.** Giving up the search with someone hiding nearby, she sometimes walks off, her footsteps and song fading as if she's far away, and waits, silent, around a corner 3 to 5 tiles from the wardrobe. Come out too soon and she's right there. Stay put and she really leaves.
+- **Loose floorboards.** Dark, cracked boards with nails sticking up lie to one side of some corridors and rooms. Step on one and it creaks loudly: she hears it from rooms away (further if you were running). There's always room to step around.
+- **Fear.** The bar at the top. It rises while she's close (that you know of), chasing you, or something scares you, and slowly falls when you're safe. Very afraid, the picture loses its colour and sways, your hands shake (the view drifts and you don't quite walk straight), and you hear things that aren't there: her footsteps behind you, a whisper, the music box, the flashlight dying. (Calm effects: no swaying.)
 
 ## Sound
 
@@ -68,11 +79,17 @@ Wear headphones: sounds come from where they happen. You hear her footsteps (hea
 
 ## Settings
 
-Look sensitivity, volume, field of view, invert looking up and down, graphics quality, her song, and **Calm effects**: no strobing, no screen shake, gentler flicker (for anyone sensitive to flashing).
+Look sensitivity, volume, field of view, invert looking up and down, graphics quality, her song, **Calm effects**: no strobing, no screen shake, gentler flicker, no swaying when afraid (for anyone sensitive to flashing or motion), and **Show performance** (also F3): frames per second, frame time, resolution, draw calls, and playing together your ping (the lobby owner sees everyone's).
+
+## Achievements
+
+18 of them, kept on this device (Menu → Achievements): escape the first floor and the last; escape on Hard, and every floor on Hard; a floor in under 3 minutes; without hiding; without her ever chasing you; without stepping on a loose board; without your fear going over half; lose her in a chase; hold your breath while she listens at your doors; stay hidden when she pretends to leave; make her leave with a text; find 10 notes, and all 20; revive a teammate; escape together with nobody lost; warn your team from beyond.
 
 ## Jump scares
 
 Every 35 to 60 seconds or so, never while she's after you: a doll that isn't where it was, her face at the end of a corridor, footsteps on the ceiling, every light dying (and her standing right in front of you when they come back), her sprinting across a junction ahead, breathing right behind you, a wardrobe door opening by itself.
+
+The paintings: some portraits have real glass eyes that turn to follow you. Others change: look at one, look away, and when you look back it isn't the same picture any more.
 
 ## Playing together (up to 4)
 
@@ -82,7 +99,9 @@ Menu → **Play together** → **Create lobby** shows a 6 digit code; the others
 - It's a bit harder together, but fair: she hears a little further and is a little faster (never faster than a sprinting player), she screams a bit more often, and there's one more wardrobe per extra player. She gives the group a few extra seconds at the start, and after catching someone she walks away so the others can revive them.
 - One person per wardrobe: if someone is already inside, it's locked.
 - Lost the connection (weak Wi-Fi, a locked phone)? Your place is kept for 90 seconds and the game reconnects by itself. Closed the page by accident? The menu shows **Rejoin game** for 10 minutes: you come back on the same floor, where you were, with the puzzles already solved. (If the lobby owner closes their page, the game ends: it runs in their browser.)
-- If she catches someone they go down. Stand next to them and hold **E** (or **REVIVE**) for 3 seconds within 50 seconds; the arrow in the top right corner shows where they are. If nobody reaches them in time they're out until the next floor. If everyone is down, it's game over and everyone goes back to the lobby.
+- If she catches someone they go down. Stand next to them and hold **E** (or **REVIVE**) for 3 seconds within 90 seconds; the arrow in the top right corner shows where they are. If nobody reaches them in time they're out until the next floor. If everyone is down, it's game over and everyone goes back to the lobby.
+- **Pings and quick messages.** Q (or 📍) marks what you're looking at for everyone, for 8 seconds: "She's here!" when you look at her, "Puzzle" at a puzzle box, otherwise "Here". Off the screen, a marker sits at the edge pointing the way. 2 to 7 (or 💬): She's here!, Help!, Follow me, Wait, Hide!, Thanks, shown over your head and in everyone's messages.
+- **Out of the game** you watch the others (click or tap, or ← →, to switch; the camera glides after them) and once every 30 seconds you can warn them (G or WARN): everyone sees a marker where she is right now.
 - How it works: peer to peer (WebRTC). The lobby owner's browser runs the game, so they should keep the game open. PeerJS's free public server (0.peerjs.com) only introduces the players. Some strict networks (certain mobile carriers or company Wi-Fi) block direct connections; if joining fails there, try another network.
 - For local testing with your own PeerJS server: `index.html?peer=127.0.0.1:9000`.
 
@@ -94,7 +113,7 @@ Takes used: 77_05 (standing, player idle), 16_15 (walk), 16_35 (jog), 09_02 (run
 
 ## Tests
 
-Browser tests with Playwright: single player, multiplayer (4 browsers and a local PeerJS server), and her AI, sprint and the scares.
+Browser tests with Playwright: single player, multiplayer (4 browsers and a local PeerJS server), her AI, sprint and the scares, the floors and puzzles, rejoining, the stealth features, fear, paintings and achievements (`extras`), and pings, emotes and spectating (`team`).
 
     cd tests && npm install && npm test          # or: node run.mjs features   (only the suites with "features" in the name)
 

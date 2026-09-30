@@ -174,3 +174,44 @@ h2{font-weight:400;letter-spacing:5px;color:#86a8ff;text-transform:uppercase;mar
 #puzzle canvas{position:static;inset:auto;display:inline-block;pointer-events:none}
 #puzzle .pzclock{display:block}
 #pzBoard{position:static;inset:auto;display:block;width:min(100%,440px,72vh);height:auto;aspect-ratio:440/340;margin:8px auto;border-radius:6px;box-shadow:0 10px 30px rgba(0,0,0,.6);touch-action:none;transition:transform .08s linear}
+/* fear (top), your breath while hiding (bottom), the performance overlay, achievements */
+#fearBar{position:fixed;left:50%;transform:translateX(-50%);top:calc(48px + env(safe-area-inset-top));width:110px;height:4px;
+  background:rgba(255,255,255,.08);border-radius:2px;pointer-events:none}
+#fearBar::before{content:'FEAR';position:absolute;right:calc(100% + 8px);top:50%;transform:translateY(-50%);font:600 9px system-ui,sans-serif;letter-spacing:2px;color:rgba(230,190,190,.6)}
+#fearBar i{display:block;height:100%;width:0;border-radius:2px;background:#ccc}
+#fearBar.high i{animation:fearpulse .5s infinite alternate}
+@keyframes fearpulse{to{opacity:.45}}
+#breathBar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(36px + env(safe-area-inset-bottom));width:160px;height:6px;
+  background:rgba(255,255,255,.1);border-radius:3px;pointer-events:none}
+#breathBar::before{content:'BREATH';position:absolute;bottom:10px;left:0;right:0;text-align:center;font:600 10px system-ui,sans-serif;letter-spacing:3px;color:rgba(190,215,255,.7)}
+#breathBar i{display:block;height:100%;width:100%;border-radius:3px;background:#9cc4ff}
+#breathBar.holding i{background:#e6f0ff}
+#breathBar.gasp i{background:#d44}
+#breath{bottom:calc(44px + env(safe-area-inset-bottom));border-color:rgba(170,200,255,.5);color:#dde8ff;font-size:11px;letter-spacing:1px}
+#warnBtn{bottom:calc(140px + env(safe-area-inset-bottom));border-color:rgba(143,208,255,.55);color:#cfeaff;background:rgba(20,40,70,.5);font-size:12px}
+#warnBtn:disabled{opacity:.5}
+.sq{position:fixed;left:16px;width:52px;height:52px;border-radius:14px;border:2px solid rgba(160,180,255,.3);background:rgba(20,25,50,.4);
+  font-size:22px;line-height:48px;padding:0;text-align:center}
+.sq.on{background:rgba(90,120,255,.45)}
+#pingBtn{bottom:calc(220px + env(safe-area-inset-bottom))}
+#emoteBtn{bottom:calc(160px + env(safe-area-inset-bottom))}
+.pc .sq[data-key]::after{content:attr(data-key);position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);
+  font:600 11px system-ui,sans-serif;color:rgba(200,210,255,.55);white-space:nowrap}
+#emoteBar{position:fixed;left:80px;right:110px;bottom:calc(150px + env(safe-area-inset-bottom));display:flex;flex-wrap:wrap;gap:6px;z-index:4}
+#emoteBar button{border:1px solid rgba(200,210,255,.35);background:rgba(15,18,35,.8);color:#e6e9ff;border-radius:16px;padding:7px 11px;font:600 13px system-ui,sans-serif}
+.pc #emoteBar button::before{content:attr(data-key) ' ';color:rgba(200,210,255,.5)}
+#perf{position:fixed;left:12px;top:calc(44px + env(safe-area-inset-top));font:11px/1.35 ui-monospace,Menlo,Consolas,monospace;color:#b8ffcf;
+  background:rgba(0,0,0,.55);padding:5px 7px;border-radius:4px;white-space:pre;pointer-events:none;z-index:20}
+#toast{position:fixed;left:50%;top:calc(70px + env(safe-area-inset-top));transform:translate(-50%,-30px);opacity:0;transition:transform .4s,opacity .4s;
+  background:rgba(20,16,8,.92);border:1px solid rgba(255,210,120,.5);border-radius:10px;padding:10px 16px;text-align:center;pointer-events:none;z-index:30;
+  box-shadow:0 8px 30px #000;min-width:200px;max-width:calc(100% - 40px);box-sizing:border-box}
+#toast.on{transform:translate(-50%,0);opacity:1}
+#toast b{display:block;color:#ffd98a;font:600 15px system-ui,sans-serif}
+#toast small{display:block;color:#d8ccb0;font:12px system-ui,sans-serif;margin-top:3px}
+#paper small.count{display:block;margin-top:14px;font-size:12px;color:#6a4a30;letter-spacing:1px;text-align:right}
+.achlist{list-style:none;padding:0;margin:8px 0;text-align:left;max-height:52vh;overflow-y:auto}
+.achlist li{display:flex;gap:10px;align-items:center;padding:7px 4px;border-bottom:1px solid rgba(255,255,255,.06);opacity:.55}
+.achlist li.got{opacity:1}
+.achlist .i{font-size:20px;width:26px;text-align:center}
+.achlist b{display:block;font-size:14px;color:#e6dcf0}
+.achlist small{display:block;font-size:12px;color:#9a93ad}
