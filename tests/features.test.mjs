@@ -94,9 +94,11 @@ check(await p.evaluate(() => bb.scares.force('ceiling')), 'footsteps on the ceil
 check(await until(p, () => bb.scares.dust && bb.scares.dust.visible, null, 24000), 'dust comes down from the ceiling when they pass over you');
 check(await until(p, () => !bb.scares.active, null, 48000), 'they end (something is dragged away)');
 // the director: scares only when she isn't after you
-await p.evaluate(() => { bb.scares.next = 0; const m = bb.monster, P = bb.player; m.active = true; m.spawnT = 0; m.state = 'chase'; m.x = P.x + 300; m.y = P.y; });
+await p.evaluate(() => { const m = bb.monster, P = bb.player, far = bb.CELLS().map(bb.center).sort((a, c) => Math.hypot(c.x - P.x, c.y - P.y) - Math.hypot(a.x - P.x, a.y - P.y))[0];
+  bb.scares.next = 0; Object.assign(m, { active: true, spawnT: 0, state: 'hunt', x: far.x, y: far.y, huntT: 30, screamT: 0, path: [], repath: 0 }); });
 await p.waitForTimeout(3000);
-check(await p.evaluate(() => !bb.scares.active), 'no scare while she is chasing you');
+const during = await p.evaluate(() => [bb.monster.state, bb.scares.active]);
+check((during[0] === 'hunt' || during[0] === 'chase') && !during[1], 'no scare while she is after you', during);
 await calm();
 
 check(pageErrors.length === 0, 'no errors on the page', pageErrors);
