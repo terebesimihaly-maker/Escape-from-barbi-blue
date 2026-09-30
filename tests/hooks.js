@@ -11,7 +11,7 @@ window.bb = {
   set flicker(v) { flicker = v }, get powerOn() { return powerOn }, set powerOn(v) { powerOn = v },
   get fusesGot() { return fusesGot }, get floorIdx() { return floorIdx }, get lastDt() { return lastDt },
   get songOn() { return songOn }, get songLevel() { return songBus ? songBus.gain.value : null }, get songPlaying() { return !!songNode },
-  get acState() { return ac && ac.state },
+  get acState() { return ac && ac.state }, audio: () => ac,
   get MP() { return MP }, get reviveTarget() { return reviveTarget }, get revP() { return revP }, set reviveHeld(v) { reviveHeld = v },
   get scares() { return scares },
   T, isWall, center, los, CELLS: () => CELLS,

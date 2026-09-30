@@ -48,11 +48,11 @@ function updateDoll(dt) {
       d.ry = d.obj.rotation.y; d.head.rotation.y = 0; d.obj.updateMatrixWorld(true); d.head.getWorldPosition(d.headWorld); s.t = 0;
     }
   } else if (s.phase === 'behind') {                  // you turn around: it's there
-    if (seen && !s.found) { s.found = true; sfx.sting(0.55); sfx.whisper(0.05, 0); shake = Math.max(shake, 3); if (navigator.vibrate) navigator.vibrate(80); }
+    if (seen && !s.found) { s.found = true; sfx.sting(0.55); sfx.whisper(0.08, { x, y, h: 0.4 }); shake = Math.max(shake, 3); if (navigator.vibrate) navigator.vibrate(80); }
     if ((s.found && s.away > 0.5) || s.t > 14) { d.obj.visible = false; endScare(); }   // look away again: gone for good
   } else if (s.phase === 'gone') {                    // no room behind you: it's just gone from where it was
     const hx = s.home.x / S, hy = s.home.z / S;
-    if (inView(hx, hy, s.home.y + 0.3, 0.7)) { sfx.whisper(0.06, relPan(hx, hy)); endScare(); } else if (s.t > 15) endScare();
+    if (inView(hx, hy, s.home.y + 0.3, 0.7)) { sfx.whisper(0.1, { x: hx, y: hy, h: s.home.y + 0.4 }); endScare(); } else if (s.t > 15) endScare();
   }
 }
 
@@ -112,10 +112,10 @@ function updateCeiling(dt) {
   const s = scares.steps; s.t -= dt;
   if (s.t <= 0 && s.n < s.of) {
     const k = s.n / (s.of - 1), x = s.x0 + (s.x1 - s.x0) * k, y = s.y0 + (s.y1 - s.y0) * k, near = 1 - Math.abs(k - 0.5) * 1.2;
-    sfx.ceilingStep(0.35 * near + 0.1, relPan(x, y) * 0.8);
+    sfx.ceilingStep(0.35 * near + 0.1, { x, y, h: WALL_H + 0.4 });
     if (Math.abs(k - 0.5) < 0.2) { shake = Math.max(shake, 1.5); dropDust(x, y); }
     s.n++; s.t = s.n === s.of ? 0.9 : 0.62 + Math.random() * 0.1;
-  } else if (s.t <= 0 && s.n === s.of) { s.n++; sfx.drag(0.12, relPan(s.x1, s.y1) * 0.8); s.t = 2.2; }
+  } else if (s.t <= 0 && s.n === s.of) { s.n++; sfx.drag(0.12, { x: s.x1, y: s.y1, h: WALL_H + 0.4 }); s.t = 2.2; }
   else if (s.t <= 0) { scares.steps = null; endScare(true); }
   const dp = scares.dust;
   if (dp && dp.visible) { const pos = dp.geometry.attributes.position, v = dp.userData.v;

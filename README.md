@@ -39,6 +39,14 @@ Computer: click to lock the cursor, then WASD to move and the mouse to look. Shi
 - If she only hears you, she runs to where you're *going*, to cut you off.
 - When she loses you she first goes the way you were heading, then checks the wardrobes near where she lost you: she stops at the doors and listens, and sometimes opens them. Hide further away. Now and then she stops completely and listens (she hears further then).
 
+## Sound
+
+Wear headphones: sounds come from where they happen. You hear her footsteps (heavy, bare, the dragging foot scraping) from her direction, muffled behind walls; the music box and her song come from her side. Your own steps sound different on each floor (creaky boards, tiles, wet concrete), and you hear your teammates walking.
+
+## Settings
+
+Look sensitivity, volume, field of view, invert looking up and down, graphics quality, her song, and **Calm effects**: no strobing, no screen shake, gentler flicker (for anyone sensitive to flashing).
+
 ## Jump scares
 
 Rare (one every minute or so at most), never while she's after you: a doll that isn't where it was, her face at the end of a corridor, footsteps on the ceiling.
@@ -50,6 +58,7 @@ Menu → **Play together** → **Create lobby** shows a 6 digit code; the others
 - Everyone starts in the same room, in the same house. Teammates are solid (no walking through each other).
 - It's a bit harder together, but fair: she hears a little further and is a little faster (never faster than a sprinting player), she screams a bit more often, and there's one more fuse (and wardrobe) per extra player. She gives the group a few extra seconds at the start, and after catching someone she walks away so the others can revive them.
 - One person per wardrobe: if someone is already inside, it's locked.
+- Lost the connection (weak Wi-Fi, a locked phone)? Your place is kept for 90 seconds and the game reconnects by itself. Closed the page by accident? The menu shows **Rejoin game** for 10 minutes: you come back on the same floor, where you were, with the fuses already found. (If the lobby owner closes their page, the game ends: it runs in their browser.)
 - If she catches someone they go down. Stand next to them and hold **E** (or **REVIVE**) for 3 seconds within 50 seconds; the arrow in the top right corner shows where they are. If nobody reaches them in time they're out until the next floor. If everyone is down, it's game over and everyone goes back to the lobby.
 - How it works: peer to peer (WebRTC). The lobby owner's browser runs the game, so they should keep the game open. PeerJS's free public server (0.peerjs.com) only introduces the players. Some strict networks (certain mobile carriers or company Wi-Fi) block direct connections; if joining fails there, try another network.
 - For local testing with your own PeerJS server: `index.html?peer=127.0.0.1:9000`.

@@ -54,6 +54,7 @@ const Bid = idOf('Bob'), Cid = idOf('Cara');
 const freeze = () => A.evaluate(() => { bb.monster.active = false; bb.monster.spawnT = 1e9; });
 await freeze();
 console.log('== teammates');
+check(await A.evaluate(() => [...bb.MP.others.values()].every(o => o.av && o.av.human)), 'teammates are human figures (not the simple stand-in)');
 for (const P of [A, B, C]) check(await P.evaluate(() => [...bb.MP.others.values()].filter(o => o.av && o.av.obj.parent).length === 2), P.pname + ' sees 2 teammate figures in the world');
 // Alice looks at the other two and takes a picture
 await A.evaluate(() => { const o = [...bb.MP.others.values()]; const mx = (o[0].x + o[1].x) / 2, my = (o[0].y + o[1].y) / 2;
@@ -162,6 +163,6 @@ await click(A, '#retry'); await click(C, '#retry');
 await click(C, '#lbLeave');
 check(await until(A, () => document.querySelectorAll('#lbList li:not(.empty)').length === 2, null, 10000), 'Cara leaves: the host lists 2 players');
 await click(A, '#lbLeave');
-check(await until(B, () => /Lost the connection/.test(document.getElementById('mpStatus').textContent), null, 20000), 'the host leaves: Bobby is told and back at the menu', await text(B, 'mpStatus'));
+check(await until(B, () => /closed the lobby|Lost the connection/.test(document.getElementById('mpStatus').textContent), null, 20000), 'the host leaves: Bobby is told and back at the menu', await text(B, 'mpStatus'));
 process.exitCode = summary();
 await b.close();

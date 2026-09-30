@@ -58,19 +58,65 @@ function out(node, pan) {
   if (pan !== undefined && ac.createStereoPanner) { const p = ac.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); node.connect(p); p.connect(master); }
   else node.connect(master);
 }
+/* ---------- 3D sound ----------
+   Sounds in the house come from where they happen: the listener is the camera, positions are in metres (the same as the 3D world).
+   Behind a wall a sound is muffled. With headphones (HRTF) you can tell front from back; on Low quality it's plain left/right. */
+function setListener(cam) {
+  if (!ac || !cam) return;
+  const L = ac.listener, p = cam.position, f = _v.set(0, 0, -1).applyQuaternion(cam.quaternion), u = _sc.set(0, 1, 0).applyQuaternion(cam.quaternion);
+  if (L.positionX) { L.positionX.value = p.x; L.positionY.value = p.y; L.positionZ.value = p.z;
+    L.forwardX.value = f.x; L.forwardY.value = f.y; L.forwardZ.value = f.z; L.upX.value = u.x; L.upY.value = u.y; L.upZ.value = u.z; }
+  else if (L.setPosition) { L.setPosition(p.x, p.y, p.z); L.setOrientation(f.x, f.y, f.z, u.x, u.y, u.z); }
+}
+// play node at (x, y) in world units, h metres up. roll 0 = direction only (the caller sets the volume itself)
+function out3d(node, x, y, h, roll) {
+  if (!ac.createPanner) { out(node, relPan(x, y)); return; }
+  const pn = ac.createPanner();
+  pn.panningModel = settings.quality === 'low' ? 'equalpower' : 'HRTF';
+  pn.distanceModel = 'inverse'; pn.refDistance = 1.6; pn.rolloffFactor = roll === undefined ? 1.1 : roll; pn.maxDistance = 60;
+  const px = x * S, pz = y * S;
+  if (pn.positionX) { pn.positionX.value = px; pn.positionY.value = h; pn.positionZ.value = pz; } else pn.setPosition(px, h, pz);
+  let head = node;
+  if (player && grid && !los(player.x, player.y, x, y)) {       // behind walls: muffled and quieter
+    const lp = ac.createBiquadFilter(), g = ac.createGain(); lp.type = 'lowpass'; lp.frequency.value = 650; g.gain.value = 0.55;
+    node.connect(lp); lp.connect(g); head = g; }
+  head.connect(pn); pn.connect(master);
+}
+// where a sound goes: a pan (-1..1), a position { x, y, h } in the house (roll: see out3d), or the middle
+function outAt(node, at, roll) { if (at && typeof at === 'object') out3d(node, at.x, at.y, at.h || 0, roll); else out(node, at); }
 function distCurve() { const c = new Float32Array(1024); for (let i = 0; i < 1024; i++) { const x = i / 512 - 1; c[i] = Math.tanh(x * 6); } return c; }
 const sfx = {
   thump(v) { if (!ac) return; const t = ac.currentTime;
     [0, 0.17].forEach((o, i) => { const osc = ac.createOscillator(), g = ac.createGain();
       osc.frequency.setValueAtTime(95, t + o); osc.frequency.exponentialRampToValueAtTime(38, t + o + 0.14);
       env(g, t + o, 0.01, v * (i ? 0.6 : 1), 0.16); osc.connect(g); out(g); osc.start(t + o); osc.stop(t + o + 0.35); }); },
-  step(run) { if (!ac) return; const t = ac.currentTime, s = noise(), f = ac.createBiquadFilter(), g = ac.createGain();
-    f.type = 'bandpass'; f.frequency.value = run ? 700 : 500; f.Q.value = 1.2;
-    env(g, t, 0.005, run ? 0.14 : 0.05, 0.06); s.connect(f); f.connect(g); out(g); s.start(t); s.stop(t + 0.1); },
+  // your own footsteps, by floor: creaky boards (nursery), hard tiles (hallway), wet concrete (basement)
+  step(run, at) { if (!ac) return; const t = ac.currentTime, style = FLOORS[floorIdx].style, v = run ? 1 : 0.4, g = ac.createGain();
+    if (at) out3d(g, at.x, at.y, 0.05); else out(g);
+    const burst = (type, fr, q, peak, dec) => { const s = noise(), f = ac.createBiquadFilter(), eg = ac.createGain(); f.type = type; f.frequency.value = fr; f.Q.value = q;
+      env(eg, t, 0.003, peak * v, dec); s.connect(f); f.connect(eg); eg.connect(g); s.start(t); s.stop(t + dec + 0.05); };
+    const knock = (fr, peak, dec) => { const o = ac.createOscillator(), eg = ac.createGain(); o.frequency.setValueAtTime(fr, t); o.frequency.exponentialRampToValueAtTime(fr * 0.6, t + dec);
+      env(eg, t, 0.002, peak * v, dec); o.connect(eg); eg.connect(g); o.start(t); o.stop(t + dec + 0.05); };
+    if (style === 'wood') { burst('bandpass', 380, 1.4, 0.12, 0.07); knock(140, 0.1, 0.09);
+      if (Math.random() < 0.12) { const o = ac.createOscillator(), f = ac.createBiquadFilter(), eg = ac.createGain();   // a board creaks
+        o.type = 'sawtooth'; o.frequency.setValueAtTime(rnd(160, 220), t + 0.03); o.frequency.linearRampToValueAtTime(rnd(90, 130), t + 0.3);
+        f.type = 'bandpass'; f.frequency.value = 1100; f.Q.value = 14; env(eg, t + 0.03, 0.04, 0.035, 0.28); o.connect(f); f.connect(eg); eg.connect(g); o.start(t); o.stop(t + 0.4); } }
+    else if (style === 'tile') { burst('bandpass', 2600, 2.5, 0.09, 0.035); burst('highpass', 5000, 0.7, 0.03, 0.02); knock(220, 0.06, 0.05); }
+    else { burst('bandpass', 900, 0.9, 0.12, 0.09); burst('highpass', 3200, 0.5, 0.05, 0.16); knock(90, 0.07, 0.08); }   // (a wet slap)
+  },
+  // her footsteps: heavy and bare, from where she is (the dragging foot scrapes when she walks)
+  herStep(x, y, run, drag) { if (!ac) return; const t = ac.currentTime, g = ac.createGain(); out3d(g, x, y, 0.05);
+    const o = ac.createOscillator(), og = ac.createGain(); o.frequency.setValueAtTime(95, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.16);
+    env(og, t, 0.004, run ? 0.5 : 0.3, 0.2); o.connect(og); og.connect(g); o.start(t); o.stop(t + 0.3);
+    const s = noise(), f = ac.createBiquadFilter(), sg = ac.createGain(); f.type = 'bandpass'; f.frequency.value = FLOORS[floorIdx].style === 'concrete' ? 800 : 420; f.Q.value = 1.1;
+    env(sg, t, 0.003, run ? 0.35 : 0.22, 0.08); s.connect(f); f.connect(sg); sg.connect(g); s.start(t); s.stop(t + 0.12);
+    if (drag) { const d = noise(), df = ac.createBiquadFilter(), dg = ac.createGain(); df.type = 'bandpass'; df.Q.value = 3;
+      df.frequency.setValueAtTime(700, t + 0.12); df.frequency.linearRampToValueAtTime(450, t + 0.5);
+      env(dg, t + 0.12, 0.08, 0.1, 0.35); d.connect(df); df.connect(dg); dg.connect(g); d.start(t + 0.1); d.stop(t + 0.6); } },
   note(freq, v, pan) { if (!ac || v < 0.002) return; const t = ac.currentTime;
     [[1, 'triangle', 1], [2.01, 'sine', 0.35], [3.98, 'sine', 0.12]].forEach(([m, type, k]) => {
       const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = freq * m;
-      env(g, t, 0.004, v * k, 0.9); o.connect(g); out(g, pan); o.start(t); o.stop(t + 1); }); },
+      env(g, t, 0.004, v * k, 0.9); o.connect(g); outAt(g, pan, 0); o.start(t); o.stop(t + 1); }); },
   pickup() { if (!ac) return; const t = ac.currentTime;
     [880, 1320, 1760].forEach((f, i) => { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = f;
       env(g, t + i * 0.07, 0.005, 0.12, 0.6); o.connect(g); out(g); o.start(t + i * 0.07); o.stop(t + 1); }); },
@@ -108,24 +154,24 @@ const sfx = {
     const k = ac.createOscillator(), kg = ac.createGain(); k.type = 'square'; k.frequency.value = 1900; env(kg, t + 0.02, 0.002, 0.03, 0.05);
     k.connect(kg); out(kg); k.start(t); k.stop(t + 0.1); },
   // a heavy footstep on the floor above you: a low thud, muffled by the ceiling
-  ceilingStep(v, pan) { if (!ac) return; const t = ac.currentTime, lp = ac.createBiquadFilter(), g = ac.createGain();
-    lp.type = 'lowpass'; lp.frequency.value = 260; env(g, t, 0.008, v, 0.32); lp.connect(g); out(g, pan);
+  ceilingStep(v, at) { if (!ac) return; const t = ac.currentTime, lp = ac.createBiquadFilter(), g = ac.createGain();
+    lp.type = 'lowpass'; lp.frequency.value = 260; env(g, t, 0.008, v, 0.32); lp.connect(g); outAt(g, at, 0.4);
     const o = ac.createOscillator(); o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(34, t + 0.2); o.connect(lp); o.start(t); o.stop(t + 0.4);
     const n = noise(); n.connect(lp); n.start(t); n.stop(t + 0.12); },
   // something heavy dragged across the floor above
   drag(v, pan) { if (!ac) return; const t = ac.currentTime, bp = ac.createBiquadFilter(), g = ac.createGain(), lp = ac.createBiquadFilter();
     bp.type = 'bandpass'; bp.Q.value = 2; bp.frequency.setValueAtTime(180, t); bp.frequency.linearRampToValueAtTime(420, t + 1.6);
     lp.type = 'lowpass'; lp.frequency.value = 900; env(g, t, 0.3, v, 1.5); const n = noise();
-    n.connect(bp); bp.connect(lp); lp.connect(g); out(g, pan); n.start(t); n.stop(t + 2); },
+    n.connect(bp); bp.connect(lp); lp.connect(g); outAt(g, pan, 0.4); n.start(t); n.stop(t + 2); },
   // a breathy whisper right next to you (noise shaped by two moving formants)
-  whisper(v, pan) { if (!ac) return; const t = ac.currentTime, g = ac.createGain(); env(g, t, 0.08, v, 0.9); out(g, pan);
+  whisper(v, pan) { if (!ac) return; const t = ac.currentTime, g = ac.createGain(); env(g, t, 0.08, v, 0.9); outAt(g, pan, 0.6);
     [[700, 1100], [1900, 2600]].forEach(([a, b]) => { const n = noise(), bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 6;
       bp.frequency.setValueAtTime(a, t); bp.frequency.linearRampToValueAtTime(b, t + 0.35); bp.frequency.linearRampToValueAtTime(a * 0.9, t + 0.8);
       n.connect(bp); bp.connect(g); n.start(t); n.stop(t + 1.1); }); },
-  creak(v) { if (!ac) return; const t = ac.currentTime, o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
+  creak(v, at) { if (!ac) return; const t = ac.currentTime, o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
     o.type = 'sawtooth'; o.frequency.setValueAtTime(rnd(90, 140), t); o.frequency.linearRampToValueAtTime(rnd(50, 80), t + 0.6);
     f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 12; env(g, t, 0.05, v, 0.6);
-    o.connect(f); f.connect(g); out(g); o.start(t); o.stop(t + 0.8); },
+    o.connect(f); f.connect(g); outAt(g, at, 0.3); o.start(t); o.stop(t + 0.8); },
 };
 
 /* ---------- monster song ---------- */
@@ -135,7 +181,10 @@ const sfx = {
 // leaves the device.
 let songBuf = null, songNode = null, songBus = null, songOn = false, songBlob = null, songFileName = '', songTesting = false, songCustom = false;
 const DEFAULT_SONG = 'audio/chase.mp3', DEFAULT_SONG_NAME = 'Chase song';
-function songGraph() { if (!songBus && ac) { songBus = ac.createGain(); songBus.gain.value = 0; songBus.connect(master); } }
+// (the song goes through a panner too, so it comes from her side)
+let songPan = null;
+function songGraph() { if (!songBus && ac) { songBus = ac.createGain(); songBus.gain.value = 0;
+  if (ac.createStereoPanner) { songPan = ac.createStereoPanner(); songBus.connect(songPan); songPan.connect(master); } else { songPan = null; songBus.connect(master); } } }
 function setSongLevel(v, fast) { if (songBus) songBus.gain.setTargetAtTime(v, ac.currentTime, fast ? 0.05 : 0.3); }
 function playSongNode() {
   stopSongNode(); songGraph();
@@ -194,6 +243,7 @@ function updateAudio(dt) {
   if (songOn) { // her song: faint when she's far away, louder and louder the closer she gets
     const near = d < 900 ? Math.pow(1 - d / 900, 1.6) : 0;
     setSongLevel(closetScene && closetScene.t > 0 ? 1 : 0.05 + 0.95 * near);
+    if (songPan) songPan.pan.setTargetAtTime(closetScene ? 0 : relPan(m.x, m.y) * 0.65, ac.currentTime, 0.1);
   }
   // The music box is her sound: it gets louder as she gets closer, and while she chases you
   // it always plays at full volume (faster and out of tune), however far away she is.
@@ -202,7 +252,7 @@ function updateAudio(dt) {
     if (musicTimer <= 0) {
       musicTimer = chasing ? 0.24 : 0.42;
       const f = MELODY[musicI++ % MELODY.length], near = d < 520 ? Math.pow(1 - d / 520, 2) : 0;
-      if (f && !songOn) sfx.note(f * (chasing ? 0.94 : 1) * (1 + rnd(-0.012, 0.012)), chasing ? Math.max(0.3, near * 0.4) : near * 0.25, relPan(m.x, m.y) * (chasing ? 0.6 : 0.9)); } }
+      if (f && !songOn) sfx.note(f * (chasing ? 0.94 : 1) * (1 + rnd(-0.012, 0.012)), chasing ? Math.max(0.3, near * 0.4) : near * 0.25, { x: m.x, y: m.y, h: 1.9 }); } }
   const c = clamp(1 - d / 420, 0, 1);
   hbTimer -= dt;
   if (hbTimer <= 0 && c > 0.05) { sfx.thump(0.15 + 0.55 * c); hbTimer = 1.1 - 0.75 * c; if (c > 0.55 && navigator.vibrate) navigator.vibrate(40); }

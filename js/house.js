@@ -313,6 +313,7 @@ function build(THREE, env) {
   function lampLevel(fx, t) {
     if (fx.state === 'dead') return 0;
     const n = Math.sin(t * 13 + fx.phase) * 0.5 + Math.sin(t * 29 + fx.phase * 2) * 0.5;
+    if (fx.state === 'flicker' && api.calm) return 0.8;          // ("Calm effects": no flickering lamps)
     if (fx.state === 'flicker') return (Math.sin(t * 2.3 + fx.phase) > 0.35 && Math.random() < 0.55) ? 0.08 : 0.85 + 0.15 * n;
     return fx.base === 1 ? 0.95 + 0.05 * n : 0.8 + 0.2 * n;   // candles waver more
   }
@@ -344,7 +345,8 @@ function build(THREE, env) {
       if (o.material && !seen.has(o.material)) { seen.add(o.material); for (const k of ['map', 'alphaMap']) if (o.material[k] && o.material[k] !== env.glowTex) o.material[k].dispose(); o.material.dispose(); } });
     if (beam) { if (beam.parent) beam.parent.remove(beam); beam.geometry.dispose(); beam.material.dispose(); }
   }
-  return { group, update, dispose, beam, fixtures, dolls, doorTiles };
+  const api = { group, update, dispose, beam, fixtures, dolls, doorTiles, calm: false };
+  return api;
 }
 
 /* ---------- the props ---------- */

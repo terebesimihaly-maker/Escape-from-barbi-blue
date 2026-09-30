@@ -14,8 +14,8 @@ function resize() {
   cvs.width = Math.round(W * DPR); cvs.height = Math.round(H * DPR);
   if (!renderer) return;
   applyQuality(); renderer.setSize(W, H, false);
-  // keep about 80 degrees of view sideways, in portrait and landscape
-  const asp = W / H, fov = clamp(2 * Math.atan(Math.tan(40 * Math.PI / 180) / asp) * 180 / Math.PI, 58, 95);
+  // keep the chosen field of view sideways (80 degrees unless changed in the settings), in portrait and landscape
+  const asp = W / H, fov = clamp(2 * Math.atan(Math.tan(clamp(settings.fov || 80, 65, 110) / 2 * Math.PI / 180) / asp) * 180 / Math.PI, 50, 110);
   camera.aspect = asp; camera.fov = fov; camera.updateProjectionMatrix();
   titleCam.aspect = asp; titleCam.fov = asp < 1 ? 38 : 30;
   // wide screens: the menu is on the left, so she is moved to the right of the picture
@@ -47,18 +47,25 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 const angDiff = (a, b) => { let d = (a - b) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
 const lerpAngle = (a, b, k) => a - angDiff(a, b) * k;
 /* ---------- settings (kept on this device) ---------- */
-const settings = { sens: 1, vol: 0.9, quality: matchMedia('(pointer: coarse)').matches ? 'medium' : 'high' };
+const settings = { sens: 1, vol: 0.9, quality: matchMedia('(pointer: coarse)').matches ? 'medium' : 'high', fov: 80, invert: false, calm: false };
 try { Object.assign(settings, JSON.parse(localStorage.getItem('bb_settings') || '{}')); } catch (e) {}
 const saveSettings = () => { try { localStorage.setItem('bb_settings', JSON.stringify(settings)); } catch (e) {} };
 function applySettings() {
   $('setSens').value = settings.sens; $('outSens').textContent = Number(settings.sens).toFixed(2) + '×';
   $('setVol').value = settings.vol; $('outVol').textContent = Math.round(settings.vol * 100) + '%';
+  $('setFov').value = settings.fov; $('outFov').textContent = Math.round(settings.fov) + '°';
+  $('setInvert').checked = !!settings.invert; $('setCalm').checked = !!settings.calm;
   document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.q === settings.quality));
   if (typeof master !== 'undefined' && master) master.gain.value = settings.vol;
   if (typeof applyQuality === 'function') applyQuality();
+  if (typeof resize === 'function' && typeof camera !== 'undefined' && camera) resize();
 }
 $('setSens').oninput = e => { settings.sens = +e.target.value; applySettings(); saveSettings(); };
 $('setVol').oninput = e => { settings.vol = +e.target.value; applySettings(); saveSettings(); };
+$('setFov').oninput = e => { settings.fov = +e.target.value; applySettings(); saveSettings(); };
+$('setInvert').onchange = e => { settings.invert = e.target.checked; saveSettings(); };
+$('setCalm').onchange = e => { settings.calm = e.target.checked; saveSettings(); };
+const calm = () => !!settings.calm;          // "Calm effects": no strobing or shaking (for anyone sensitive to flashing)
 document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { settings.quality = b.dataset.q; applySettings(); saveSettings(); });
 // the menu's "How to play" and "Settings" panels
 function openPanel(name) {

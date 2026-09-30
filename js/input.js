@@ -21,6 +21,7 @@ document.addEventListener('pointerlockchange', () => { if (!locked() && state ==
 // turn the view. Inside a wardrobe you can still look around, but only through the doors
 function lookBy(dx, dy) {
   const p = player; if (state !== 'play') return;
+  if (settings.invert) dy = -dy;
   if (p.hidden) { p.hideYaw = clamp(p.hideYaw + dx, -0.7, 0.7); p.hidePitch = clamp(p.hidePitch - dy, -0.4, 0.4); }
   else { p.ang += dx; p.pitch = clamp(p.pitch - dy, -1.1, 1.1); }
 }
@@ -126,7 +127,7 @@ function exitHide() { closetScene = null; const p = player, c = p.closet;
 /* ---------- screens ---------- */
 function toTitle() {
   stopSong(); state = 'title'; setHud(false); show('downMsg', false); show('revive', false);
-  ['dead', 'win', 'trans', 'paused', 'note', 'lobby'].forEach(s => show(s, false)); show('title', true); loadBest();
+  ['dead', 'win', 'trans', 'paused', 'note', 'lobby'].forEach(s => show(s, false)); show('title', true); loadBest(); updateRejoinBtn();
   // (screens reused by multiplayer get their single player words back)
   $('dTitle').textContent = 'SHE GOT YOU'; $('retry').textContent = 'Try again'; $('menu1').textContent = 'Main menu';
   $('again').textContent = 'Play again'; show('winLeave', false); show('tGo', true); $('pText').textContent = 'She is waiting.';

@@ -24,5 +24,5 @@ function frame(now) {
 init3D();
 addEventListener('resize', resize); resize(); applySettings();
 loadBarbi();
-loadBest();
+loadBest(); updateRejoinBtn();
 requestAnimationFrame(frame);

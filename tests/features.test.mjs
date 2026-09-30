@@ -101,5 +101,30 @@ const during = await p.evaluate(() => [bb.monster.state, bb.scares.active]);
 check((during[0] === 'hunt' || during[0] === 'chase') && !during[1], 'no scare while she is after you', during);
 await calm();
 
+console.log('== settings');
+const fov0 = await p.evaluate(() => bb.camera.fov);
+await p.evaluate(() => { const r = document.getElementById('setFov'); r.value = 100; r.dispatchEvent(new Event('input')); });
+check(await p.evaluate(f => bb.camera.fov > f + 5, fov0), 'a wider field of view widens the camera', await p.evaluate(() => bb.camera.fov));
+await p.evaluate(() => { const r = document.getElementById('setFov'); r.value = 80; r.dispatchEvent(new Event('input')); });
+const pitch = await p.evaluate(() => { const c = document.getElementById('setInvert'); c.checked = true; c.dispatchEvent(new Event('change'));
+  const P = bb.player; P.pitch = 0; lookBy(0, 0.1); const inv = P.pitch; c.checked = false; c.dispatchEvent(new Event('change')); P.pitch = 0; lookBy(0, 0.1); return [inv, P.pitch]; });
+check(pitch[0] > 0 && pitch[1] < 0, 'invert flips looking up and down', pitch);
+await p.evaluate(() => { const c = document.getElementById('setCalm'); c.checked = true; c.dispatchEvent(new Event('change')); });
+check(await p.evaluate(() => JSON.parse(localStorage.getItem('bb_settings')).calm === true), 'calm effects is saved');
+await p.evaluate(() => { const c = document.getElementById('setCalm'); c.checked = false; c.dispatchEvent(new Event('change')); });
+
+console.log('== 3D sound');
+// count the 3D sound sources made while she walks around near you
+const sound = await p.evaluate(async () => {
+  if (!bb.acState) return { skip: 'no audio' };
+  const proto = Object.getPrototypeOf(bb.audio()), orig = proto.createPanner; let n = 0; proto.createPanner = function () { n++; return orig.call(this); };
+  const m = bb.monster, P = bb.player, c = bb.CELLS().map(bb.center).filter(q => Math.hypot(q.x - P.x, q.y - P.y) < bb.T * 5)[0] || P;
+  Object.assign(m, { active: true, spawnT: 0, state: 'wander', x: c.x, y: c.y, target: null, path: [] });
+  await new Promise(r => setTimeout(r, 6000));
+  proto.createPanner = orig; m.active = false; m.spawnT = 1e9;
+  return { panners: n, ac: bb.acState };
+});
+check(sound.skip || sound.panners > 0, 'her footsteps come from where she is (3D sound sources are made)', sound);
+
 check(pageErrors.length === 0, 'no errors on the page', pageErrors);
 process.exitCode = summary(); await b.close();

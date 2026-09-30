@@ -181,7 +181,9 @@ function createHuman(THREE, opts) {
   const slot = (opts.slot || 0) % 4, look = LOOKS[slot];
   const model = THREE.cloneSkinned(opts.template);
   model.position.set(0, 0, 0); model.rotation.set(0, 0, 0); model.scale.setScalar(look.scale);
-  model.traverse(o => { o.visible = true; if (o.isSprite) o.parent.remove(o); });
+  // (her eye glow isn't theirs; collect first, then remove: removing while walking the tree skips and breaks)
+  const sprites = []; model.traverse(o => { o.visible = true; if (o.isSprite) sprites.push(o); });
+  sprites.forEach(o => o.parent.remove(o));
   const meshes = {};
   model.traverse(o => { if (o.isMesh) { meshes[o.name] = o; o.material = o.material.clone(); o.castShadow = true; o.frustumCulled = false; } });
   if (meshes.Body) { zoneBody(THREE, meshes.Body); dressBody(THREE, meshes.Body.material, look); meshes.Body.material.color.set(look.skin); }
@@ -255,7 +257,7 @@ function createHuman(THREE, opts) {
     root.traverse(o => { if (o.material) { if (o.isSprite && o.material.map) o.material.map.dispose(); o.material.dispose(); } });
     tube.geometry.dispose(); lens.geometry.dispose();
   }
-  return { obj: root, setName, update, light, dispose, anim };
+  return { obj: root, setName, update, light, dispose, anim, human: true };
 }
 
 window.PlayerModel = { create, createHuman, TAGS };

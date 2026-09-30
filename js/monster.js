@@ -143,6 +143,8 @@ function updateMonster(dt) {
   m.anim += dt * spd * 0.05;
   const mv = Math.hypot(m.x - m.px, m.y - m.py); m.px = m.x; m.py = m.y;
   m.vel += ((mv < 20 ? mv / dt : 0) - m.vel) * Math.min(1, dt * 8);
+  m.sndAcc = (m.sndAcc || 0) + (mv < 20 ? mv : 0);            // her footsteps: every stride walking, every other when she runs
+  if (m.active && m.sndAcc > (m.vel > 60 ? 38 : 17)) { m.sndAcc = 0; sfx.herStep(m.x, m.y, m.vel > 60, m.vel < 60 && m.foot > 0); }
   if (mv < 20) { m.stepAcc += mv;
     if (m.stepAcc > 17) { m.stepAcc = 0; m.foot = -m.foot;
       prints.push({ x: m.x + Math.cos(m.ang + 1.57) * 3.5 * m.foot, y: m.y + Math.sin(m.ang + 1.57) * 3.5 * m.foot, a: m.ang, t: 14 });

@@ -127,9 +127,10 @@ const CLIPS = {
 
   // chasing: hand-made, so she doesn't run like a person: a lurching, uneven sprint (a long stride, then a stumbling one),
   // bent low with her head held dead level and tilted, jaw hanging; head and arms move in stop-motion jerks
-  chase: { dur: 0.9, loop: true, speed: 6.2, fn(t, P) { sprint(t, P, 0.9, 1); } },
+  // (speed: how fast her planted foot sweeps back at normal playback, measured, so her feet don't skate; she's sped up to match)
+  chase: { dur: 0.9, loop: true, speed: 3.5, fn(t, P) { sprint(t, P, 0.9, 1); } },
   // hunting (running to where she heard you): the same sprint, her arms hanging and flopping behind her
-  run: { dur: 0.9, loop: true, speed: 5.4, fn(t, P) { sprint(t, P, 0.9, 0); } },
+  run: { dur: 0.9, loop: true, speed: 3.5, fn(t, P) { sprint(t, P, 0.9, 0); } },
 
   // the scream: she stops, bends, then throws her head back with her arms spread, shaking
   scream: { dur: 2.0, loop: false, fn(t, P) {
@@ -224,12 +225,12 @@ CLIPS.lean = { dur: 3.0, loop: true, fn(t, P) {
 // reach 1: arms out for your face, clawing; reach 0: arms hanging loose, flopping behind her.
 function sprint(t, P, dur, reach) {
   const k = t / dur, ph = k * TAU, w = ph + 0.45 * sin(ph);    // (warped time: the uneven stride)
-  const q = Math.floor(k * 9) / 9, qt = q * dur;                // stop-motion time for the head and arms: 9 held poses per loop
+  const q = Math.floor(k * 4) / 4, qt = q * dur;                // stop-motion time for the head and arms: 4 held poses per loop (it plays fast)
   const stumble = spike(k, 0.62, 0.07), snap = spike(k, 0.34, 0.035), snap2 = spike(k, 0.83, 0.03);
-  legs(P, w, 46, 92, 0.25); oLegsRun(P, 1.35);
+  legs(P, w, 60, 100, 0.25); oLegsRun(P, 1.35);
   P.move(sin(w) * 0.06, -0.09 + 0.06 * Math.abs(cos(w)) - 0.07 * stumble, 0);
-  P.rot('root', 16 + stumble * 6, sin(w) * 11, sin(w) * 7 + stumble * 6);             // pitched forward from the hips
-  P.spine(52 + cos(w * 2) * 5 + stumble * 10, -sin(w) * 13, -stumble * 4);
+  P.rot('root', 9 + stumble * 6, sin(w) * 11, sin(w) * 7 + stumble * 6);              // pitched forward from the hips
+  P.spine(48 + cos(w * 2) * 5 + stumble * 10, -sin(w) * 13, -stumble * 4);
   // the head stays level and locked on you whatever the body does, tilted over; it snaps sideways now and then
   P.neck(-36 - stumble * 8, sin(w) * 9, 0);
   P.rot('head', -22 + wob(qt, 21, 0) * 3, -sin(w) * 10 + wob(qt, 13, 1) * 6 + snap * 32 - snap2 * 26, 30 + wob(qt, 9, 2) * 6 - snap * 40 + snap2 * 20);

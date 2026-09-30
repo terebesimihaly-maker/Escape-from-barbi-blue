@@ -21,21 +21,21 @@ function placeCamera(t) {
     yaw = Math.atan2(c.oy, c.ox) + (cs ? 0 : p.hideYaw) + Math.sin(t * 0.7) * 0.03;
     pitch = cs ? (cs.t > SC.lean ? 0.02 : 0.1) : -0.03 + p.hidePitch; h = 1.55 + Math.sin(t * 1.7) * 0.006;
   } else if (p.dead && MP.on) {                   // out: watch a teammate who's still standing (tap to switch)
-    const al = [...MP.others.values()].filter(o => !o.down && !o.dead), w = al.length ? al[MP.spec % al.length] : null;
+    const al = [...MP.others.values()].filter(o => !o.down && !o.dead && !o.away), w = al.length ? al[MP.spec % al.length] : null;
     if (w) { cx = w.x - Math.cos(w.ang) * 30; cy = w.y - Math.sin(w.ang) * 30; yaw = w.ang; pitch = -0.25; h = 2.3;
       if (blocked(cx, cy, 2)) { cx = w.x; cy = w.y; h = EYE; pitch = w.pitch; } }
     else { h = 0.35; }
   } else if (p.down) { h = 0.32 + Math.sin(t * 1.2) * 0.01; pitch = clamp(pitch, -0.3, 1.1); }   // lying on the floor
   else if (p.moving) { h += Math.sin(stepPhase) * (p.sprinting ? 0.045 : 0.025); yaw += Math.sin(stepPhase * 0.5) * 0.006; }
-  const sh = shake * 0.01;
+  const sh = calm() ? 0 : shake * 0.01;
   camera.position.set(cx * S + rnd(-sh, sh), h + rnd(-sh, sh) * 0.6, cy * S + rnd(-sh, sh));
   camera.rotation.set(pitch, -Math.PI / 2 - yaw, 0);
 }
 function render3D(t) {
   const p = player, m = monster;
   if (!level || level.grid !== grid) buildLevel();
-  placeCamera(t);
-  flash.visible = !p.hidden && !p.dead; flash.intensity = FLASH_I * flicker * (p.down ? 0.5 : 1);
+  placeCamera(t); setListener(camera);
+  flash.visible = !p.hidden && !p.dead; flash.intensity = FLASH_I * (calm() ? 0.8 + 0.2 * flicker : flicker) * (p.down ? 0.5 : 1);
   aura.intensity = p.hidden ? (closetScene && closetScene.t > 0 ? 3.5 : 3.2) : 1.2; aura.distance = p.hidden ? 8 : 4.5;
 
   // her
@@ -46,7 +46,8 @@ function render3D(t) {
     if (sc) { const c = p.closet, al = sceneAlong(sc.t, c), sd = sceneSide(sc.t);
       // (-oy, ox) is to your right as you look out of the wardrobe: that's the door that opens, so she leans in there
       mx = c.x + c.ox * al - c.oy * sd; my = c.y + c.oy * al + c.ox * sd; ma = Math.atan2(-c.oy, -c.ox); show = sc.t < SC.gone;
-      if (sc.t > SC.vanish && sc.t < SC.gone) { show = Math.random() < 0.55; mx += rnd(-3, 3); my += rnd(-3, 3); } }   // glitching away
+      if (sc.t > SC.vanish && sc.t < SC.gone) {                                    // glitching away (calm: just gone, no strobing)
+        if (calm()) show = sc.t < (SC.vanish + SC.gone) / 2; else { show = Math.random() < 0.55; mx += rnd(-3, 3); my += rnd(-3, 3); } } }
     barbi.obj.visible = show;
     barbi.obj.position.set(mx * S, 0, my * S); barbi.obj.rotation.y = Math.PI / 2 - ma;
     let eye = 0;
@@ -78,6 +79,7 @@ function render3D(t) {
   }
   // teammates
   if (MP.on) for (const o of MP.others.values()) { if (!o.av) continue;
+    o.av.obj.visible = !o.away;                        // (lost the connection: not drawn until they're back)
     o.av.obj.position.set(o.x * S, 0, o.y * S); o.av.obj.rotation.y = Math.PI / 2 - o.ang;
     o.av.update(lastDt, { speed: o.spd * S, sprinting: o.sprinting, down: o.down, dead: o.dead, hidden: o.hidden, pitch: o.pitch, lightOn: settings.quality !== 'low' });
     o.av.setName(o.dead ? o.name + ' ✝' : o.down ? o.name + ' · ' + Math.ceil(o.downLeft) + 's' : o.name, o.down || o.dead); }
@@ -104,6 +106,7 @@ function render3D(t) {
     col.setXYZ(i, b, b * 0.92, b * 0.8);
   });
   pos.needsUpdate = col.needsUpdate = true;
+  if (level.house) level.house.calm = calm();
   if (level.house) level.house.update(lastDt, t, camera, p, flash);
   draw(scene, camera);
 }
@@ -167,7 +170,7 @@ function drawTeamFx(t) {
   const p = player, cw = cvs.width, ch = cvs.height, D = DPR;
   let row = 0;
   for (const o of MP.others.values()) {
-    if (!o.down || o.dead) continue;
+    if (!o.down || o.dead || o.away) continue;
     const cx = cw - 44 * D, cy = 86 * D + row * 64 * D, r = 20 * D; row++;
     const a = angDiff(Math.atan2(o.y - p.y, o.x - p.x), p.ang) - Math.PI / 2, pulse = 0.65 + 0.35 * Math.sin(t * 6);
     ctx.save();

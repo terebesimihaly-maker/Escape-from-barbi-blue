@@ -33,7 +33,8 @@ function update(dt) {
     if (huntTimer <= 0) { huntTimer = rnd(45, 70) - floorIdx * 8 - (MP.n - 1) * 2; monster.huntT = 6;
       if (MP.on) hostEmit({ t: 'scream' });
       else { startScream(); sfx.scream(clamp(1 - d / 700, 0.2, 0.8)); shake = 7; showMsg('A scream tears through the house. She knows where you are. HIDE.', 3.5); } } }
-  creakTimer -= dt; if (creakTimer <= 0) { creakTimer = rnd(7, 18); sfx.creak(rnd(0.03, 0.07)); }
+  creakTimer -= dt; if (creakTimer <= 0) { creakTimer = rnd(7, 18);        // the house creaks, somewhere around you
+    const a = rnd(0, 6.28), r = rnd(80, 220); sfx.creak(rnd(0.05, 0.1), { x: player.x + Math.cos(a) * r, y: player.y + Math.sin(a) * r, h: rnd(0.5, WALL_H) }); }
 
   const st = $('stam'); st.firstChild.style.width = (player.stam * 100) + '%'; st.classList.toggle('tired', player.exhausted);
   if (MP.on) updateDownMsg();
@@ -42,7 +43,7 @@ function update(dt) {
 let downMsgText = '';
 function updateDownMsg() {
   const p = player; let t = '';
-  if (p.dead && MP.scareT <= 0) { const al = [...MP.others.values()].filter(o => !o.down && !o.dead), w = al.length ? al[MP.spec % al.length] : null;
+  if (p.dead && MP.scareT <= 0) { const al = [...MP.others.values()].filter(o => !o.down && !o.dead && !o.away), w = al.length ? al[MP.spec % al.length] : null;
     t = "You didn't make it<small>" + (w ? 'Watching ' + escapeHtml(w.name) + ' · tap to switch' : 'Nobody is left standing') + '</small>'; }
   else if (p.down && MP.scareT <= 0) { const by = [...MP.others.values()].find(o => o.rv === MP.myId);
     t = (by ? escapeHtml(by.name) + ' is reviving you…' : "You're down · " + Math.ceil(p.downLeft) + 's') + '<small>a teammate can get you back up</small>'; }
@@ -89,7 +90,7 @@ function updateCloset(dt) {
 
 function updatePlayer(dt) {
   const p = player; readInput();
-  if (MP.menu) { input.x = input.y = 0; input.sprint = input.sprintKey = false; input.turn = 0; }
+  if (MP.menu || MP.reconnecting) { input.x = input.y = 0; input.sprint = input.sprintKey = false; input.turn = 0; }
   if (p.down || p.dead) {                          // down (or out): you can look around, nothing else
     p.moving = p.sprinting = false; if (input.turn) lookBy(input.turn * 2.4 * dt, 0);
     hideTarget = null; reviveTarget = null; revP = 0; show('hide', false); show('revive', false); show('run', false); show('phone', false);

@@ -18,15 +18,15 @@ function renderDead(dt, overGame) {
     // she's right in front of you: the camera snaps to her, she lunges
     const D = deathCam, a = D.a, k = Math.min(1, dt * 18);
     D.yaw = D.yaw - angDiff(D.yaw, -Math.PI / 2 - a) * k; D.pitch += (0.2 - D.pitch) * k;
-    const sh = (deadT < 1.5 ? 0.05 : 0.008);
+    const sh = (deadT < 1.5 ? 0.05 : 0.008) * (calm() ? 0.1 : 1);
     camera.position.set(D.x + rnd(-sh, sh), D.y + rnd(-sh, sh), D.z + rnd(-sh, sh)); camera.rotation.set(D.pitch + rnd(-sh, sh), D.yaw, rnd(-sh, sh) * 2);
     const dist = 1.3;
     putBarbi(scene); barbi.obj.visible = true;
     barbi.obj.position.set(D.x + Math.cos(a) * dist, 0, D.z + Math.sin(a) * dist); barbi.obj.rotation.y = Math.PI / 2 - (a + Math.PI);
     barbi.anim.update(dt); setEyes(0.8 + Math.random() * 0.2);
-    flash.visible = true; flash.intensity = FLASH_I * (deadT < 1.4 ? (Math.random() < 0.3 ? 0.15 : 1.1) : 0.5);
+    flash.visible = true; flash.intensity = FLASH_I * (deadT < 1.4 ? (calm() ? 0.9 : Math.random() < 0.3 ? 0.15 : 1.1) : 0.5);
     draw(scene, camera);
-    ctx.fillStyle = deadT < 1.4 && Math.random() < 0.25 ? 'rgba(90,0,0,.45)' : 'rgba(0,0,0,' + clamp((deadT - 1.4) * 0.5, 0, 0.5) + ')';
+    ctx.fillStyle = deadT < 1.4 && !calm() && Math.random() < 0.25 ? 'rgba(90,0,0,.45)' : 'rgba(0,0,0,' + clamp((deadT - 1.4) * 0.5, 0, 0.5) + ')';
     ctx.fillRect(0, 0, cw, ch);
     // tear the picture into glitching strips
     if (deadT < 1.5) { const n = 14;
@@ -34,16 +34,16 @@ function renderDead(dt, overGame) {
         ctx.drawImage(renderer.domElement, 0, y / ch * renderer.domElement.height, renderer.domElement.width, renderer.domElement.height / n, off, y, cw, ch / n + 1); } }
   } else {
     paintFace(fctx, deadT);
-    ctx.fillStyle = deadT < 1.4 && Math.random() < 0.25 ? '#3a0000' : '#000'; ctx.fillRect(0, 0, cw, ch);
+    ctx.fillStyle = deadT < 1.4 && !calm() && Math.random() < 0.25 ? '#3a0000' : '#000'; ctx.fillRect(0, 0, cw, ch);
     const z = deadT < 0.22 ? 0.35 + deadT / 0.22 * 0.95 : 1.3 + Math.sin(deadT * 40) * 0.03;
-    const size = Math.min(cw, ch) * 1.15 * z, sh = deadT < 1.5 ? 30 * DPR : 4 * DPR;
+    const size = Math.min(cw, ch) * 1.15 * z, sh = (deadT < 1.5 ? 30 * DPR : 4 * DPR) * (calm() ? 0.1 : 1);
     const dx = cw / 2 - size / 2 + rnd(-sh, sh), dy = ch / 2 - size / 2 + rnd(-sh, sh), n = 14;
     for (let i = 0; i < n; i++) {
       const off = Math.random() < 0.3 ? rnd(-50, 50) * DPR * (deadT < 1.5 ? 1 : 0.2) : 0;
       ctx.drawImage(faceCv, 0, i * 512 / n, 512, 512 / n, dx + off, dy + i * size / n, size, size / n + 1);
     }
   }
-  if (deadT < 1.5 && Math.random() < 0.3) { ctx.fillStyle = 'rgba(255,0,0,.18)'; ctx.fillRect(0, 0, cw, ch); }
+  if (deadT < 1.5 && !calm() && Math.random() < 0.3) { ctx.fillStyle = 'rgba(255,0,0,.18)'; ctx.fillRect(0, 0, cw, ch); }
   drawGrain(0.12);
   if (!overGame && deadT > 1.8 && $('dead').classList.contains('hidden')) { $('dText').textContent = deathReason; show('dead', true); }
 }
@@ -104,7 +104,7 @@ function renderTitle(dt) {
     titleKey.position.set(titleAim.x + 0.55, titleAim.y - 0.05, titleAim.z + 1.0); titleKey.target.position.copy(titleAim);
     // the bulb over her keeps failing; when you point at "Enter the house" it goes mad and her eyes flare
     if (titleFlick > 0) titleFlick -= dt; else if (Math.random() < dt * (titleHover ? 6 : 0.5)) titleFlick = rnd(0.05, titleHover ? 0.15 : 0.4);
-    const on = titleFlick > 0 ? (Math.random() < 0.5 ? 0.05 : 0.25) : 1;
+    const on = titleFlick > 0 && !calm() ? (Math.random() < 0.5 ? 0.05 : 0.25) : 1;
     titleLight.intensity = 9 * on; titleBulbLight.intensity = 2.5 * on; titleKey.intensity = 2.2 * on;
     titleBulb.material.color.setScalar(0.25 + 0.75 * on);
     titleLight.color.setHex(titleHover ? 0xa8b8ff : 0x86a8ff);

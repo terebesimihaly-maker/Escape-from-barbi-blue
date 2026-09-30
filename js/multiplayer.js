@@ -9,6 +9,19 @@
 const MP = { on: false, host: false, peer: null, conns: new Map(), hostConn: null, myId: '', code: '', lobby: null, others: new Map(),
   sendT: 0, menu: false, n: 1, leaving: false, inGame: false, overSent: false, floorDone: false, exitAsked: false, spec: 0, scareT: 0, kicked: false, rejected: '' };
 const PEER_PREFIX = 'escape-barbi-blue-', MAX_PLAYERS = 4, SEND_HZ = 15, DOWN_TIME = 50, REVIVE_TIME = 3;
+// rejoining: a player who drops keeps their place for AWAY_TIME seconds and reconnects by themselves (for RECONNECT_FOR seconds);
+// after closing the page, the menu offers "Rejoin" for 10 minutes (the lobby code and their player id are kept on the device)
+const AWAY_TIME = 90, RECONNECT_FOR = 70, REJOIN_KEY = 'bb_rejoin', REJOIN_MAX = 10 * 60 * 1000;
+const newPid = () => Array.from({ length: 8 }, () => 'abcdefghijklmnopqrstuvwxyz0123456789'[Math.random() * 36 | 0]).join('');
+function saveRejoin() { if (MP.host || !MP.code || !MP.pid) return; try { localStorage.setItem(REJOIN_KEY, JSON.stringify({ code: MP.code, pid: MP.pid, t: Date.now() })); } catch (e) {} }
+function loadRejoin() {
+  try { const r = JSON.parse(localStorage.getItem(REJOIN_KEY) || 'null');
+    if (r && /^\d{6}$/.test(r.code) && /^[a-z0-9]{8}$/.test(r.pid) && Date.now() - r.t < REJOIN_MAX) return r; } catch (e) {}
+  return null;
+}
+function clearRejoin() { try { localStorage.removeItem(REJOIN_KEY); } catch (e) {} updateRejoinBtn(); }
+function updateRejoinBtn() { const r = !MP.on && loadRejoin(); show('rejoinBtn', !!r);
+  if (r) $('rejoinBtn').textContent = 'Rejoin game ' + r.code.slice(0, 3) + ' ' + r.code.slice(3); }
 const cleanName = t => String(t || '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 14);
 let myName = '';
 try { myName = cleanName(localStorage.getItem('bb_name')); } catch (e) {}
@@ -39,10 +52,13 @@ function leaveMP(quiet) {
   MP.leaving = true;
   if (MP.lobbyTimer) { clearInterval(MP.lobbyTimer); MP.lobbyTimer = null; }
   if (MP.hostConn) { send(MP.hostConn, { t: 'leave' }); }
+  if (MP.host) broadcast({ t: 'bye' });                   // (so the others don't wait for the owner to come back)
+  stopReconnect();
+  if (!quiet) clearRejoin();
   const peer = MP.peer;
   setTimeout(() => { try { if (peer) peer.destroy(); } catch (e) {} }, 150);
   for (const o of MP.others.values()) removeAvatar(o);
-  Object.assign(MP, { on: false, host: false, peer: null, hostConn: null, myId: '', code: '', lobby: null, inGame: false, menu: false, n: 1, scareT: 0 });
+  Object.assign(MP, { on: false, host: false, peer: null, hostConn: null, myId: '', code: '', pid: '', lobby: null, inGame: false, menu: false, n: 1, scareT: 0, floorData: null });
   MP.conns = new Map(); MP.others = new Map();
   MP.leaving = false;
   if (!quiet) mpStatus('');
@@ -70,6 +86,10 @@ function createLobby() {
 function hostAccept(conn) {
   conn.on('open', () => {
     if (!MP.lobby) { conn.close(); return; }
+    if (lobbyPlayer(conn.peer)) {                          // a player coming back (after losing the connection)
+      const old = MP.conns.get(conn.peer); MP.conns.set(conn.peer, conn);
+      if (old && old !== conn) setTimeout(() => { try { old.close(); } catch (e) {} }, 300);
+      return; }
     const why = MP.lobby.started ? 'That game has already started.' : MP.lobby.players.length >= MAX_PLAYERS ? 'That lobby is full (4 players).' : '';
     if (why) { send(conn, { t: 'reject', why }); setTimeout(() => { try { conn.close(); } catch (e) {} }, 3000); return; }
     MP.conns.set(conn.peer, conn);
@@ -78,11 +98,15 @@ function hostAccept(conn) {
   conn.on('close', () => { if (MP.conns.get(conn.peer) === conn) hostDrop(conn.peer); });
   conn.on('error', () => { if (MP.conns.get(conn.peer) === conn) hostDrop(conn.peer); });
 }
-function hostDrop(id) {
+function hostDrop(id, final) {
   const c = MP.conns.get(id); MP.conns.delete(id);
   if (c) setTimeout(() => { try { c.close(); } catch (e) {} }, 300);
   if (!MP.lobby) return;
   const pl = lobbyPlayer(id);
+  // lost the connection during a game: keep their place for a while, they'll probably be back
+  if (pl && !final && MP.lobby.started) {
+    if (!pl.away) { pl.away = true; pl.awayT = AWAY_TIME; hostEmit({ t: 'away', id }); hostSendLobby(); }
+    return; }
   MP.lobby.players = MP.lobby.players.filter(p => p.id !== id);
   if (pl && MP.inGame) hostEmit({ t: 'left', id, name: pl.name });
   hostLobbyChanged();
@@ -90,7 +114,7 @@ function hostDrop(id) {
 function kickPlayer(id) {
   const c = MP.conns.get(id); if (!c) return;
   send(c, { t: 'kicked' });
-  hostDrop(id);
+  hostDrop(id, true);
 }
 function hostLobbyChanged() {
   const L = MP.lobby; if (!L) return;
@@ -114,10 +138,11 @@ function hostHandle(id, m) {
     case 'hello':
       if (!pl && MP.conns.has(id) && MP.lobby.players.length < MAX_PLAYERS && !MP.lobby.started) {
         MP.lobby.players.push({ id, name: cleanName(m.name) || 'Player', ready: false }); hostLobbyChanged(); }
+      else if (pl && MP.conns.has(id)) hostWelcomeBack(id, pl);
       break;
     case 'name': if (pl) { pl.name = cleanName(m.name) || pl.name; hostLobbyChanged(); } break;
     case 'ready': if (pl && !MP.lobby.started) { pl.ready = !!m.ready; hostLobbyChanged(); } break;
-    case 'leave': hostDrop(id); break;
+    case 'leave': hostDrop(id, true); break;
     case 'st': hostPlayerState(id, m); break;
     case 'fuse': hostFuse(id, m.k | 0); break;
     case 'exit': hostExit(); break;
@@ -126,36 +151,83 @@ function hostHandle(id, m) {
   }
 }
 
+// a player reconnected: back in the lobby list, and (during a game) into the current floor, as they were
+function hostWelcomeBack(id, pl) {
+  const was = pl.away; pl.away = false; pl.awayT = 0;
+  hostSendLobby();
+  if (!MP.lobby.started || !MP.floorData) return;
+  const o = MP.others.get(id);
+  send(MP.conns.get(id), { t: 'resync', d: MP.floorData, got: fuses.map(f => f.got ? 1 : 0), power: powerOn ? 1 : 0, rt: runTime, trans: state === 'trans' ? 1 : 0,
+    you: o ? { x: o.tx, y: o.ty, a: o.ang, dn: o.down ? 1 : 0, dd: o.dead ? 1 : 0, dl: o.downLeft } : null });
+  if (was) hostEmit({ t: 'back', id });
+}
+
 // ---- the joining side
-function joinLobby() {
+// join with a code, or rejoin (r = the saved { code, pid } of a game you dropped out of)
+function joinLobby(r) {
   if (!window.peerjs) { mpStatus('Playing together could not load.'); return; }
-  const code = $('mpCode').value.replace(/\D/g, '');
+  const code = r ? r.code : $('mpCode').value.replace(/\D/g, '');
   if (code.length !== 6) { mpStatus('The code has 6 digits.'); return; }
   leaveMP(true); saveName($('mpName').value);
-  mpStatus('Connecting…'); MP.kicked = false; MP.rejected = '';
-  const peer = new peerjs.Peer(peerOptions()); MP.peer = peer;
-  let joined = false;
-  const fail = t => { if (joined || MP.peer !== peer) return; clearTimeout(timer); leaveMP(true); mpStatus(t); };
-  const timer = setTimeout(() => fail("Couldn't reach that lobby. Check the code and try again."), 15000);
-  peer.on('open', id => {
-    MP.myId = id;
-    const conn = peer.connect(PEER_PREFIX + code, { reliable: true }); MP.hostConn = conn;
-    conn.on('open', () => send(conn, { t: 'hello', name: myName }));
-    conn.on('data', d => {
-      if (d && d.t === 'reject') { MP.rejected = d.why; fail(d.why); return; }
-      if (!joined && d && d.t === 'lobby') { joined = true; clearTimeout(timer); Object.assign(MP, { on: true, host: false, code }); mpStatus(''); showLobby(); }
-      if (joined) clientHandle(d);
+  mpStatus(r ? 'Rejoining…' : 'Connecting…'); MP.kicked = false; MP.rejected = ''; MP.hostLeft = false;
+  // your player id in this lobby (the same one when you rejoin, so the owner knows it's you)
+  const pid = r ? r.pid : newPid(), t0 = performance.now(), wait = r ? RECONNECT_FOR * 1000 : 15000;
+  let joined = false, peer = null;
+  const fail = t => { if (joined) return; clearTimeout(timer); leaveMP(true); if (r) clearRejoin(); mpStatus(t); };
+  const timer = setTimeout(() => fail(r ? "Couldn't rejoin. The game may be over." : "Couldn't reach that lobby. Check the code and try again."), wait);
+  const start = () => {
+    peer = new peerjs.Peer(PEER_PREFIX + code + '-' + pid, peerOptions()); MP.peer = peer; MP.pid = pid; MP.code = code;
+    peer.on('open', id => {
+      MP.myId = id;
+      openHostConn(peer, code, () => {                    // (first message from the owner: we're in)
+        if (joined) return; joined = true; clearTimeout(timer);
+        Object.assign(MP, { on: true, host: false, code }); mpStatus(''); saveRejoin(); updateRejoinBtn();
+        if (!MP.lobby || !MP.lobby.started) showLobby();  // (rejoining a game in progress: the owner sends the floor)
+      }, why => fail(why));
     });
-    conn.on('close', () => { if (!joined) fail(MP.rejected || "Couldn't join that lobby."); else clientLost(); });
-    conn.on('error', () => { if (!joined) fail(MP.rejected || "Couldn't join that lobby."); });
-  });
-  peer.on('error', err => { if (!joined) fail(netError(err)); else if (err.type !== 'peer-unavailable') clientLost(); });
+    peer.on('error', err => {
+      // rejoining right after dropping out: the server may still hold your old id for a minute. Try again.
+      if (err.type === 'unavailable-id' && !joined && performance.now() - t0 < wait - 3000) { try { peer.destroy(); } catch (e) {} setTimeout(() => { if (MP.peer === peer) start(); }, 3000); return; }
+      if (!joined) fail(err.type === 'peer-unavailable' && r ? "Couldn't rejoin. The game is over." : netError(err));
+      else if (err.type !== 'peer-unavailable') clientLost();
+    });
+    peer.on('disconnected', () => { if (MP.peer === peer && !MP.leaving && joined) try { peer.reconnect(); } catch (e) {} });
+  };
+  start();
 }
+// a data connection to the lobby owner (used to join, and again to reconnect)
+function openHostConn(peer, code, onIn, onFail) {
+  const conn = peer.connect(PEER_PREFIX + code, { reliable: true }); MP.hostConn = conn;
+  let inside = false;
+  conn.on('open', () => send(conn, { t: 'hello', name: myName }));
+  conn.on('data', d => {
+    if (MP.hostConn !== conn) return;
+    if (d && d.t === 'reject') { MP.rejected = d.why; if (onFail) onFail(d.why); return; }
+    if (!inside && d && (d.t === 'lobby' || d.t === 'resync')) { inside = true; if (d.t === 'lobby') MP.lobby = d.lobby; onIn(); stopReconnect(); }
+    if (inside) clientHandle(d);
+  });
+  conn.on('close', () => { if (MP.hostConn !== conn) return; if (!inside && onFail) onFail(MP.rejected || "Couldn't join that lobby."); else if (inside) clientLost(); });
+  conn.on('error', () => { if (MP.hostConn === conn && !inside && onFail) onFail(MP.rejected || "Couldn't join that lobby."); });
+  return conn;
+}
+// the connection to the owner dropped: keep trying for a while (the game waits for you), then give up
 function clientLost() {
   if (MP.leaving || !MP.on) return;
-  const why = MP.kicked ? 'The lobby owner removed you from the lobby.' : 'Lost the connection to the lobby owner.';
-  leaveMP(true); toTitle(); openPanel('mp'); mpStatus(why);
+  if (MP.kicked || MP.hostLeft) { endClient(MP.kicked ? 'The lobby owner removed you from the lobby.' : 'The lobby owner closed the lobby.'); return; }
+  if (MP.reconnecting) return;
+  MP.reconnecting = { t0: performance.now(), timer: 0 }; setSprint(false);
+  show('reconn', true); tryReconnect();
 }
+function tryReconnect() {
+  const R = MP.reconnecting; if (!R || !MP.on || MP.leaving) return;
+  const left = RECONNECT_FOR - (performance.now() - R.t0) / 1000, peer = MP.peer;
+  if (left <= 0 || !peer || peer.destroyed) { endClient('Lost the connection to the lobby owner.'); return; }
+  if (peer.disconnected) { try { peer.reconnect(); } catch (e) {} R.timer = setTimeout(tryReconnect, 2500); return; }
+  openHostConn(peer, MP.code, () => {});
+  R.timer = setTimeout(() => { if (MP.reconnecting === R) tryReconnect(); }, 5000);
+}
+function stopReconnect() { if (MP.reconnecting) clearTimeout(MP.reconnecting.timer); MP.reconnecting = null; show('reconn', false); }
+function endClient(why) { stopReconnect(); leaveMP(true); clearRejoin(); toTitle(); openPanel('mp'); mpStatus(why); }
 
 // ---- the lobby screen
 function showLobby() {
@@ -173,6 +245,7 @@ function renderLobby() {
     const dot = document.createElement('span'); dot.className = 'dot'; dot.style.background = PlayerModel.TAGS[i % 4];
     const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = (i === 0 ? '👑 ' : '') + pl.name;
     if (pl.id === MP.myId) { const y = document.createElement('span'); y.className = 'you'; y.textContent = '  (you)'; nm.appendChild(y); }
+    if (pl.away) { const y = document.createElement('span'); y.className = 'you'; y.textContent = '  (reconnecting…)'; nm.appendChild(y); }
     const rd = document.createElement('span'); rd.className = 'rd' + (pl.ready ? ' on' : ''); rd.textContent = pl.ready ? 'Ready' : 'Not ready';
     li.append(dot, nm, rd);
     if (MP.host && pl.id !== MP.myId) { const k = document.createElement('button'); k.className = 'kick'; k.textContent = 'Kick'; k.onclick = () => kickPlayer(pl.id); li.appendChild(k); }
@@ -199,6 +272,8 @@ $('lbName').addEventListener('input', e => {
   if (MP.host) { const me = lobbyPlayer(MP.myId); if (me) { me.name = myName; hostLobbyChanged(); } } else send(MP.hostConn, { t: 'name', name: myName });
 });
 $('lbLeave').onclick = () => { leaveMP(); toTitle(); openPanel('mp'); };
+$('rejoinBtn').onclick = () => { const r = loadRejoin(); if (!r) { updateRejoinBtn(); return; } unlockAudio(); primeVoice(); openPanel('mp'); joinLobby(r); };
+$('reconnLeave').onclick = () => { leaveMP(); toTitle(); openPanel('mp'); };
 
 /* ---------- multiplayer: the game ---------- */
 function hostStartMatch() {
@@ -210,6 +285,7 @@ function hostStartFloor(i) {
   const L = MP.lobby; if (!L) return;
   const d = generateFloor(i, L.players.length);
   d.order = L.players.map(p => p.id); d.names = L.players.map(p => p.name);
+  MP.floorData = d;                                   // (kept, for anyone who reconnects during this floor)
   MP.floorDone = false; MP.overSent = false;
   hostEmit({ t: 'floor', d });
 }
@@ -217,6 +293,7 @@ function hostStartFloor(i) {
 function hostEndMatch() {
   const L = MP.lobby; if (!L) return;
   L.started = false; L.players.forEach(p => { p.ready = false; });
+  for (const p of L.players.filter(p => p.away)) hostDrop(p.id, true);   // (still gone at the end: they leave the lobby)
   hostSendLobby();
 }
 function makeOther(id, slot, name) {
@@ -244,13 +321,29 @@ function clientHandle(m) {
       if (state === 'lobby') renderLobby();
       break;
     case 'kicked': MP.kicked = true; break;
+    case 'bye': MP.hostLeft = true; break;
+    case 'away': case 'back': {                       // a teammate lost the connection / came back
+      const o = MP.others.get(m.id); if (o) o.away = m.t === 'away';
+      if (m.id !== MP.myId) showMsg(m.t === 'away' ? nameOf(m.id) + ' lost the connection. Waiting for them to come back…' : nameOf(m.id) + ' is back.', 3);
+      break; }
+    case 'resync': {                                  // back in after losing the connection: the floor as it is now
+      clientHandle({ t: 'floor', d: m.d });
+      m.got.forEach((g, k) => { if (g && fuses[k]) { fuses[k].got = true; fusesGot++; } });
+      powerOn = !!m.power; updateFuseHud(); runTime = m.rt || 0;
+      const y = m.you, p = player;
+      if (y) { p.x = y.x; p.y = y.y; p.ang = y.a;
+        if (y.dn || y.dd) { p.down = true; p.dead = !!y.dd; p.downLeft = y.dl || 0; setHud(false); show('hud', true); } }
+      if (m.trans) { state = 'trans'; setHud(false); $('tText').textContent = 'Everyone goes down together…'; show('tGo', false); show('trans', true); }
+      showMsg('You are back in the game.', 2.5);
+      break; }
     case 'lockedout': if (player.hidden) { exitHide(); lockedOut(); } break;
     case 'floor': {
       const d = m.d, slot = Math.max(0, d.order.indexOf(MP.myId));
       for (const [id, o] of MP.others) if (!d.order.includes(id)) { removeAvatar(o); MP.others.delete(id); }
       d.order.forEach((id, i) => { if (id === MP.myId) return;
         const o = makeOther(id, i, d.names[i]), sp = d.spawns[Math.min(i, d.spawns.length - 1)];
-        Object.assign(o, { x: sp[0], y: sp[1], tx: sp[0], ty: sp[1], ang: d.a0, down: false, dead: false, downLeft: 0, hidden: false, closet: -1, inv: 0 }); });
+        Object.assign(o, { x: sp[0], y: sp[1], tx: sp[0], ty: sp[1], ang: d.a0, down: false, dead: false, downLeft: 0, hidden: false, closet: -1, inv: 0, heardAt: performance.now() }); });
+      MP.lastW = performance.now();
       MP.n = d.order.length; MP.inGame = true; MP.menu = false; MP.exitAsked = false; MP.scareT = 0; MP.spec = 0;
       ['lobby', 'title', 'panel', 'dead', 'win', 'trans', 'paused', 'note'].forEach(id => show(id, false));
       if (m.d.i === 0) runTime = 0;
@@ -315,6 +408,7 @@ function mpEnd(won) {
 // everybody's position and state from the host, ~15 times a second
 function clientWorld(m) {
   if (!MP.inGame || MP.host) return;
+  MP.lastW = performance.now();
   for (const q of m.ps) {
     if (q.id === MP.myId) {                    // being down is decided by the host
       player.downLeft = q.dl;
@@ -322,7 +416,7 @@ function clientWorld(m) {
     }
     const o = MP.others.get(q.id); if (!o) continue;
     o.tx = q.x; o.ty = q.y; o.ang = q.a; o.pitch = q.p; o.hidden = !!q.h; o.closet = q.c; o.moving = !!q.mv; o.sprinting = !!q.sp;
-    o.down = !!q.dn; o.dead = !!q.dd; o.downLeft = q.dl; o.rv = q.rv || '';
+    o.down = !!q.dn; o.dead = !!q.dd; o.downLeft = q.dl; o.rv = q.rv || ''; o.away = !!q.aw;
   }
   const M = m.m, mo = monster;
   if (M.ac && !mo.active) showMsg('Somewhere in the house, a music box starts playing.', 3);
@@ -337,6 +431,8 @@ function updateMonsterClient(dt) {
   if (Math.hypot(m.tx - m.x, m.ty - m.y) > T * 3) { m.x = m.tx; m.y = m.ty; }   // (she was moved far away: no sliding across the map)
   m.x += (m.tx - m.x) * k; m.y += (m.ty - m.y) * k; m.ang = lerpAngle(m.ang, m.tang || 0, k);
   const mv = Math.hypot(m.x - m.px, m.y - m.py); m.px = m.x; m.py = m.y;
+  m.sndAcc = (m.sndAcc || 0) + (mv < 20 ? mv : 0);            // her footsteps: every stride walking, every other when she runs
+  if (m.active && m.sndAcc > (m.vel > 60 ? 38 : 17)) { m.sndAcc = 0; sfx.herStep(m.x, m.y, m.vel > 60, m.vel < 60 && m.foot > 0); }
   if (m.active && mv < 20) { m.stepAcc += mv;
     if (m.stepAcc > 17) { m.stepAcc = 0; m.foot = -m.foot;
       prints.push({ x: m.x + Math.cos(m.ang + 1.57) * 3.5 * m.foot, y: m.y + Math.sin(m.ang + 1.57) * 3.5 * m.foot, a: m.ang, t: 14 });
@@ -346,6 +442,8 @@ function updateMonsterClient(dt) {
 // the host keeps each player's latest state
 function hostPlayerState(id, m) {
   const o = MP.others.get(id); if (!o || !MP.inGame) return;
+  o.heardAt = performance.now();
+  const pl = lobbyPlayer(id); if (pl && pl.away) hostWelcomeBack(id, pl);     // (they were only silent for a while)
   const num = v => Number.isFinite(v) ? v : 0;
   o.tx = clamp(num(m.x), 0, GW * T); o.ty = clamp(num(m.y), 0, GH * T); o.ang = num(m.a); o.pitch = clamp(num(m.p), -1.2, 1.2);
   const wasHidden = o.hidden; o.hidden = !!m.h; o.closet = m.c | 0; o.moving = !!m.mv; o.sprinting = !!m.sp; o.rv = typeof m.rv === 'string' ? m.rv : '';
@@ -399,7 +497,7 @@ function hostRevive(by, id) {
 function allPlayers() {
   const list = [{ id: MP.myId || 'me', me: true, x: player.x, y: player.y, hidden: player.hidden, moving: player.moving, sprinting: player.sprinting,
     down: player.down, dead: player.dead, inv: player.inv, closet: player.hidden ? closets.indexOf(player.closet) : -1 }];
-  if (MP.on) for (const o of MP.others.values()) list.push({ id: o.id, x: o.x, y: o.y, hidden: o.hidden, moving: o.moving, sprinting: o.sprinting, down: o.down, dead: o.dead, inv: o.inv,
+  if (MP.on) for (const o of MP.others.values()) if (!o.away) list.push({ id: o.id, x: o.x, y: o.y, hidden: o.hidden, moving: o.moving, sprinting: o.sprinting, down: o.down, dead: o.dead, inv: o.inv,
     closet: o.hidden ? o.closet : -1 });
   return list;
 }
@@ -431,6 +529,8 @@ function mpTick(dt) {
     const ox = o.x, oy = o.y;
     o.x += (o.tx - o.x) * k; o.y += (o.ty - o.y) * k;
     o.spd += (Math.hypot(o.x - ox, o.y - oy) / Math.max(dt, 1e-3) - o.spd) * Math.min(1, dt * 10);
+    o.stepAcc = (o.stepAcc || 0) + Math.min(20, Math.hypot(o.x - ox, o.y - oy));      // their footsteps, from where they are
+    if (o.stepAcc > (o.sprinting ? 40 : 30)) { o.stepAcc = 0; if (!o.away && !o.hidden && state === 'play') sfx.step(o.sprinting, { x: o.x, y: o.y }); }
     if (o.inv > 0) o.inv -= dt;
     if (o.down && !o.dead && o.downLeft > 0) o.downLeft = Math.max(0, o.downLeft - dt);
   }
@@ -439,9 +539,19 @@ function mpTick(dt) {
   if (MP.host && state === 'play') {
     // bleeding out, and the end of the game when nobody is left standing
     for (const q of [player, ...MP.others.values()]) if (q.down && !q.dead && q.downLeft <= 0) hostEmit({ t: 'bled', id: q === player ? MP.myId : q.id });
-    const everyone = [player, ...MP.others.values()];
+    const everyone = [player, ...[...MP.others.values()].filter(o => !o.away)];
     if (!MP.overSent && everyone.every(q => q.down || q.dead)) { MP.overSent = true; setTimeout(() => { if (MP.on && MP.host) hostEmit({ t: 'over' }); }, 2500); }
   }
+  if (MP.host && MP.lobby) for (const pl of MP.lobby.players) {
+    if (pl.away && (pl.awayT -= dt) <= 0) { hostDrop(pl.id, true); continue; }   // gone for good
+    // silent for 8 seconds (a locked phone, a dead connection the browser hasn't noticed yet): away
+    const o = MP.others.get(pl.id);
+    if (o && !pl.away && MP.lobby.started && performance.now() - (o.heardAt || performance.now()) > 8000) { pl.away = true; pl.awayT = AWAY_TIME; hostEmit({ t: 'away', id: pl.id }); hostSendLobby(); }
+  }
+  // (and the other way round: nothing from the owner for 8 seconds, so reconnect)
+  if (!MP.host && !MP.reconnecting && MP.lastW && performance.now() - MP.lastW > 8000) { MP.lastW = 0; const c = MP.hostConn; MP.hostConn = null; try { c && c.close(); } catch (e) {} clientLost(); }
+  if (!MP.host && !MP.reconnecting && (MP.rejoinT = (MP.rejoinT || 0) - dt) <= 0) { MP.rejoinT = 5; saveRejoin(); }
+  if (MP.reconnecting) $('reconnTxt').textContent = 'Reconnecting… ' + Math.max(0, Math.ceil(RECONNECT_FOR - (performance.now() - MP.reconnecting.t0) / 1000)) + ' s';
   MP.sendT -= dt;
   if (MP.sendT > 0) return;
   MP.sendT = 1 / SEND_HZ;
@@ -451,7 +561,7 @@ function mpTick(dt) {
   const ps = [{ id: MP.myId, x: r1(p.x), y: r1(p.y), a: r2(p.ang), p: r2(p.pitch), h: p.hidden ? 1 : 0, c: cl, mv: p.moving ? 1 : 0, sp: p.sprinting ? 1 : 0,
     dn: p.down ? 1 : 0, dd: p.dead ? 1 : 0, dl: r1(p.downLeft), rv }];
   for (const o of MP.others.values()) ps.push({ id: o.id, x: r1(o.tx), y: r1(o.ty), a: r2(o.ang), p: r2(o.pitch), h: o.hidden ? 1 : 0, c: o.closet, mv: o.moving ? 1 : 0,
-    sp: o.sprinting ? 1 : 0, dn: o.down ? 1 : 0, dd: o.dead ? 1 : 0, dl: r1(o.downLeft), rv: o.rv });
+    sp: o.sprinting ? 1 : 0, dn: o.down ? 1 : 0, dd: o.dead ? 1 : 0, dl: r1(o.downLeft), rv: o.rv, aw: o.away ? 1 : 0 });
   const m = monster;
   broadcast({ t: 'w', ps, m: { x: r1(m.x), y: r1(m.y), a: r2(m.ang), s: m.state, ac: m.active ? 1 : 0, v: r1(m.vel), sc: r2(m.screamT), ti: m.ti } });
 }
@@ -459,7 +569,7 @@ function mpTick(dt) {
 function mateBlocked(x, y) {
   if (!MP.on) return false;
   for (const o of MP.others.values()) {
-    if (o.hidden || o.down || o.dead) continue;
+    if (o.hidden || o.down || o.dead || o.away) continue;
     const d = Math.hypot(x - o.x, y - o.y);
     if (d < 22 && d < Math.hypot(player.x - o.x, player.y - o.y) - 0.01) return true;
   }

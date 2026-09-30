@@ -133,3 +133,12 @@ h2{font-weight:400;letter-spacing:5px;color:#86a8ff;text-transform:uppercase;mar
   font:600 20px/1.4 system-ui,sans-serif;color:#ffd0cc;text-shadow:0 0 10px #000,0 0 4px #000;letter-spacing:1px}
 #downMsg small{display:block;font-weight:400;font-size:14px;color:#d8c8d0}
 .hidden{display:none!important}
+#reconn{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:30;display:flex;flex-direction:column;align-items:center;gap:6px;
+  width:min(320px,calc(100% - 32px));box-sizing:border-box;padding:18px 16px;background:rgba(8,8,16,.88);border:1px solid rgba(255,140,120,.45);border-radius:6px;
+  color:#f2e6e6;font:15px Georgia,serif;text-align:center}
+#reconn b{color:#ffb3a8;letter-spacing:2px}
+#reconn small{color:#a79fb5;font-size:12px}
+#reconn .sbtn{margin-top:6px}
+.row span small{display:block;color:#8f8aa3;font:12px system-ui,sans-serif;letter-spacing:0;margin-top:2px}
+.row input[type=checkbox]{width:22px;height:22px;accent-color:#6f8cff;flex:none}
+.row:has(input[type=checkbox]) > span{flex:1}
