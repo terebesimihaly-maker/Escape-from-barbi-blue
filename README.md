@@ -1,6 +1,6 @@
 # Escape from Barbi Blue
 
-A first-person 3D horror maze for phones and desktop. Solve the labyrinth boxes, unlock the door, and don't let her catch you.
+A first-person 3D horror maze for phones and desktop. Solve the puzzles, unlock the door, and don't let her catch you.
 
 - `index.html`: the page (menus, HUD); `css/style.css`: its styles
 - The game, in plain scripts that share one scope (loaded in this order by `index.html`, no build step):
@@ -13,7 +13,7 @@ A first-person 3D horror maze for phones and desktop. Solve the labyrinth boxes,
   - `js/monster.js`: her AI (see "Her" below)
   - `js/world3d.js`, `js/level.js`, `js/render.js`: the 3D world, building a floor, drawing a frame
   - `js/scares.js`: the jump scares
-  - `js/puzzles.js`: the labyrinth boxes (the puzzles)
+  - `js/puzzles.js`: the puzzles (a different kind on every floor)
   - `js/cinematics.js`: the death screen and the title screen; `js/main.js`: the main loop and start-up
 - `js/house.js`: dresses each floor: skirting, rails and crown molding, framed doorways, lamps that really light the rooms (a few flicker or are dead), rugs and a runner carpet, porcelain dolls whose heads turn when you look away, teddy bears, side tables, grandfather clocks, basement pipes, crates, barrels and puddles, the attic's sheet-covered furniture, trunks and cobwebs, the workshop's workbenches, shelves of doll heads, dress forms and dolls hanging on strings, and a flashlight beam you can see in the air
 - `models/barbi.glb`: her rigged model (made in Blender)
@@ -33,9 +33,9 @@ A first-person 3D horror maze for phones and desktop. Solve the labyrinth boxes,
 
 **Enter the house** shows the five floors: The Nursery, The Doll Hallway, The Basement, The Attic and The Workshop. A floor opens once you've escaped the one before it (your progress and best time per floor are kept on this device). Pick **Easy**, **Medium** or **Hard** above the list:
 
-- Easy: she's slower, hears and sees less, rarely opens wardrobes; one labyrinth box less, smaller mazes; the phone recharges in 35 s; 65 s to revive a teammate
+- Easy: she's slower, hears and sees less, rarely opens wardrobes; one puzzle less, smaller boards; the phone recharges in 35 s; 65 s to revive a teammate
 - Medium: the house as it was meant to be played (45 s phone, 50 s to revive)
-- Hard: she's faster (a sprint still gets away from her), hears and sees further, opens wardrobes more often, screams more; bigger mazes with more holes; 60 s phone; 40 s to revive
+- Hard: she's faster (a sprint still gets away from her), hears and sees further, opens wardrobes more often, screams more; bigger boards, more holes, longer melodies; 60 s phone; 40 s to revive
 
 Playing together, the lobby owner picks the floor (from the ones they've opened) and the difficulty for everyone; escaping a floor together opens the next one for all of you.
 
@@ -44,9 +44,17 @@ The game loads its files over HTTP, so open it from a web server (e.g. GitHub Pa
 Controls: left side of the screen, drag to walk. Right side, drag to look. RUN, HIDE, and PHONE buttons.
 Computer: click to lock the cursor, then WASD to move and the mouse to look. Shift runs, E hides, 1 uses the phone, Esc frees the cursor and pauses.
 
-## The labyrinth boxes
+## The puzzles
 
-Instead of fuses, every floor has wooden labyrinth boxes on its walls (1 to 4, more on later floors), like the tilting ball maze game. Walk up and press **USE** (or E): tilt the board to roll the steel ball into the gold hole. Point the mouse where the ball should roll (or use the arrow keys / WASD); on a phone drag your finger, or tap "Tilt your phone". A ball falling into a hole is loud, and she hears it, and the game doesn't stop while you play. Later floors and Hard have bigger mazes with more holes and a faster ball; Easy has one box less, smaller mazes and a slower ball. Playing together, a box one of you solves is solved for everyone. Stuck? When one box is left, or none has been solved for a minute, an arrow points to the nearest.
+Instead of fuses, every floor has wooden puzzle boxes on its walls (3 to 5; one less on Easy), and every floor has its own kind. Walk up and press **USE** (or E):
+
+1. **The Nursery: the labyrinth.** Tilt the board to roll the ball into the gold hole: point the mouse where it should roll (or arrow keys / WASD); on a phone drag your finger, or tap "Tilt your phone". A ball in a hole is loud: she hears it.
+2. **The Doll Hallway: the portrait.** A sliding-tile puzzle: slide the pieces back to put the doll's portrait together (numbered on Easy; 4x4 on Hard).
+3. **The Basement: the pipes.** Turn the pipes until the water runs from the valve to the drain.
+4. **The Attic: the music box.** It plays a melody on four keys; play it back, one note longer each time. A wrong note is loud.
+5. **The Workshop: her face.** Turn the rings until her face lines up; turning a ring also turns the next one out.
+
+The game doesn't stop while you play: she can come. Later floors and Hard have bigger boards, more holes, longer melodies and more rings. Playing together, a box one of you solves is solved for everyone. Stuck? When one box is left, or none has been solved for a minute, an arrow points to the nearest.
 
 ## Her
 
@@ -73,7 +81,7 @@ Menu → **Play together** → **Create lobby** shows a 6 digit code; the others
 - Everyone starts in the same room, in the same house. Teammates are solid (no walking through each other).
 - It's a bit harder together, but fair: she hears a little further and is a little faster (never faster than a sprinting player), she screams a bit more often, and there's one more wardrobe per extra player. She gives the group a few extra seconds at the start, and after catching someone she walks away so the others can revive them.
 - One person per wardrobe: if someone is already inside, it's locked.
-- Lost the connection (weak Wi-Fi, a locked phone)? Your place is kept for 90 seconds and the game reconnects by itself. Closed the page by accident? The menu shows **Rejoin game** for 10 minutes: you come back on the same floor, where you were, with the labyrinth boxes already solved. (If the lobby owner closes their page, the game ends: it runs in their browser.)
+- Lost the connection (weak Wi-Fi, a locked phone)? Your place is kept for 90 seconds and the game reconnects by itself. Closed the page by accident? The menu shows **Rejoin game** for 10 minutes: you come back on the same floor, where you were, with the puzzles already solved. (If the lobby owner closes their page, the game ends: it runs in their browser.)
 - If she catches someone they go down. Stand next to them and hold **E** (or **REVIVE**) for 3 seconds within 50 seconds; the arrow in the top right corner shows where they are. If nobody reaches them in time they're out until the next floor. If everyone is down, it's game over and everyone goes back to the lobby.
 - How it works: peer to peer (WebRTC). The lobby owner's browser runs the game, so they should keep the game open. PeerJS's free public server (0.peerjs.com) only introduces the players. Some strict networks (certain mobile carriers or company Wi-Fi) block direct connections; if joining fails there, try another network.
 - For local testing with your own PeerJS server: `index.html?peer=127.0.0.1:9000`.

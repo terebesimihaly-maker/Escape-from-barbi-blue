@@ -27,7 +27,7 @@ function generateFloor(i, n, diff) {
   const closetsD = dead.slice(0, 4 + i * 2 + (n - 1)).map(c => { used.add(c.join(','));
     const [ox, oy] = DIRS.find(([dx, dy]) => !isWall(c[0] + dx, c[1] + dy)); return [c[0], c[1], ox, oy]; });
 
-  // the puzzles: labyrinth boxes on the walls, each in its own cell away from the start (js/puzzles.js)
+  // the puzzles: boxes on the walls (a different kind on every floor), each in its own cell away from the start (js/puzzles.js)
   const cand = shuffle(CELLS.filter(c => !used.has(c.join(',')) && dist[idx(c[0], c[1])] > Math.max(2, maxD * 0.12)));
   const puzzlesD = makePuzzles(puzzleCount(i, diff), cand, i, diff);
   for (const p of puzzlesD) used.add(p.cell.join(','));
@@ -77,7 +77,7 @@ function applyFloor(d, slot) {
   state = 'play'; startSong();
   const nf = fuses.length, what = nf === 1 ? 'the puzzle' : 'the ' + nf + ' puzzles';
   showMsg(d.n > 1 ? (d.i === 0 ? d.n + ' players: she is faster and hears more. Solve ' + what + ' together.' : F.name + '. Solve ' + what + '.')
-    : d.i === 0 ? 'Solve ' + what + ' to unlock the front door: the wooden labyrinth boxes on the walls.' : F.name + '. Solve ' + what + '.', 4);
+    : d.i === 0 ? 'Solve ' + what + ' to unlock the front door: the wooden boxes on the walls.' : F.name + '. Solve ' + what + '.', 4);
 }
 function startFloor(i) { applyFloor(generateFloor(i, 1, settings.difficulty), 0); }
 function updateFuseHud() { $('hFuse').textContent = (powerOn ? '🔓 ' : '🧩 ') + fusesGot + '/' + fuses.length; }

@@ -85,7 +85,7 @@ const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.r
 /* ---------- content ---------- */
 const FLOORS = [
   { name: 'The Nursery', cw: 7, ch: 11,
-    text: "You wake up in a nursery that isn't yours. The door is locked. Someone has left wooden labyrinth boxes on the walls.",
+    text: "You wake up in a nursery that isn't yours. The door is locked. Someone has left puzzle boxes on the walls.",
     style: 'wood', floorA: '#3b2722', wallTop: '#1c1118', face: '#6a3d54', pattern: '#7f4b66', dot: '#d3a9bd', base: '#2a1820', frames: 0.12 },
   { name: 'The Doll Hallway', cw: 8, ch: 13,
     text: 'The stairs only go down. Porcelain faces line the walls. Some of them turn to watch you.',
@@ -104,14 +104,14 @@ const FLOORS = [
 // difficulty: single player picks it with the floor; together, the lobby owner picks it for everyone.
 // speed/hear: her speed and hearing; sight: how far she sees (units); hunt: seconds added to the time between her screams;
 // spawn: seconds before she wakes; check: the chance she opens a wardrobe she stops at; phone: its cooldown;
-// down: seconds to revive a teammate. (How many labyrinth boxes, and how hard they are: js/puzzles.js)
+// down: seconds to revive a teammate. (How many puzzles, and how hard they are: js/puzzles.js)
 const DIFFS = {
   easy:   { name: 'Easy', speed: 0.85, hear: 0.75, sight: 300, hunt: 18, spawn: 5, check: 0.12, phone: 35, down: 65,
-            text: 'She is slower and hears less. One labyrinth box less, smaller mazes, fewer holes and a slower ball. The phone recharges faster.' },
+            text: 'She is slower and hears less. One puzzle less, and smaller, easier ones. The phone recharges faster.' },
   medium: { name: 'Medium', speed: 1, hear: 1, sight: 360, hunt: 0, spawn: 0, check: 0.3, phone: 45, down: 50,
             text: 'The house as it was meant to be played.' },
   hard:   { name: 'Hard', speed: 1.1, hear: 1.3, sight: 430, hunt: -10, spawn: -1, check: 0.5, phone: 60, down: 40,
-            text: 'She is faster (you can still outrun her), hears and sees further, and opens wardrobes more often. Bigger mazes with more holes, and a faster ball.' },
+            text: 'She is faster (you can still outrun her), hears and sees further, and opens wardrobes more often. Bigger, harder puzzles.' },
 };
 let curDiff = 'medium';                                   // (the difficulty of the floor being played)
 const DF = () => DIFFS[curDiff] || DIFFS.medium;
@@ -132,7 +132,7 @@ const NOTES = [
   "Don't run unless you have to.\nShe hears running.\nShe hears EVERYTHING.",
   "If the melody gets close, get in a wardrobe.\nShe doesn't look inside...\nunless she SAW you go in.",
   "Her eyes glow in the dark.\nIf you can see them,\nshe can see you.",
-  "Finish every labyrinth box and the door unlocks.\nBut the lock is loud. It wakes her up.\nBe ready to move.",
+  "Solve every puzzle box and the door unlocks.\nBut the lock is loud. It wakes her up.\nBe ready to move.",
   "I can see the door.\nI can hear her humming right behind m",
   "The attic ladder was already down.\nSomeone wanted me up here.\nThe sheets move when I'm not looking.",
   "Wardrobes won't save you forever.\nIf she lost you close by,\nshe checks every one of them.",

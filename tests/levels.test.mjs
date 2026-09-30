@@ -102,29 +102,38 @@ await p.evaluate(() => { bb.fuses.forEach((f, k) => bb.applyFuse(k)); const m = 
 check(await until(p, () => bb.state === 'win' && !document.getElementById('win').classList.contains('hidden')), 'escaping floor 5 wins the game');
 check(await p.evaluate(() => progress.done[4] === true), 'floor 5 saved as escaped');
 
-console.log('== every labyrinth can be solved (the real ball physics, fast-forwarded, with an autopilot)');
+console.log('== every puzzle can be solved (each kind, every floor and difficulty; the game\'s own code, fast-forwarded)');
 const sim = await p.evaluate(() => {
-  const keep = drawBoard, fx = fuses, res = []; drawBoard = () => {};                 // (no drawing: just the physics)
+  const keep = drawBoard, fx = fuses, res = [], cv = { width: 440, height: 340 }; drawBoard = () => {};
   for (let fl = 0; fl < 5; fl++) for (const diff of ['easy', 'medium', 'hard']) for (let s = 0; s < 5; s++) {
-    const pz = { cell: [0, 0], dir: [0, -1], seed: (fl * 1000 + s * 7919 + diff.length * 31) | 0, spec: mazeSpec(fl, diff) };
-    pz.maze = buildMaze(pz); pz.solved = false; puzzles = [pz]; fuses = [];
-    pzOpen = { k: 0, ball: { x: 0.5, y: 0.5, vx: 0, vy: 0 }, fall: 0, won: 0 };
-    const mz = pz.maze; let i = 0, t = 0, falls = 0, was = 0;
-    while (t < 180 && !pzOpen.won) {
-      const o = pzOpen, b = o.ball; if (o.fall && !was) { falls++; i = 0; } was = o.fall;
-      while (i < mz.route.length - 1 && Math.hypot(b.x - (mz.route[i][0] + 0.5), b.y - (mz.route[i][1] + 0.5)) < 0.3) i++;
-      const g = mz.route[i], dx = g[0] + 0.5 - b.x, dy = g[1] + 0.5 - b.y, d = Math.hypot(dx, dy) || 1;
-      tilt.mx = clamp(dx / d * 0.9 - b.vx * 0.35, -1, 1); tilt.my = clamp(dy / d * 0.9 - b.vy * 0.35, -1, 1);
-      updateBall(1 / 60); t += 1 / 60;
-    }
-    res.push({ fl, diff, ok: !!pzOpen.won, t: Math.round(t), falls, holes: mz.holes.length, size: mz.C + 'x' + mz.R });
+    const kind = FLOOR_KIND[fl], pz = { cell: [0, 0], dir: [0, -1], seed: (fl * 1000 + s * 7919 + diff.length * 31) | 0, kind, spec: puzzleSpec(kind, fl, diff) };
+    pz.data = KINDS[kind].build(pz); pz.solved = false; puzzles = [pz]; fuses = [];
+    const o = pzOpen = Object.assign({ k: 0, won: 0 }, KINDS[kind].start(pz)); let t = 0, info = '';
+    if (kind === 'maze') { const mz = pz.data; let i = 0, falls = 0, was = 0;
+      while (t < 180 && !o.won) { const b = o.ball; if (o.fall && !was) { falls++; i = 0; } was = o.fall;
+        while (i < mz.route.length - 1 && Math.hypot(b.x - (mz.route[i][0] + 0.5), b.y - (mz.route[i][1] + 0.5)) < 0.3) i++;
+        const g = mz.route[i], dx = g[0] + 0.5 - b.x, dy = g[1] + 0.5 - b.y, d = Math.hypot(dx, dy) || 1;
+        tilt.mx = clamp(dx / d * 0.9 - b.vx * 0.35, -1, 1); tilt.my = clamp(dy / d * 0.9 - b.vy * 0.35, -1, 1); updateBall(1 / 60); t += 1 / 60; }
+      info = mz.C + 'x' + mz.R + ', ' + mz.holes.length + ' holes'; }
+    else if (kind === 'slide') { for (let i = pz.data.hist.length - 1; i >= 0 && !o.won; i--) slideAt(o, pz, pz.data.hist[i]); info = pz.data.n + 'x' + pz.data.n + ', ' + pz.data.hist.length + ' moves'; }
+    else if (kind === 'pipes') { const n = pz.data.n, sz = Math.min(cv.width * 0.8, cv.height * 0.9), cs = sz / n, ox = (cv.width - sz) / 2, oy = (cv.height - sz) / 2;
+      for (let y = 0; y < n && !o.won; y++) for (let x = 0; x < n && !o.won; x++) while (o.rot[y][x] !== 0 && !o.won) KINDS.pipes.click(o, pz, ox + (x + 0.5) * cs, oy + (y + 0.5) * cs, cv);
+      info = n + 'x' + n; }
+    else if (kind === 'simon') { while (t < 120 && !o.won) { KINDS.simon.update(o, pz, 1 / 30); t += 1 / 30;
+        if (o.phase === 'play') for (let i = 0; i < o.round && !o.won && o.phase === 'play'; ) { const r = o.round; musicKey(o, pz, pz.data.seq[i]); if (o.round !== r) break; i = o.i; } }
+      info = pz.spec.len + ' notes'; }
+    else { for (let i = 0; i < pz.data.R && !o.won; i++) while (o.off[i] !== 0 && !o.won) turnRing(o, pz, i); info = pz.data.R + ' rings'; }
+    res.push({ fl, diff, kind, ok: !!o.won, info });
   }
   pzOpen = null; puzzles = []; fuses = fx; drawBoard = keep; tilt.mx = tilt.my = 0;
   return res;
 });
 const failed = sim.filter(r => !r.ok);
-check(failed.length === 0, `all ${sim.length} labyrinths (5 floors x 3 difficulties x 5 mazes) reach the gold hole`, failed.slice(0, 5));
-console.log('  (sizes', [...new Set(sim.map(r => r.size))].join(' '), '· holes up to', Math.max(...sim.map(r => r.holes)), '· autopilot fell in', sim.reduce((a, r) => a + r.falls, 0), 'times over all of them · slowest', Math.max(...sim.map(r => r.t)), 's)');
+check(failed.length === 0, `all ${sim.length} puzzles (5 floors x 3 difficulties x 5 random boards) can be solved`, failed.slice(0, 5));
+for (let fl = 0; fl < 5; fl++) { const rs = sim.filter(r => r.fl === fl); console.log(`  floor ${fl + 1}: ${rs[0].kind} (${[...new Set(rs.map(r => r.info))].slice(0, 4).join('; ')})`); }
+check(await p.evaluate(() => [0, 1, 2, 3, 4].every(fl => { startFloor(fl); return puzzles.length === puzzleCount(fl, settings.difficulty) && puzzles.every(z => z.kind === FLOOR_KIND[fl]); })),
+  'every floor has its own kind of puzzle, 3 to 5 of them');
+await p.evaluate(() => { state = 'win'; });
 // and one for real: walk up, USE, tilt the ball in, the door unlocks
 const real = await p.evaluate(async () => {
   settings.difficulty = 'medium'; startFloor(0); state = 'play'; const m = bb.monster; m.active = false; m.spawnT = 1e9; notes.forEach(n => n.read = true);
@@ -133,7 +142,7 @@ const real = await p.evaluate(async () => {
     const z = puzzles[k], w = wallPoint(z.cell, z.dir, 22); bb.player.x = w.x; bb.player.y = w.y;
     for (let j = 0; j < 50 && puzzleTarget !== k; j++) await wait(100);
     bb.toggleHide(); if (!pzOpen) return { k, opened: false };
-    const mz = z.maze, t0 = performance.now(); let i = 0;
+    const mz = z.data, t0 = performance.now(); let i = 0;
     while (pzOpen && performance.now() - t0 < 120000) { const o = pzOpen, b = o.ball; if (o.fall) i = 0;
       while (i < mz.route.length - 1 && Math.hypot(b.x - (mz.route[i][0] + 0.5), b.y - (mz.route[i][1] + 0.5)) < 0.3) i++;
       const g = mz.route[i], dx = g[0] + 0.5 - b.x, dy = g[1] + 0.5 - b.y, d = Math.hypot(dx, dy) || 1;

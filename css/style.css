@@ -173,4 +173,4 @@ h2{font-weight:400;letter-spacing:5px;color:#86a8ff;text-transform:uppercase;mar
 #pzMsg{min-height:1.2em;color:#ff9a8a;margin:8px 0}
 #puzzle canvas{position:static;inset:auto;display:inline-block;pointer-events:none}
 #puzzle .pzclock{display:block}
-#pzBoard{position:static;inset:auto;display:block;width:min(100%,440px);height:auto;aspect-ratio:440/340;margin:8px auto;border-radius:6px;box-shadow:0 10px 30px rgba(0,0,0,.6);touch-action:none;transition:transform .08s linear}
+#pzBoard{position:static;inset:auto;display:block;width:min(100%,440px,72vh);height:auto;aspect-ratio:440/340;margin:8px auto;border-radius:6px;box-shadow:0 10px 30px rgba(0,0,0,.6);touch-action:none;transition:transform .08s linear}
