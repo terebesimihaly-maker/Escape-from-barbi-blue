@@ -59,6 +59,8 @@ addEventListener('pointermove', e => {
 const endJoy = e => { if (e.pointerId === joy.id) { joy.id = null; joy.x = joy.y = 0; } if (e.pointerId === look.id) look.id = null; };
 addEventListener('pointerup', endJoy); addEventListener('pointercancel', endJoy);
 
+// CROUCH (touch): tap to crouch, tap again to stand
+$('crouch').addEventListener('pointerdown', e => { e.preventDefault(); input.crouchToggle = !input.crouchToggle; $('crouch').classList.toggle('on', input.crouchToggle); });
 const runBtn = $('run');
 const setSprint = v => { input.sprint = v; runBtn.classList.toggle('on', v); };
 runBtn.addEventListener('pointerdown', e => { e.preventDefault(); setSprint(true); });
@@ -127,7 +129,7 @@ function readInput() {
   let ky = (keyDown('back') ? 1 : 0) - (keyDown('forward') ? 1 : 0);
   if (kx || ky) { const d = Math.hypot(kx, ky); input.x = kx / d; input.y = ky / d; }
   else { input.x = joy.x; input.y = joy.y; }
-  input.sprintKey = keyDown('run');
+  input.sprintKey = keyDown('run'); input.crouchKey = keyDown('crouch');
   input.turn = (keys.ArrowRight && freeKey('ArrowRight') ? 1 : 0) - (keys.ArrowLeft && freeKey('ArrowLeft') ? 1 : 0);
 }
 
@@ -162,7 +164,7 @@ $('openKeys').onclick = () => { rebinding = null; $('keyMsg').textContent = ''; 
 // the keys shown next to the buttons, and in "How to play", follow the settings
 function applyKeyHints() {
   const set = (id, a, hold) => { const el = $(id); if (el) el.dataset.key = keyLabel(a, hold); };
-  set('run', 'run'); set('hide', 'use'); set('phone', 'phone'); set('revive', 'use', true); set('breath', 'breath', true);
+  set('run', 'run'); set('crouch', 'crouch'); set('hide', 'use'); set('phone', 'phone'); set('revive', 'use', true); set('breath', 'breath', true);
   set('pingBtn', 'ping'); set('emoteBtn', 'emote', true); set('warnBtn', 'warn');
   document.querySelectorAll('[data-keyof]').forEach(el => { el.textContent = keyLabel(el.dataset.keyof); });
   document.querySelectorAll('[data-keyname]').forEach(el => { el.textContent = keyName(bound(el.dataset.keyname)[0]); });

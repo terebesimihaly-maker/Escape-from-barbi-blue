@@ -557,6 +557,7 @@ function createHuman(THREE, opts) {
     let clip = v < 0.35 ? (s.stand && anim.actions.p_stand ? 'p_stand' : 'p_idle') : v < 2.4 ? 'p_walk' : v < 5.4 ? 'p_jog' : 'p_run';   // (stand: calm, for the profile and the lobby)
     const dancing = !!s.dance && !lying && v < 1.2 && !!anim.actions[s.dance];   // (a dance from the wheel, standing still)
     if (dancing) clip = s.dance;
+    if (s.crouching && !lying && !dancing && anim.actions.p_crouch) clip = v < 0.2 ? 'p_crouch' : 'p_sneak';   // (crouching: low, creeping)
     if (lying) clip = s.dead ? 'p_dead' : 'p_down';
     anim.play(clip, lying ? 0.5 : 0.25); if (dancing) anim.setSpeed(0); else anim.setSpeed(v);
     anim.update(dt);

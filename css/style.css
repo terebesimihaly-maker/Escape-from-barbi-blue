@@ -15,6 +15,8 @@ button{font-family:inherit;cursor:pointer}
 .btn{position:fixed;right:18px;width:80px;height:80px;border-radius:50%;border:2px solid rgba(160,180,255,.35);
   background:rgba(20,25,50,.35);color:#cfd8ff;font:600 13px/76px system-ui,sans-serif;text-align:center;letter-spacing:2px;padding:0}
 #run{bottom:calc(44px + env(safe-area-inset-bottom))}
+#crouch{bottom:calc(52px + env(safe-area-inset-bottom));right:172px;width:64px;height:64px;line-height:60px;font-size:10px;letter-spacing:1px}
+body:not(.pc) #crouch{right:110px}   /* (on a computer RUN's key sits between them) */
 #hide{bottom:calc(140px + env(safe-area-inset-bottom));border-color:rgba(200,160,110,.5);color:#f0d9b5;background:rgba(60,35,15,.45)}
 .btn.on{background:rgba(90,120,255,.45)}
 #msg{position:fixed;top:20%;left:16px;right:16px;text-align:center;font-size:18px;font-style:italic;color:#c9d6ff;

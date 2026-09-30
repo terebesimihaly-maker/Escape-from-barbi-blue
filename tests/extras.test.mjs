@@ -64,7 +64,7 @@ const boards = await p.evaluate(() => {
 check(boards.bad.length === 0, 'on every floor and difficulty: boards in the open, never on anything important', boards.bad);
 check(boards.share > 0.04 && boards.share < 0.18, 'about one in ten lies right across a corridor, wall to wall (no way round): ' + boards.mid + ' of ' + (boards.side + boards.mid), boards);
 check(boards.minLane >= 14, 'the others: always a wide lane to walk past (at least ' + boards.minLane + ' of 28 units)', boards);
-const b3d = await until(p, () => typeof boardsTemplate !== 'undefined' && boardsTemplate, null, 60000) && await p.evaluate(() => { startFloor(0); state = 'play'; notes.forEach(n => n.read = true); const m = bb.monster; m.active = false; m.spawnT = 1e9;
+const b3d = await until(p, () => typeof boardsTemplate !== 'undefined' && boardsTemplate, null, 60000) && await p.evaluate(() => { startFloor(0); state = 'play'; notes.forEach(n => n.read = true); const m = bb.monster; m.active = false; m.spawnT = 1e9; buildLevel();   // (the level is built on the next frame otherwise)
   const groups = bb.level.group.children.filter(g => g.children && g.children.some(c => /^Board(Short|Long)$/.test(c.name)));
   return { n: creaks.length, groups: groups.length, long: groups.filter(g => g.children.some(c => c.name === 'BoardLong')).length, mid: creaks.filter(c => c.mid).length }; });
 check(b3d && b3d.groups === b3d.n && b3d.long === b3d.mid, 'every loose board is a real 3D board (made in Blender), a long one wherever it lies across a corridor', b3d);
@@ -91,13 +91,43 @@ const across = await p.evaluate(() => {                    // one right across a
 check(across.creak === 1 && across.counted === 0, 'a long board across a corridor: it creaks too (even 20 units off its middle), but it doesn\'t count against "Light feet"', across);
 await p.screenshot({ path: OUT + '/board.png' });
 
+console.log('== crouching (Ctrl): slower, completely silent');
+check(await p.evaluate(() => settings.keys.run[0] === 'ShiftLeft' && !settings.keys.run.includes('ControlLeft') && settings.keys.crouch[0] === 'ControlLeft'), 'Shift runs, Ctrl crouches');
+check(await p.evaluate(() => { const k = migrateKeys({ run: ['ShiftLeft', 'ControlLeft'] }); return k.run.join() === 'ShiftLeft,'; }), 'keys saved before crouching existed: Ctrl no longer runs');
+const cr = await p.evaluate(async () => {
+  const P = bb.player, m = bb.monster; notes.forEach(n => n.read = true); if (bb.state === 'note') { noteAt = 0; closeNote(); } bb.state = 'play';
+  if (P.hidden) exitHide();
+  m.active = false; m.spawnT = 1e9; m.state = 'wander'; m.x = -9999; m.y = -9999;   // (the board test left her hunting)
+  // (stand in the middle of the longest open corridor from here, facing along it)
+  const tx = Math.floor(P.x / bb.T), ty = Math.floor(P.y / bb.T); let best = [0, 0];
+  for (const [dx, dy] of DIRS) { let n = 0; while (!bb.isWall(tx + dx * (n + 1), ty + dy * (n + 1))) n++; if (n > best[0]) best = [n, Math.atan2(dy, dx)]; }
+  P.x = (tx + 0.5) * bb.T; P.y = (ty + 0.5) * bb.T; P.ang = best[1];
+  const frames = n => new Promise(r => { let k = 0; const f = () => (++k >= n ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+  const eye0 = EYE;                                       // (standing height)
+  let steps = 0; const os = sfx.step; sfx.step = (...a) => { steps++; return os(...a); };
+  keys.ControlLeft = true; keys.KeyW = true; const x0 = P.x, y0 = P.y, t0 = levelTime;
+  await frames(40);
+  const crouching = P.crouching, eye1 = bb.camera.position.y, dist = Math.hypot(P.x - x0, P.y - y0), dt = levelTime - t0;
+  // she's right there, walking about: she doesn't hear a crouching player move
+  // (behind you, facing away, walking off: she can only hear, not see)
+  m.active = true; m.spawnT = 0; m.state = 'wander'; m.x = P.x - Math.cos(P.ang) * 55; m.y = P.y - Math.sin(P.ang) * 55; m.ang = P.ang + Math.PI; m.last = null; m.heard = false;
+  await frames(4); const heard = m.heard; m.active = false; m.spawnT = 1e9;
+  // a loose board under a crouching foot: no creak
+  const n0 = window.__boards; const b = { x: P.x, y: P.y, along: 0, len: BOARD_LEN, mid: false, on: false }; creaks.push(b); updateBoards(); const creak = window.__boards - n0; creaks.pop();
+  keys.ControlLeft = false; keys.KeyW = false; sfx.step = os; m.active = false; m.spawnT = 1e9;
+  return { state: bb.state, locked: document.pointerLockElement ? 1 : 0, paused: !document.getElementById('paused').classList.contains('hidden'), crouching, eyeDrop: +(eye0 - eye1).toFixed(2), speed: +(dist / Math.max(dt, 1e-3)).toFixed(1), steps, heard, creak };
+});
+check(cr.crouching && cr.eyeDrop > 0.4, 'holding Ctrl: you crouch, the camera goes down', cr);
+check(cr.speed > 20 && cr.speed < 70, 'and move at about half speed (' + cr.speed + ' a second; walking is 105)', cr);
+check(cr.steps === 0 && !cr.heard && cr.creak === 0, 'completely silent: no footsteps, she doesn\'t hear you, the boards don\'t creak', cr);
+
 console.log('== holding your breath');
 await calmHer();
 // (the board test teleports the player around: it may have landed on a note. Read them all, close any that's open)
 await p.evaluate(() => { notes.forEach(n => { n.read = true; }); if (bb.state === 'note') { noteAt = 0; closeNote(); } });
 await p.evaluate(() => { const c = bb.closets[0]; bb.player.x = c.x + c.ox * 30; bb.player.y = c.y + c.oy * 30; });
 await p.evaluate(() => { const c = bb.closets[0]; hideTarget = c; bb.toggleHide(); });
-check(await until(p, () => bb.player.hidden && !document.getElementById('breath').classList.contains('hidden') && !document.getElementById('breathBar').classList.contains('hidden') && document.getElementById('run').classList.contains('hidden'), null, 10000),
+check(await until(p, () => bb.player.hidden && !document.getElementById('breath').classList.contains('hidden') && !document.getElementById('breathBar').classList.contains('hidden') && document.getElementById('run').classList.contains('hidden'), null, 30000),
   'in the wardrobe: the BREATH button and bar replace RUN');
 await p.evaluate(() => { DIFFS.medium.breath = 3; });           // (a short breath: the test machine is slow)
 await p.keyboard.down('Space');

@@ -94,7 +94,7 @@ function updateMonster(dt) {
     m.seenT += dt;
     let hd = 1e9, heard = null;
     const listening = m.listenT > 0 ? 2 : 1;               // (standing still and listening, she hears further)
-    for (const q of alive) { if (q.hidden || !q.moving) continue;
+    for (const q of alive) { if (q.hidden || !q.moving || q.crouching) continue;   // (crouching: silent)
       const d = dist(q), hear = (q.sprinting ? 300 : 70 * listening) * hearMul;
       if (d < hear && d < hd) { hd = d; heard = q; } }
     if (heard) { track(heard); m.heard = true; m.listenT = 0; if (m.state !== 'chase') m.state = 'hunt'; }

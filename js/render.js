@@ -50,7 +50,9 @@ function placeCamera(t) {
       cx = sc.x; cy = sc.y; h = sc.h; yaw = sc.yaw; pitch = sc.pitch; }
     else { h = 0.35; }
   } else if (p.down) { h = 0.32 + Math.sin(t * 1.2) * 0.01; pitch = clamp(pitch, -0.3, 1.1); }   // lying on the floor
-  else if (p.moving) { h += Math.sin(stepPhase) * (p.sprinting ? 0.045 : 0.025); yaw += Math.sin(stepPhase * 0.5) * 0.006; }
+  else if (p.moving) { h += Math.sin(stepPhase) * (p.sprinting ? 0.045 : p.crouching ? 0.012 : 0.025); yaw += Math.sin(stepPhase * 0.5) * 0.006; }
+  crouchCam = clamp(crouchCam + lastDt * (p.crouching && !p.hidden && !p.down && !p.dead ? 5 : -5), 0, 1);   // (crouching: your eyes about a metre from the floor)
+  if (!p.hidden && !p.down && !(p.dead && MP.on)) h -= 0.62 * crouchCam * crouchCam * (3 - 2 * crouchCam);
   if (!(p.dead && MP.on)) specCam.on = false;
   if (hideAnim.t >= 0) {                            // stepping into or out of a wardrobe: from where you were to where you are
     hideAnim.t += lastDt; const f = hideAnim.from, k0 = clamp((hideAnim.t - 0.12) / 0.42, 0, 1), k = k0 * k0 * (3 - 2 * k0);
@@ -74,6 +76,7 @@ function placeCamera(t) {
   if (Math.abs(camera.fov - fov) > 0.01) { if (!camera.userData.fov) camera.userData.fov = camera.fov; camera.fov = fov; camera.updateProjectionMatrix(); }
 }
 const specCam = { on: false, id: '', x: 0, y: 0, h: 0, yaw: 0, pitch: 0 }, danceCam = { k: 0 };
+let crouchCam = 0;
 // your own figure (playing together): only shown while you dance, when the camera is out in front of you
 function updateMyFigure() {
   if (!MP.on || !playerTemplate || !renderer) return;
@@ -157,7 +160,7 @@ function render3D(t) {
     }
     if (!o.av) continue;
     o.av.obj.position.set(o.x * S, 0, o.y * S); o.av.obj.rotation.y = Math.PI / 2 - o.ang;
-    o.av.update(lastDt, { speed: o.spd * S, sprinting: o.sprinting, down: o.down, dead: o.dead, hidden: o.hidden, away: o.away, pitch: o.pitch, lightOn: settings.quality !== 'low',
+    o.av.update(lastDt, { speed: o.spd * S, sprinting: o.sprinting, crouching: o.crouching, down: o.down, dead: o.dead, hidden: o.hidden, away: o.away, pitch: o.pitch, lightOn: settings.quality !== 'low',
       dance: o.dance >= 0 && DANCES[o.dance] ? DANCES[o.dance][2] : null });
     o.av.setName(o.dead ? o.name + ' ✝' : o.down ? o.name + ' · ' + Math.ceil(o.downLeft) + 's' : o.name, o.down || o.dead); }
   // things on the floor, and on the walls

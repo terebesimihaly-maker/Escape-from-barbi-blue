@@ -101,8 +101,8 @@ function updatePlayer(dt) {
   const p = player; readInput();
   if (MP.menu || MP.reconnecting || pzOpen) { input.x = input.y = 0; input.sprint = input.sprintKey = false; input.turn = 0; }
   if (p.down || p.dead) {                          // down (or out): you can look around, nothing else
-    p.moving = p.sprinting = false; if (input.turn) lookBy(input.turn * 2.4 * dt, 0);
-    hideTarget = null; reviveTarget = null; revP = 0; show('hide', false); show('revive', false); show('run', false); show('phone', false);
+    p.moving = p.sprinting = p.crouching = false; if (input.turn) lookBy(input.turn * 2.4 * dt, 0);
+    hideTarget = null; reviveTarget = null; revP = 0; show('hide', false); show('revive', false); show('run', false); show('crouch', false); show('phone', false);
     return;
   }
   const mag = Math.min(1, Math.hypot(input.x, input.y));
@@ -111,7 +111,9 @@ function updatePlayer(dt) {
     else { p.moving = p.sprinting = false; p.stam = Math.min(1, p.stam + dt / 4); if (input.turn) lookBy(input.turn * 2.4 * dt, 0); return; }
   }
   p.moving = mag > 0.15;
-  const wantSprint = (input.sprint || input.sprintKey) && p.moving && !p.exhausted;
+  // crouching (Ctrl, or CROUCH): half speed, and completely silent: no steps, she can't hear you, loose boards don't creak
+  p.crouching = !!(input.crouchKey || input.crouchToggle);
+  const wantSprint = (input.sprint || input.sprintKey) && p.moving && !p.exhausted && !p.crouching;
   p.sprinting = wantSprint && p.stam > 0;
   if (p.sprinting) { p.stam -= dt / 3; if (p.stam <= 0) { p.stam = 0; p.exhausted = true; showMsg('You are out of breath...', 1.5); } }
   else { p.stam = Math.min(1, p.stam + dt / 5); if (p.exhausted && p.stam > 0.35) p.exhausted = false; }
@@ -119,7 +121,7 @@ function updatePlayer(dt) {
   { const fk = fearK() * (calm() ? 0.5 : 1); if (fk > 0) p.ang += Math.sin(levelTime * 0.6) * 0.3 * fk * fk * dt; }   // (and the view drifts)
   if (p.moving) {
     // joystick up = the way you're looking
-    const spd = (p.sprinting ? 170 : p.exhausted ? 80 : 105) * mag, fw = -input.y / mag, st = input.x / mag;
+    const spd = (p.sprinting ? 170 : p.crouching ? 52 : p.exhausted ? 80 : 105) * mag, fw = -input.y / mag, st = input.x / mag;
     // very afraid: your hands shake, you don't quite walk where you mean to (js/stealth.js)
     const fk = fearK() * (calm() ? 0.5 : 1), wob = fk * fk * Math.sin(levelTime * 1.7) * 0.35;
     const ca = Math.cos(p.ang + wob), sa = Math.sin(p.ang + wob), mx = ca * fw - sa * st, my = sa * fw + ca * st;
@@ -129,7 +131,7 @@ function updatePlayer(dt) {
     if (!blocked(p.x + dx, p.y, 11) && (inCloset || !closetBlocked(p.x + dx, p.y, 11)) && !mateBlocked(p.x + dx, p.y)) p.x += dx;
     if (!blocked(p.x, p.y + dy, 11) && (inCloset || !closetBlocked(p.x, p.y + dy, 11)) && !mateBlocked(p.x, p.y + dy)) p.y += dy;
     stepTimer -= dt * spd / (p.sprinting ? 55 : 45); stepPhase += dt * spd * 0.12;
-    if (stepTimer <= 0) { stepTimer = 1; sfx.step(p.sprinting); }
+    if (stepTimer <= 0) { stepTimer = 1; if (!p.crouching) sfx.step(p.sprinting); }
   }
 
   updatePuzzles(dt);                                   // the labyrinth box you're next to, and the ball while one is open (js/puzzles.js)

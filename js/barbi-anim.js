@@ -205,6 +205,24 @@ const PLAYER_CLIPS = {
     P.side('upperleg01', 1, 0, 0, sin(k) * 1.5).side('upperleg01', -1, 0, 0, -sin(k) * 1.5);
     P.hand(1, 0.25, 3).hand(-1, 0.3, 3);
   } },
+  // crouching: low on bent knees, the flashlight held out; and creeping along like that (slow, careful steps)
+  p_crouch: { dur: 4, loop: true, fn(t, P) {
+    const k = t / 4 * TAU;
+    straightLegs(P);
+    P.sym('upperleg01', -62, 0, 4).sym('lowerleg01', 108, 0, 0).sym('foot', -38, 0, 0);
+    P.spine(24 + sin(k) * 1.5, sin(k) * 5, 0).neck(-22, sin(k + 0.7) * 16, 0);
+    P.side('upperarm01', -1, -48, 0, -12).side('lowerarm01', -1, -40, 0, 0).hand(-1, 0.75, 0);   // (the flashlight)
+    P.side('upperarm01', 1, -22, 0, -8).side('lowerarm01', 1, -35, 0, 0).hand(1, 0.35, 3);
+  } },
+  p_sneak: { dur: 1.6, loop: true, speed: 0.55, fn(t, P) {
+    const ph = t / 1.6 * TAU;
+    straightLegs(P);
+    for (const s of [1, -1]) { const p = s > 0 ? ph : ph + Math.PI, lift = Math.max(0, cos(p));
+      P.side('upperleg01', s, -58 - 20 * sin(p), 0, 4).side('lowerleg01', s, 100 + 14 * lift, 0, 0).side('foot', s, -36 + 10 * sin(p), 0, 0); }
+    P.spine(26, sin(ph) * 4, 0).neck(-24, 0, 0).move(0, -0.01 * Math.abs(sin(ph)), 0);
+    P.side('upperarm01', -1, -48, 0, -12).side('lowerarm01', -1, -40, 0, 0).hand(-1, 0.75, 0);
+    P.side('upperarm01', 1, -18 + sin(ph) * 10, 0, -8).side('lowerarm01', 1, -30, 0, 0).hand(1, 0.35, 3);
+  } },
   // down: lying on the back, one hand reaching up for help (the whole body is laid down by rotating the root)
   p_down: { dur: 3, loop: true, fn(t, P) {
     const k = t / 3 * TAU;

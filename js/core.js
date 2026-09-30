@@ -71,7 +71,7 @@ const calm = () => !!settings.calm;
 const KEY_ACTIONS = [
   ['forward', 'Walk forward', ['KeyW', 'ArrowUp']], ['back', 'Walk back', ['KeyS', 'ArrowDown']],
   ['left', 'Step left', ['KeyA', '']], ['right', 'Step right', ['KeyD', '']],
-  ['run', 'Run', ['ShiftLeft', 'ControlLeft']], ['use', 'Hide / use / revive', ['KeyE', '']],
+  ['run', 'Run', ['ShiftLeft', '']], ['crouch', 'Crouch (slower, completely silent)', ['ControlLeft', 'KeyC']], ['use', 'Hide / use / revive', ['KeyE', '']],
   ['breath', 'Hold your breath (in a wardrobe)', ['Space', '']], ['phone', 'Phone', ['Digit1', 'Numpad1']],
   ['ping', 'Ping (together)', ['KeyQ', '']], ['emote', 'Dance wheel (together, hold)', ['KeyR', '']],
   ['warn', 'Warn the others (when out)', ['KeyG', '']], ['pause', 'Pause (Esc always works)', ['KeyP', '']],
@@ -79,7 +79,9 @@ const KEY_ACTIONS = [
 ];
 const DEFAULT_KEYS = Object.fromEntries(KEY_ACTIONS.map(([a, , k]) => [a, k.slice()]));
 // (copies: changing a key must never change the defaults it resets to)
-{ const saved = settings.keys || {}; settings.keys = {};
+// (keys saved before crouching existed had Ctrl for running too: Ctrl is for crouching now)
+function migrateKeys(saved) { if (saved && Array.isArray(saved.run) && !saved.crouch) saved.run = saved.run.map(c => c === 'ControlLeft' ? '' : c); return saved; }
+{ const saved = migrateKeys(settings.keys || {}); settings.keys = {};
   for (const a in DEFAULT_KEYS) settings.keys[a] = Array.isArray(saved[a]) && saved[a].length === 2 ? saved[a].map(String) : DEFAULT_KEYS[a].slice(); }
 // (left and right Shift / Ctrl / Alt count as the same key)
 const normKey = c => String(c || '').replace(/(Shift|Control|Alt|Meta)Right$/, '$1Left');

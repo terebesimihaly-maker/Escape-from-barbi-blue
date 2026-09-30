@@ -85,7 +85,7 @@ function applyFloor(d, slot) {
   decals = d.decals;
   const sp = d.spawns[Math.min(slot, d.spawns.length - 1)];
   player = { x: sp[0], y: sp[1], ang: d.a0, pitch: 0, hideYaw: 0, hidePitch: 0, stam: 1, exhausted: false, hidden: false, closet: null,
-    moving: false, sprinting: false, down: false, dead: false, downLeft: 0, inv: 0, breath: 1, holding: false, gasping: false, fear: 0, dance: -1, danceT: 0 };
+    moving: false, sprinting: false, crouching: false, down: false, dead: false, downLeft: 0, inv: 0, breath: 1, holding: false, gasping: false, fear: 0, dance: -1, danceT: 0 };
   monster = { ...center(d.m0), ang: 0, state: 'wander', path: [], repath: 0, last: null, seenT: 99,
     searchT: 0, huntT: 0, target: null, knowsCloset: false, kc: null, ti: null, active: false, spawnT: (d.n > 1 ? 6 : 4) + DF().spawn, anim: 0, stepAcc: 0, foot: 1, screamT: 0, vel: 0,
     dir: null, plan: [], checked: new Set(), checking: -1, checkT: 0, listenT: 0, heard: false, quiet: 0, fakeT: 0, fakeCool: 0, fakeFor: null };
@@ -103,7 +103,7 @@ function applyFloor(d, slot) {
 }
 function startFloor(i) { applyFloor(generateFloor(i, 1, settings.difficulty), 0); }
 function updateFuseHud() { $('hFuse').textContent = (powerOn ? '🔓 ' : '🧩 ') + fusesGot + '/' + fuses.length; }
-function setHud(on) { ['hud', 'stam', 'run', 'phone', 'fearBar'].forEach(id => show(id, on));
+function setHud(on) { ['hud', 'stam', 'run', 'crouch', 'phone', 'fearBar'].forEach(id => show(id, on));
   if (!on) ['hide', 'breath', 'breathBar', 'pingBtn', 'emoteBtn', 'warnBtn'].forEach(id => show(id, false)); closeWheel(false); lastHid = false; teamBtnState = ''; }
 
 let msgTimer = 0;

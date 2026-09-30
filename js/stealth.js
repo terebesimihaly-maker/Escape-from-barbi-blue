@@ -51,7 +51,7 @@ function updateBoards() {
   for (let k = 0; k < creaks.length; k++) {
     const b = creaks[k], dx = Math.abs(p.x - b.x), dy = Math.abs(p.y - b.y);
     const on = (b.along ? dx : dy) < BOARD_ACROSS && (b.along ? dy : dx) < b.len / 2 + 3;
-    if (on && !b.on) stepOnBoard(k, p.sprinting);
+    if (on && !b.on && !p.crouching) stepOnBoard(k, p.sprinting);   // (crouching: you ease your weight on, it doesn't creak)
     b.on = on;
   }
 }
