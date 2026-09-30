@@ -34,6 +34,14 @@ function placeCamera(t) {
   } else if (p.down) { h = 0.32 + Math.sin(t * 1.2) * 0.01; pitch = clamp(pitch, -0.3, 1.1); }   // lying on the floor
   else if (p.moving) { h += Math.sin(stepPhase) * (p.sprinting ? 0.045 : 0.025); yaw += Math.sin(stepPhase * 0.5) * 0.006; }
   if (!(p.dead && MP.on)) specCam.on = false;
+  // dancing (js/team.js): the camera slides out in front of you and turns round to watch you (the mouse turns it around you)
+  const dancing = p.dance >= 0 && !p.hidden && !p.down && !p.dead;
+  danceCam.k = clamp(danceCam.k + lastDt * (dancing ? 2.2 : -4), 0, 1);
+  if (danceCam.k > 0 && !p.hidden && !p.down && !p.dead) {
+    const e = danceCam.k * danceCam.k * (3 - 2 * danceCam.k), ca = Math.cos(p.ang), sa = Math.sin(p.ang);
+    let d = 64; while (d > 18 && (blocked(p.x + ca * d, p.y + sa * d, 5) || !los(p.x, p.y, p.x + ca * d, p.y + sa * d))) d -= 4;   // (never through a wall)
+    cx = p.x + ca * d * e; cy = p.y + sa * d * e; h += (1.45 - h) * e; yaw = p.ang + Math.PI * e; pitch += (-0.12 - pitch) * e;
+  }
   const sh = calm() ? 0 : shake * 0.01;
   // very afraid: the picture sways and breathes (js/stealth.js; not with "Calm effects")
   const fk = calm() || p.dead ? 0 : fearK(), fk2 = fk * fk;
@@ -42,7 +50,20 @@ function placeCamera(t) {
   const fov = (camera.userData.fov || camera.fov) + Math.sin(t * 0.8) * 5 * fk2;
   if (Math.abs(camera.fov - fov) > 0.01) { if (!camera.userData.fov) camera.userData.fov = camera.fov; camera.fov = fov; camera.updateProjectionMatrix(); }
 }
-const specCam = { on: false, id: '', x: 0, y: 0, h: 0, yaw: 0, pitch: 0 };
+const specCam = { on: false, id: '', x: 0, y: 0, h: 0, yaw: 0, pitch: 0 }, danceCam = { k: 0 };
+// your own figure (playing together): only shown while you dance, when the camera is out in front of you
+function updateMyFigure() {
+  if (!MP.on || !playerTemplate || !renderer) return;
+  const slot = MP.mySlot || 0;
+  if (!MP.meAv || MP.meAvSlot !== slot) {
+    if (MP.meAv) { scene.remove(MP.meAv.obj); MP.meAv.dispose(); }
+    MP.meAv = PlayerModel.createHuman(THREE, { slot, name: myName, template: playerTemplate, mocap: mocapData }); MP.meAvSlot = slot; scene.add(MP.meAv.obj);
+  }
+  const p = player, av = MP.meAv, on = danceCam.k > 0.05 && !p.hidden && !p.down && !p.dead;
+  av.obj.position.set(p.x * S, 0, p.y * S); av.obj.rotation.y = Math.PI / 2 - p.ang;
+  av.update(lastDt, { speed: 0, dance: p.dance >= 0 ? DANCES[p.dance][2] : null, hidden: !on, lightOn: false });
+  av.setName(myName, false);
+}
 // who you're watching when you're out of the game (MP.spec: tap / ← → to switch)
 function watched() {
   const al = [...MP.others.values()].filter(o => !o.down && !o.dead && !o.away);
@@ -99,10 +120,12 @@ function render3D(t) {
     const mine = p.hidden && p.closet === c, k = mine && closetScene && d.side < 0 ? sceneDoor(closetScene.t) : d.side < 0 ? scareDoorOpen(c) : 0;
     d.pivot.rotation.y = d.side * k * 1.9; d.leaf.visible = !mine || k > 0.12;
   }
+  updateMyFigure();
   // teammates
   if (MP.on) for (const o of MP.others.values()) { if (!o.av) continue;
     o.av.obj.position.set(o.x * S, 0, o.y * S); o.av.obj.rotation.y = Math.PI / 2 - o.ang;
-    o.av.update(lastDt, { speed: o.spd * S, sprinting: o.sprinting, down: o.down, dead: o.dead, hidden: o.hidden, away: o.away, pitch: o.pitch, lightOn: settings.quality !== 'low' });
+    o.av.update(lastDt, { speed: o.spd * S, sprinting: o.sprinting, down: o.down, dead: o.dead, hidden: o.hidden, away: o.away, pitch: o.pitch, lightOn: settings.quality !== 'low',
+      dance: o.dance >= 0 && DANCES[o.dance] ? DANCES[o.dance][2] : null });
     o.av.setName(o.dead ? o.name + ' ✝' : o.down ? o.name + ' · ' + Math.ceil(o.downLeft) + 's' : o.name, o.down || o.dead); }
   // things on the floor, and on the walls
   animatePuzzles(t); updatePaintings(lastDt);

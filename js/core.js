@@ -73,13 +73,14 @@ const KEY_ACTIONS = [
   ['left', 'Step left', ['KeyA', '']], ['right', 'Step right', ['KeyD', '']],
   ['run', 'Run', ['ShiftLeft', 'ControlLeft']], ['use', 'Hide / use / revive', ['KeyE', '']],
   ['breath', 'Hold your breath (in a wardrobe)', ['Space', '']], ['phone', 'Phone', ['Digit1', 'Numpad1']],
-  ['ping', 'Ping (together)', ['KeyQ', '']], ['emote', 'Emote wheel (together, hold)', ['KeyR', '']],
+  ['ping', 'Ping (together)', ['KeyQ', '']], ['emote', 'Dance wheel (together, hold)', ['KeyR', '']],
   ['warn', 'Warn the others (when out)', ['KeyG', '']], ['pause', 'Pause (Esc always works)', ['KeyP', '']],
   ['perf', 'Performance overlay', ['F3', '']],
 ];
 const DEFAULT_KEYS = Object.fromEntries(KEY_ACTIONS.map(([a, , k]) => [a, k.slice()]));
-settings.keys = Object.assign({}, DEFAULT_KEYS, settings.keys || {});
-for (const a in DEFAULT_KEYS) if (!Array.isArray(settings.keys[a]) || settings.keys[a].length !== 2) settings.keys[a] = DEFAULT_KEYS[a].slice();
+// (copies: changing a key must never change the defaults it resets to)
+{ const saved = settings.keys || {}; settings.keys = {};
+  for (const a in DEFAULT_KEYS) settings.keys[a] = Array.isArray(saved[a]) && saved[a].length === 2 ? saved[a].map(String) : DEFAULT_KEYS[a].slice(); }
 // (left and right Shift / Ctrl / Alt count as the same key)
 const normKey = c => String(c || '').replace(/(Shift|Control|Alt|Meta)Right$/, '$1Left');
 const bound = a => (settings.keys[a] || []).filter(Boolean);

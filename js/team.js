@@ -1,29 +1,34 @@
-/* Escape from Barbi Blue: Playing together: pings, emotes, and helping from beyond.
+/* Escape from Barbi Blue: Playing together: pings, dances, and helping from beyond.
      ping   - Q (or the 📍 button) marks the spot you're looking at, for everyone, for 8 seconds. Looking at her it says
               "She's here!", at a puzzle box "Puzzle". A marker off the screen sits at its edge, pointing the way.
-     emotes - hold R (or tap 💬): a wheel of six. Point at one with the mouse and let go (or click, or tap it): it pops up
-              over your head and in everyone's messages.
+     dances - hold R (or tap 💬): a wheel of eight dances. Point at one with the mouse and let go (or click, or tap it):
+              your figure dances for everyone, and your camera pulls back so you can see it. Moving stops it.
      beyond - out of the game you watch the others (click / tap, or ← →, to switch), and once every 30 seconds you can
               warn them (G, or WARN): everyone sees where she is, right now.
    (The game is split over several plain scripts that share one scope; index.html loads them in order.) */
 'use strict';
 
-const EMOTES = [["She's here!", '👁'], ['Help!', '🆘'], ['Follow me', '👉'], ['Wait', '✋'], ['Hide!', '🚪'], ['Thanks', '💙']];
+// [name, icon, animation (js/barbi-anim.js)]
+const DANCES = [['Floss', '🕺', 'd_floss'], ['Robot', '🤖', 'd_robot'], ['Disco', '🪩', 'd_disco'], ['Chicken', '🐔', 'd_chicken'],
+  ['Wave', '🌊', 'd_wave'], ['Twist', '🌀', 'd_twist'], ['Air guitar', '🎸', 'd_guitar'], ['Hype', '🙌', 'd_hype']];
+const DANCE_MAX = 30;                                   // (seconds: a dance stops by itself after this)
 const PING_LIFE = 8, WARN_COOL = 30, PING_KINDS = {
   her: { label: "She's here!", col: '255,90,90' }, pz: { label: 'Puzzle', col: '255,190,85' },
   go: { label: 'Here', col: '232,236,255' }, ghost: { label: "👻 She's here", col: '143,208,255' } };
-const team = { pings: [], bubbles: new Map(), sentAt: {}, warnCool: 0, sent: 0 };
+const team = { pings: [], sentAt: {}, warnCool: 0, sent: 0 };
 
-function resetTeam() { team.pings = []; team.bubbles.clear(); team.warnCool = 0; closeWheel(false); }
-// (no spamming: one ping, and one emote, every 0.6 seconds, in real time)
+function resetTeam() { team.pings = []; team.warnCool = 0; closeWheel(false); }
+// (no spamming: one ping every 0.6 seconds, in real time)
 function teamReady(k) { const now = performance.now(); if (now - (team.sentAt[k] || 0) < 600) return false; team.sentAt[k] = now; return true; }
 function updateTeam(dt) {
   team.warnCool = Math.max(0, team.warnCool - dt);
   for (const q of team.pings) q.t -= dt;
   team.pings = team.pings.filter(q => q.t > 0);
-  for (const [id, b] of team.bubbles) if ((b.t -= dt) <= 0) team.bubbles.delete(id);
+  // your dance: moving, hiding, going down (or half a minute) ends it
+  const p = player;
+  if (p.dance >= 0) { p.danceT += dt; if (p.moving || p.hidden || p.down || p.dead || !MP.on || p.danceT > DANCE_MAX) stopDance(); }
   const on = MP.on && MP.inGame && state === 'play', dead = on && player.dead;
-  teamButtons(on && !dead, on, dead);
+  teamButtons(on && !dead, on && !dead && !player.down, dead);
 }
 let teamBtnState = '';
 function teamButtons(ping, emote, warn) {
@@ -33,13 +38,13 @@ function teamButtons(ping, emote, warn) {
   if (!emote) closeWheel(false);
   if (warn) { const b = $('warnBtn'); b.disabled = team.warnCool > 0; b.textContent = team.warnCool > 0 ? Math.ceil(team.warnCool) + 's' : 'WARN'; }
 }
-/* ---------- the emote wheel ---------- */
-// six emotes in a ring, the first at the top, clockwise. With the mouse captured, moving it points at one (it doesn't turn
+/* ---------- the dance wheel ---------- */
+// eight dances in a ring, the first at the top, clockwise. With the mouse captured, moving it points at one (it doesn't turn
 // the view while the wheel is open); letting go of the key, or a click, sends it. With a cursor or a finger: point, or tap one
 const wheel = { open: false, byKey: false, vx: 0, vy: 0, sel: -1 };
-EMOTES.forEach(([txt, icon], i) => { const b = document.createElement('button'), a = i / EMOTES.length * Math.PI * 2;
+DANCES.forEach(([txt, icon], i) => { const b = document.createElement('button'), a = i / DANCES.length * Math.PI * 2;
   b.className = 'seg'; b.dataset.i = i; b.innerHTML = '<i></i><span></span>'; b.firstChild.textContent = icon; b.lastChild.textContent = txt;
-  b.style.left = (50 + Math.sin(a) * 36) + '%'; b.style.top = (50 - Math.cos(a) * 36) + '%';
+  b.style.left = (50 + Math.sin(a) * 38) + '%'; b.style.top = (50 - Math.cos(a) * 38) + '%';
   b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); wheel.sel = i; closeWheel(true); });
   b.addEventListener('pointerenter', () => { if (wheel.open) { wheel.sel = i; wheelShow(); } });
   $('emoteRing').appendChild(b); });
@@ -49,17 +54,17 @@ function openWheel(byKey) {
 }
 function closeWheel(send) {
   if (!wheel.open) return; wheel.open = false; show('emoteRing', false); $('emoteBtn').classList.remove('on');
-  if (send && wheel.sel >= 0) doEmote(wheel.sel);
+  if (send && wheel.sel >= 0) startDance(wheel.sel);
 }
 function wheelMove(dx, dy) {
   wheel.vx = clamp(wheel.vx + dx, -150, 150); wheel.vy = clamp(wheel.vy + dy, -150, 150);
-  const d = Math.hypot(wheel.vx, wheel.vy), n = EMOTES.length;
+  const d = Math.hypot(wheel.vx, wheel.vy), n = DANCES.length;
   wheel.sel = d < 30 ? -1 : ((Math.round(Math.atan2(wheel.vx, -wheel.vy) / (Math.PI * 2 / n)) % n) + n) % n;
   wheelShow();
 }
 function wheelShow() {
   document.querySelectorAll('#emoteRing .seg').forEach(b => b.classList.toggle('on', +b.dataset.i === wheel.sel));
-  $('emoteHub').textContent = wheel.sel >= 0 ? EMOTES[wheel.sel][0] : (canLock ? 'point with the mouse' : 'tap one');
+  $('emoteHub').textContent = wheel.sel >= 0 ? DANCES[wheel.sel][0] : (canLock ? 'point with the mouse' : 'tap one');
 }
 // a click with the mouse captured sends what's pointed at; a click on the empty middle closes it
 document.addEventListener('mousedown', e => { if (wheel.open && locked()) { e.stopImmediatePropagation(); closeWheel(true); } }, true);
@@ -73,10 +78,12 @@ function doPing() {
   const at = pingTarget(); team.sent++;
   toHost({ t: 'ping', x: Math.round(at.x), y: Math.round(at.y), k: at.k });
 }
-function doEmote(e) {
-  if (!MP.on || !MP.inGame || state !== 'play' || !EMOTES[e] || !teamReady('emote')) return;
-  team.sent++; toHost({ t: 'emote', e });
+// dancing: your state (player.dance) goes out with your position, ~15 times a second, so everyone sees it (js/multiplayer.js)
+function startDance(i) {
+  const p = player; if (!MP.on || !MP.inGame || state !== 'play' || !DANCES[i] || p.hidden || p.down || p.dead) return;
+  p.dance = i; p.danceT = 0; team.sent++; setSprint(false);
 }
+function stopDance() { player.dance = -1; player.danceT = 0; }
 function warnTeam() {
   if (!MP.on || !player.dead || team.warnCool > 0) return;
   if (!monster.active) { showMsg("She isn't anywhere right now.", 2); return; }
@@ -99,7 +106,6 @@ function hostPing(id, m) {
   const k = m.k === 'her' || m.k === 'pz' ? m.k : 'go', num = v => Number.isFinite(+v) ? +v : 0;
   hostEmit({ t: 'ping', by: id, x: clamp(num(m.x), 0, GW * T), y: clamp(num(m.y), 0, GH * T), k });
 }
-function hostEmote(id, m) { const q = meOrOther(id), e = m.e | 0; if (q && MP.inGame && EMOTES[e] && teamRate(q, 'emote')) hostEmit({ t: 'emote', by: id, e }); }
 function hostWarn(id) {
   const q = meOrOther(id), now = performance.now(); if (!q || !q.dead || !MP.inGame || !monster.active) return;
   if (now - (q.warnAt || -1e9) < (WARN_COOL - 1) * 1000) return; q.warnAt = now;
@@ -115,11 +121,6 @@ function gotPing(m) {
   if (m.k === 'ghost') { if (m.by === MP.myId) unlock('ghost'); else showMsg(nameOf(m.by) + "'s ghost shows you where she is.", 3); }
   else if (m.k === 'her' && m.by !== MP.myId) showMsg(nameOf(m.by) + ": She's here!", 2.5);
 }
-function gotEmote(m) {
-  const e = EMOTES[m.e]; if (!e) return;
-  team.bubbles.set(m.by, { e: m.e, t: 4 }); sfx.ping(null, m.e === 0 || m.e === 1 || m.e === 4);
-  showMsg((m.by === MP.myId ? 'You' : nameOf(m.by)) + ': ' + e[1] + ' ' + e[0], 2.5);
-}
 
 /* ---------- drawing (on top of the 3D view) ---------- */
 // a point in the house (world units, h metres up) on the 2D overlay: its position, and whether it's behind you
@@ -129,7 +130,7 @@ function toScreen(x, y, h) {
   if (behind) { sx = cvs.width - sx; sy = cvs.height - sy; }
   return { x: sx, y: sy, behind };
 }
-function drawTeamMarks(t) {
+function drawTeamMarks(t) {   // (pings)
   const D = DPR, cw = cvs.width, ch = cvs.height, p = player, pad = 34 * D;
   ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const q of team.pings) {
@@ -148,15 +149,6 @@ function drawTeamMarks(t) {
     ctx.fillText(K.label, x, y - r - 10 * D);
     ctx.fillStyle = 'rgba(230,230,240,' + 0.8 * a + ')'; ctx.font = 11 * D + 'px system-ui,sans-serif';
     ctx.fillText(q.name + ' · ' + Math.round(Math.hypot(q.x - p.x, q.y - p.y) * S) + ' m', x, y + r + 11 * D);
-  }
-  for (const [id, b] of team.bubbles) {            // emotes, over their heads
-    const o = MP.others.get(id); if (!o || o.away) continue;
-    const s = toScreen(o.x, o.y, 2.25); if (s.behind || s.x < 0 || s.x > cw || s.y < 0 || s.y > ch) continue;
-    const txt = EMOTES[b.e][1] + ' ' + EMOTES[b.e][0], a = Math.min(1, b.t / 0.6);
-    ctx.font = '600 ' + 13 * D + 'px system-ui,sans-serif'; const w = ctx.measureText(txt).width + 16 * D, h = 24 * D;
-    ctx.fillStyle = 'rgba(245,242,255,' + 0.92 * a + ')'; ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(s.x - w / 2, s.y - h, w, h, 10 * D); else ctx.rect(s.x - w / 2, s.y - h, w, h); ctx.fill();
-    ctx.fillStyle = 'rgba(20,16,30,' + a + ')'; ctx.fillText(txt, s.x, s.y - h / 2);
   }
   ctx.restore();
 }

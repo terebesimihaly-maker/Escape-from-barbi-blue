@@ -254,10 +254,12 @@ function createHuman(THREE, opts) {
     fall += ((lying ? 1 : 0) - fall) * Math.min(1, dt * 6);
     tag.position.y = tagH - (tagH - 0.75) * fall;
     let clip = v < 0.35 ? 'p_idle' : v < 2.4 ? 'p_walk' : v < 5.4 ? 'p_jog' : 'p_run';
+    const dancing = !!s.dance && !lying && v < 1.2 && !!anim.actions[s.dance];   // (a dance from the wheel, standing still)
+    if (dancing) clip = s.dance;
     if (lying) clip = s.dead ? 'p_dead' : 'p_down';
-    anim.play(clip, lying ? 0.5 : 0.25); anim.setSpeed(v);
+    anim.play(clip, lying ? 0.5 : 0.25); if (dancing) anim.setSpeed(0); else anim.setSpeed(v);
     anim.update(dt);
-    if (!lying) {
+    if (!lying && !dancing) {
       root.updateMatrixWorld(true);
       _ax.set(1, 0, 0).applyQuaternion(root.getWorldQuaternion(new THREE.Quaternion()));
       const pitch = s.pitch || 0;

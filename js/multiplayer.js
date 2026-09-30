@@ -80,6 +80,7 @@ function leaveMP(quiet) {
   const peer = MP.peer;
   setTimeout(() => { try { if (peer) peer.destroy(); } catch (e) {} }, 150);
   for (const o of MP.others.values()) removeAvatar(o);
+  if (MP.meAv) { scene.remove(MP.meAv.obj); MP.meAv.dispose(); MP.meAv = null; }
   Object.assign(MP, { on: false, host: false, peer: null, hostConn: null, myId: '', code: '', pid: '', lobby: null, inGame: false, menu: false, n: 1, scareT: 0, floorData: null });
   MP.conns = new Map(); MP.others = new Map();
   MP.leaving = false;
@@ -183,7 +184,6 @@ function hostHandle(id, m) {
       if (b && q && MP.inGame && Math.hypot(qx - b.x, qy - b.y) < 80) { boardNoise(b, id, !!m.r); hostEmit({ t: 'creak', k: m.k | 0, by: id, r: m.r ? 1 : 0 }); }
       break; }
     case 'ping': hostPing(id, m); break;                                  // (js/team.js)
-    case 'emote': hostEmote(id, m); break;
     case 'warn': hostWarn(id); break;
     case 'pi': send(MP.conns.get(id), { t: 'po', s: m.s }); break;        // (the performance overlay's ping)
   }
@@ -359,7 +359,7 @@ function hostEndMatch() {
 function makeOther(id, slot, name) {
   let o = MP.others.get(id);
   if (!o) { o = { id, x: 0, y: 0, tx: 0, ty: 0, ang: 0, pitch: 0, hidden: false, closet: -1, moving: false, sprinting: false,
-    down: false, dead: false, downLeft: 0, inv: 0, rv: '', spd: 0, px: 0, py: 0, av: null }; MP.others.set(id, o); }
+    down: false, dead: false, downLeft: 0, inv: 0, rv: '', spd: 0, px: 0, py: 0, av: null, dance: -1 }; MP.others.set(id, o); }
   o.slot = slot; o.name = name;
   if (renderer && (!o.av || o.avSlot !== slot || (playerTemplate && !o.avHuman))) {
     removeAvatar(o);
@@ -403,11 +403,11 @@ function clientHandle(m) {
       break; }
     case 'lockedout': if (player.hidden) { exitHide(); lockedOut(); } break;
     case 'floor': {
-      const d = m.d, slot = Math.max(0, d.order.indexOf(MP.myId));
+      const d = m.d, slot = Math.max(0, d.order.indexOf(MP.myId)); MP.mySlot = slot;
       for (const [id, o] of MP.others) if (!d.order.includes(id)) { removeAvatar(o); MP.others.delete(id); }
       d.order.forEach((id, i) => { if (id === MP.myId) return;
         const o = makeOther(id, i, d.names[i]), sp = d.spawns[Math.min(i, d.spawns.length - 1)];
-        Object.assign(o, { x: sp[0], y: sp[1], tx: sp[0], ty: sp[1], ang: d.a0, down: false, dead: false, downLeft: 0, hidden: false, closet: -1, inv: 0, heardAt: performance.now() }); });
+        Object.assign(o, { x: sp[0], y: sp[1], tx: sp[0], ty: sp[1], ang: d.a0, down: false, dead: false, downLeft: 0, hidden: false, closet: -1, inv: 0, dance: -1, heardAt: performance.now() }); });
       MP.lastW = performance.now();
       MP.n = d.order.length; MP.inGame = true; MP.menu = false; MP.exitAsked = false; MP.scareT = 0; MP.spec = 0;
       ['lobby', 'title', 'panel', 'dead', 'win', 'trans', 'paused', 'note'].forEach(id => show(id, false));
@@ -418,7 +418,6 @@ function clientHandle(m) {
     case 'fuseGot': applyFuse(m.k, m.by); break;
     case 'creak': if (m.by !== MP.myId && creaks[m.k]) sfx.board(creaks[m.k], m.r ? 1 : 0.75); break;   // a teammate stepped on a loose board
     case 'ping': gotPing(m); break;
-    case 'emote': gotEmote(m); break;
     case 'ach': if (m.id === MP.myId) { unlock(m.a); if (m.msg) showMsg(m.msg, 2.5); } break;
     case 'po': { const rt = performance.now() - m.s; if (rt >= 0 && rt < 60000) MP.rtt = MP.rtt ? MP.rtt * 0.6 + rt * 0.4 : rt; break; }
     case 'scream': {
@@ -488,7 +487,7 @@ function clientWorld(m) {
     }
     const o = MP.others.get(q.id); if (!o) continue;
     o.tx = q.x; o.ty = q.y; o.ang = q.a; o.pitch = q.p; o.hidden = !!q.h; o.closet = q.c; o.moving = !!q.mv; o.sprinting = !!q.sp;
-    o.down = !!q.dn; o.dead = !!q.dd; o.downLeft = q.dl; o.rv = q.rv || ''; o.away = !!q.aw;
+    o.down = !!q.dn; o.dead = !!q.dd; o.downLeft = q.dl; o.rv = q.rv || ''; o.away = !!q.aw; o.dance = DANCES[q.dc] ? q.dc : -1;
   }
   const M = m.m, mo = monster;
   if (M.ac && !mo.active) showMsg('Somewhere in the house, a music box starts playing.', 3);
@@ -519,7 +518,7 @@ function hostPlayerState(id, m) {
   const num = v => Number.isFinite(v) ? v : 0;
   o.tx = clamp(num(m.x), 0, GW * T); o.ty = clamp(num(m.y), 0, GH * T); o.ang = num(m.a); o.pitch = clamp(num(m.p), -1.2, 1.2);
   const wasHidden = o.hidden; o.hidden = !!m.h; o.closet = m.c | 0; o.moving = !!m.mv; o.sprinting = !!m.sp; o.rv = typeof m.rv === 'string' ? m.rv : '';
-  o.holding = !!m.b; o.rt = clamp(m.rt | 0, 0, 99999);                   // (holding their breath; their ping, for the overlay)
+  o.holding = !!m.b; o.rt = clamp(m.rt | 0, 0, 99999); o.dance = DANCES[m.dc] ? m.dc | 0 : -1;                   // (holding their breath; their ping, for the overlay)
   // two players in one wardrobe (they climbed in at the same moment): whoever was there first stays, the other is pushed out
   if (o.hidden && !wasHidden) {
     const k = o.closet, first = (player.hidden && closets.indexOf(player.closet) === k) ||
@@ -636,11 +635,11 @@ function mpTick(dt) {
   const r1 = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100, p = player;
   const cl = p.closet ? closets.indexOf(p.closet) : -1, rv = reviveTarget && revP > 0 ? reviveTarget.id : '';
   if (!MP.host) { send(MP.hostConn, { t: 'st', x: r1(p.x), y: r1(p.y), a: r2(p.ang), p: r2(p.pitch), h: p.hidden ? 1 : 0, c: cl, mv: p.moving ? 1 : 0, sp: p.sprinting ? 1 : 0, rv,
-    b: p.holding ? 1 : 0, rt: Math.round(MP.rtt || 0) }); return; }
+    b: p.holding ? 1 : 0, rt: Math.round(MP.rtt || 0), dc: p.dance }); return; }
   const ps = [{ id: MP.myId, x: r1(p.x), y: r1(p.y), a: r2(p.ang), p: r2(p.pitch), h: p.hidden ? 1 : 0, c: cl, mv: p.moving ? 1 : 0, sp: p.sprinting ? 1 : 0,
-    dn: p.down ? 1 : 0, dd: p.dead ? 1 : 0, dl: r1(p.downLeft), rv }];
+    dn: p.down ? 1 : 0, dd: p.dead ? 1 : 0, dl: r1(p.downLeft), rv, dc: p.dance }];
   for (const o of MP.others.values()) ps.push({ id: o.id, x: r1(o.tx), y: r1(o.ty), a: r2(o.ang), p: r2(o.pitch), h: o.hidden ? 1 : 0, c: o.closet, mv: o.moving ? 1 : 0,
-    sp: o.sprinting ? 1 : 0, dn: o.down ? 1 : 0, dd: o.dead ? 1 : 0, dl: r1(o.downLeft), rv: o.rv, aw: o.away ? 1 : 0 });
+    sp: o.sprinting ? 1 : 0, dn: o.down ? 1 : 0, dd: o.dead ? 1 : 0, dl: r1(o.downLeft), rv: o.rv, aw: o.away ? 1 : 0, dc: o.dance >= 0 ? o.dance : -1 });
   const m = monster;
   broadcast({ t: 'w', ps, m: { x: r1(m.x), y: r1(m.y), a: r2(m.ang), s: m.state, ac: m.active ? 1 : 0, v: r1(m.vel), sc: r2(m.screamT), ti: m.ti, q: r2(m.quiet || 0) } });
 }

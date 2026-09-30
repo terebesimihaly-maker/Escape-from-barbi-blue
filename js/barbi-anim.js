@@ -206,6 +206,76 @@ const PLAYER_CLIPS = {
     P.hand(1, 0.35, 4).hand(-1, 0.3, 4);
     P.side('upperleg01', 1, -6, 0, 6).side('upperleg01', -1, -2, 0, 8); straightLegs(P);
   } },
+  /* ---------- dances (the emote wheel, playing together) ---------- */
+
+  // 1. the floss: straight arms swing from side to side, in front and behind, the hips going the other way
+  d_floss: { dur: 1.0, loop: true, fn(t, P) {
+    const ph = t / 1.0 * TAU, s = sin(ph), fb = cos(ph);
+    P.side('upperarm01', 1, 28 * fb, 0, 18 + 34 * s).side('upperarm01', -1, 28 * fb, 0, 18 - 34 * s);
+    P.sym('lowerarm01', -6, 0, 0).hand(1, 0.85, 0).hand(-1, 0.85, 0);
+    P.move(-0.07 * s, -0.02, 0).spine(0, 0, 8 * s).rot('head', 0, 0, -6 * s);
+    P.side('upperleg01', 1, -6 - 6 * Math.max(0, s), 0, 0).side('lowerleg01', 1, 10 + 10 * Math.max(0, s), 0, 0);
+    P.side('upperleg01', -1, -6 - 6 * Math.max(0, -s), 0, 0).side('lowerleg01', -1, 10 + 10 * Math.max(0, -s), 0, 0); straightLegs(P);
+  } },
+  // 2. the robot: stiff, snapping from pose to pose
+  d_robot: { dur: 2.4, loop: true, fn(t, P) {
+    const k = t / 0.6, i = Math.floor(k) % 4, f = smooth(0, 0.18, k % 1), prev = (i + 3) % 4;
+    const poses = [[-90, 0, -90, 0, 30], [-90, 60, -90, 60, -30], [-20, 90, -110, 20, 30], [-110, 20, -20, 90, -30]];   // L thigh/elbow..., head
+    const A = poses[prev], B = poses[i], L = (a, b) => a + (b - a) * f;
+    P.side('upperarm01', 1, L(A[0], B[0]), 0, 12).side('lowerarm01', 1, -L(A[1], B[1]) - 20, 0, 0);
+    P.side('upperarm01', -1, L(A[2], B[2]), 0, 12).side('lowerarm01', -1, -L(A[3], B[3]) - 20, 0, 0);
+    P.hand(1, 0, 0).hand(-1, 0, 0).rot('head', 0, L(A[4], B[4]), 0).spine(0, L(A[4], B[4]) * -0.3, 0);
+    P.move(0, -0.02 * Math.abs(sin(k * Math.PI)), 0); straightLegs(P);
+  } },
+  // 3. disco: point up across the sky, then down to the other hip; the other hand on the hip, hips swaying
+  d_disco: { dur: 1.6, loop: true, fn(t, P) {
+    const ph = t / 1.6 * TAU, up = (sin(ph) + 1) / 2;
+    P.side('upperarm01', -1, -30 - 20 * up, 0, 20 + 130 * up).side('lowerarm01', -1, -10, 0, 0).hand(-1, 1, 0);
+    P.side('finger2-1', -1, 0, 0, 55).side('finger2-2', -1, 0, 0, 70).side('finger2-3', -1, 0, 0, 50);   // (the pointing finger straight)
+    P.side('upperarm01', 1, -10, 0, 32).side('lowerarm01', 1, -95, 0, 0).side('wrist', 1, 0, 0, 30).hand(1, 0.7, 0);   // hand on the hip
+    P.move(0.05 * sin(ph * 2), -0.03 - 0.02 * sin(ph * 2 + 1), 0).spine(0, 10 * (up - 0.5), 10 * (0.5 - up)).rot('head', 12 * (0.5 - up), -20 * (up - 0.5), 0);
+    P.sym('upperleg01', -10, 0, 0).sym('lowerleg01', 16 + 8 * sin(ph * 2), 0, 0); straightLegs(P);
+  } },
+  // 4. the chicken: hands in the armpits, elbows flapping, pecking, knees bouncing
+  d_chicken: { dur: 1.2, loop: true, fn(t, P) {
+    const ph = t / 1.2 * TAU, flap = Math.max(0, sin(ph * 2)), peck = Math.max(0, sin(ph * 2 + 1.2));
+    P.sym('upperarm01', 10, 0, 18 + 55 * flap).sym('lowerarm01', -150, 0, 0).sym('wrist', 0, 0, -20).hand(1, 0.9, 0).hand(-1, 0.9, 0);
+    P.spine(18 + 8 * peck, 0, 0).neck(-20 - 20 * peck, 0, 0).rot('head', 10 * peck, 0, 0);
+    P.move(0, -0.06 - 0.04 * sin(ph * 2), 0.02).sym('upperleg01', -28, 0, 0).sym('lowerleg01', 44 + 10 * sin(ph * 2), 0, 0).sym('foot', -12, 0, 0);
+    P.side('upperleg01', 1, 0, 0, 6).side('upperleg01', -1, 0, 0, 6); straightLegs(P);
+  } },
+  // 5. the wave: arms out to the sides, a wave rolling from one hand, through the shoulders, to the other
+  d_wave: { dur: 2.0, loop: true, fn(t, P) {
+    const ph = t / 2.0 * TAU, w = x => sin(ph - x);
+    P.side('upperarm01', 1, 0, 0, 86 + 16 * w(0)).side('lowerarm01', 1, 0, 0, 30 * w(0.8)).side('wrist', 1, 0, 0, 30 * w(1.4));
+    P.side('upperarm01', -1, 0, 0, 86 + 16 * w(3.2)).side('lowerarm01', -1, 0, 0, 30 * w(2.4)).side('wrist', -1, 0, 0, 30 * w(1.8));
+    P.side('clavicle', 1, 0, 0, 10 * w(0.4)).side('clavicle', -1, 0, 0, 10 * w(2.8)).spine(0, 0, 6 * w(1.6)).rot('head', 0, 0, 8 * w(1.6));
+    P.hand(1, 0.1, 6).hand(-1, 0.1, 6).move(0, -0.02 - 0.02 * sin(ph * 2), 0).sym('lowerleg01', 8 + 6 * sin(ph * 2), 0, 0); straightLegs(P);
+  } },
+  // 6. the twist: knees bent, hips twisting one way and the shoulders the other
+  d_twist: { dur: 1.0, loop: true, fn(t, P) {
+    const ph = t / 1.0 * TAU, s = sin(ph);
+    P.rot('root', 0, 28 * s, 0).spine(12, -46 * s, 0).rot('head', 0, -8 * s, 0);
+    P.move(0, -0.13 - 0.03 * Math.abs(s), 0).sym('upperleg01', -34, 0, 0).sym('lowerleg01', 58, 0, 0).sym('foot', -18, 0, 0);
+    P.side('upperarm01', 1, -30 + 25 * s, 0, 30).side('upperarm01', -1, -30 - 25 * s, 0, 30).sym('lowerarm01', -90, 0, 0).hand(1, 0.6, 0).hand(-1, 0.6, 0);
+    straightLegs(P);
+  } },
+  // 7. air guitar: leaning back, one hand on the neck, the other strumming, head banging
+  d_guitar: { dur: 1.6, loop: true, fn(t, P) {
+    const ph = t / 1.6 * TAU, strum = sin(t * 16), bang = Math.max(0, sin(ph * 4));
+    P.side('upperarm01', 1, -38, 0, 62).side('lowerarm01', 1, -22, 0, 0).side('wrist', 1, 0, 0, -25).hand(1, 0.65, 4);    // the neck, out to the side
+    P.side('upperarm01', -1, -8, 0, 20).side('lowerarm01', -1, -62, 0, 0).side('wrist', -1, 30 * strum, 0, 0).hand(-1, 0.8, 0);    // strumming at the hip
+    P.spine(-20 + 6 * sin(ph), 18, 0).neck(10 + 25 * bang, 0, 0).rot('head', 12 * bang, 0, 0);
+    P.move(0, -0.05 - 0.03 * sin(ph * 4), 0).side('upperleg01', 1, -30, 0, 8).side('lowerleg01', 1, 40, 0, 0).side('upperleg01', -1, 8, 0, 6).side('lowerleg01', -1, 12, 0, 0);
+    straightLegs(P);
+  } },
+  // 8. hype: jumping jacks, arms clapping over the head
+  d_hype: { dur: 0.9, loop: true, fn(t, P) {
+    const ph = t / 0.9 * TAU, open = (1 - cos(ph)) / 2, air = Math.max(0, sin(ph));
+    P.move(0, 0.16 * air - 0.03, 0).sym('upperarm01', 0, 0, 25 + 145 * open).sym('lowerarm01', -10 * open, 0, 0).hand(1, 0.1, 6 * open).hand(-1, 0.1, 6 * open);
+    P.sym('upperleg01', -4, 0, 4 + 16 * open).sym('lowerleg01', 8 + 12 * (1 - air), 0, 0).sym('foot', 0, 0, -10 * open).neck(-8 * open, 0, 0);
+    straightLegs(P);
+  } },
 };
 
 // in the open wardrobe door: bent deep into the wardrobe, face right up to yours, holding the door with one hand

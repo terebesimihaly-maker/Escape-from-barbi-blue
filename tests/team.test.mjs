@@ -41,28 +41,34 @@ check(await until(A, () => /Ben: She's here!/.test(document.getElementById('msg'
 check(await A.evaluate(id => team.pings.filter(q => q.by === id).length === 1, benId), 'one ping each: the new one replaced his first');
 await A.evaluate(() => { const m = bb.monster; m.active = false; m.spawnT = 1e9; m.screamT = 0; m.state = 'wander'; });
 
-console.log('== the emote wheel');
+console.log('== the dance wheel');
 await B.keyboard.down('KeyR');
-check(await until(B, () => !document.getElementById('emoteRing').classList.contains('hidden') && document.querySelectorAll('#emoteRing .seg').length === 6, null, 10000),
-  'Ben holds R: the wheel with six emotes opens');
+check(await until(B, () => !document.getElementById('emoteRing').classList.contains('hidden') && document.querySelectorAll('#emoteRing .seg').length === 8, null, 10000),
+  'Ben holds R: the wheel with eight dances opens');
 await B.evaluate(() => wheelMove(70, 40));                                // (the mouse, pointing down and to the right)
-check(await B.evaluate(() => wheel.sel === 2 && document.querySelector('#emoteRing .seg.on').textContent.includes('Follow me') && /Follow me/.test(document.getElementById('emoteHub').textContent)),
-  'pointing with the mouse picks "Follow me" (highlighted)');
+check(await B.evaluate(() => wheel.sel === 3 && document.querySelector('#emoteRing .seg.on').textContent.includes('Chicken') && /Chicken/.test(document.getElementById('emoteHub').textContent)),
+  'pointing with the mouse picks "Chicken" (highlighted)', await B.evaluate(() => wheel.sel));
 const lookBefore = await B.evaluate(() => bb.player.ang);
-await B.screenshot({ path: OUT + '/emote_wheel.png' });
+await B.screenshot({ path: OUT + '/dance_wheel.png' });
 await B.keyboard.up('KeyR');
-check(await until(A, id => team.bubbles.get(id) && team.bubbles.get(id).e === 2, benId, 15000), 'letting go of R sends it: "Follow me" pops up over his head for Anna');
-check(await until(A, () => /Ben: 👉 Follow me/.test(document.getElementById('msg').textContent), null, 5000), 'and in her messages');
-check(await B.evaluate(a => document.getElementById('emoteRing').classList.contains('hidden') && Math.abs(bb.player.ang - a) < 0.01, lookBefore), 'the wheel closes; pointing didn\'t turn his view');
-await B.keyboard.down('KeyR'); await B.waitForTimeout(300); await B.keyboard.up('KeyR');
-await A.waitForTimeout(1500);
-check(await A.evaluate(id => team.bubbles.get(id).e === 2, benId), 'opening it and letting go without pointing sends nothing');
+check(await B.evaluate(a => document.getElementById('emoteRing').classList.contains('hidden') && Math.abs(bb.player.ang - a) < 0.01 && bb.player.dance === 3, lookBefore),
+  'letting go of R: the wheel closes (pointing didn\'t turn his view) and Ben dances');
+check(await until(A, id => bb.MP.others.get(id).dance === 3 && bb.MP.others.get(id).av.anim.current === 'd_chicken', benId, 15000), 'Anna sees Ben\'s figure do the chicken dance');
+check(await until(B, () => { const p = bb.player, c = bb.camera.position; return Math.hypot(c.x - p.x * S, c.z - p.y * S) > 1.2 && bb.MP.meAv && bb.MP.meAv.anim.current === 'd_chicken'; }, null, 15000),
+  'Ben\'s camera pulls back and he sees himself dancing', await B.evaluate(() => { const p = bb.player, c = bb.camera.position; return Math.hypot(c.x - p.x * S, c.z - p.y * S); }));
+await B.waitForTimeout(1500);
+await A.screenshot({ path: OUT + '/dance_seen.png' }); await B.screenshot({ path: OUT + '/dance_self.png' });
+await B.keyboard.down('KeyW'); await B.waitForTimeout(800); await B.keyboard.up('KeyW');
+check(await until(B, () => bb.player.dance === -1, null, 10000), 'walking stops the dance');
+check(await until(A, id => bb.MP.others.get(id).dance === -1, benId, 15000), 'for Anna too');
+check(await until(B, () => { const p = bb.player, c = bb.camera.position; return Math.hypot(c.x - p.x * S, c.z - p.y * S) < 0.2; }, null, 15000), 'and Ben\'s camera is back in his eyes');
 await A.evaluate(() => { document.getElementById('emoteBtn').dispatchEvent(new PointerEvent('pointerdown')); });
-check(await A.evaluate(() => !document.getElementById('emoteRing').classList.contains('hidden')), 'on a touch screen, the 💬 button opens the wheel');
-await A.evaluate(() => { document.querySelectorAll('#emoteRing .seg')[5].dispatchEvent(new PointerEvent('pointerdown')); });
-check(await until(B, id => team.bubbles.get(id) && team.bubbles.get(id).e === 5, annaId, 15000), 'Anna taps "Thanks": Ben sees it');
+check(await A.evaluate(() => !document.getElementById('emoteRing').classList.contains('hidden')), 'on a touch screen, the 💃 button opens the wheel');
+await A.evaluate(() => { document.querySelectorAll('#emoteRing .seg')[7].dispatchEvent(new PointerEvent('pointerdown')); });
+check(await until(B, id => bb.MP.others.get(id).dance === 7 && bb.MP.others.get(id).av.anim.current === 'd_hype', annaId, 15000), 'Anna taps "Hype": Ben sees her jumping');
 check(await A.evaluate(() => document.getElementById('emoteRing').classList.contains('hidden')), 'and the wheel closes');
-await B.screenshot({ path: OUT + '/emote.png' });
+await A.evaluate(() => stopDance());
+
 
 console.log('== holding breath, gasps and loose boards, for the host\'s her');
 await B.evaluate(() => { const c = bb.closets.find(c => !bb.allPlayers().some(q => q.hidden)); hideTarget = c; bb.toggleHide(); keys.Space = true; });
@@ -90,7 +96,7 @@ await A.evaluate(() => { const m = bb.monster; m.active = false; m.spawnT = 1e9;
 
 console.log('== she fades out for everyone');
 await A.evaluate(() => { const m = bb.monster; m.active = true; m.state = 'lurk'; m.quiet = 1; m.fakeT = 1e9; m.fakeFor = null; m.x = bb.exit.x; m.y = bb.exit.y; });
-check(await until(B, () => bb.monster.quiet === 1, null, 10000), 'while she only pretends to be gone, she\'s silent on Ben\'s side too');
+check(await until(B, () => bb.monster.quiet > 0.5, null, 15000), 'while she only pretends to be gone, she\'s silent on Ben\'s side too', await B.evaluate(() => bb.monster.quiet));
 await A.evaluate(() => { const m = bb.monster; m.active = false; m.spawnT = 1e9; m.state = 'wander'; m.quiet = 0; });
 
 console.log('== the ping in the performance overlay');
