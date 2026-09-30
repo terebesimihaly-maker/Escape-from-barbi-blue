@@ -12,6 +12,24 @@ function relPan(x, y) {   // -1 = to your left, 1 = to your right
   const dx = x - player.x, dy = y - player.y, d = Math.hypot(dx, dy) || 1;
   return (-Math.sin(player.ang) * dx + Math.cos(player.ang) * dy) / d;
 }
+/* ---------- getting into and out of a wardrobe ----------
+   The doors swing open, the camera steps in (or out) while they're open, and they close again. The game already has you
+   inside (or out) from the first moment: only the picture takes its time. */
+const HIDE_T = 0.95, hideAnim = { t: -1, dir: 'in', from: null, c: null };
+function startHideAnim(dir, c) {
+  const p = player;
+  hideAnim.from = dir === 'in' ? { x: p.x, y: p.y, yaw: p.ang, pitch: p.pitch, h: EYE } : insideView(c, 0);
+  Object.assign(hideAnim, { t: 0, dir, c }); startSwing(c);
+}
+// where your eyes are inside a wardrobe, looking out through the slats
+function insideView(c, t) { return { x: c.x - c.ox * (CLOSET_FRONT + 5), y: c.y - c.oy * (CLOSET_FRONT + 5), yaw: Math.atan2(c.oy, c.ox), pitch: -0.03, h: 1.55 + Math.sin(t * 1.7) * 0.006 }; }
+const startSwing = c => { if (c) c.swingT = 0; };
+// how far the doors are open during the swing: quickly open, held while you step through, then pulled shut
+function doorSwing(t) {
+  if (t < 0 || t > HIDE_T) return 0;
+  const e = x => x * x * (3 - 2 * x);
+  return t < 0.2 ? e(t / 0.2) : t < 0.55 ? 1 : 1 - e((t - 0.55) / (HIDE_T - 0.55));
+}
 function placeCamera(t) {
   const p = player;
   let cx = p.x, cy = p.y, yaw = p.ang, pitch = p.pitch, h = EYE;
@@ -34,6 +52,11 @@ function placeCamera(t) {
   } else if (p.down) { h = 0.32 + Math.sin(t * 1.2) * 0.01; pitch = clamp(pitch, -0.3, 1.1); }   // lying on the floor
   else if (p.moving) { h += Math.sin(stepPhase) * (p.sprinting ? 0.045 : 0.025); yaw += Math.sin(stepPhase * 0.5) * 0.006; }
   if (!(p.dead && MP.on)) specCam.on = false;
+  if (hideAnim.t >= 0) {                            // stepping into or out of a wardrobe: from where you were to where you are
+    hideAnim.t += lastDt; const f = hideAnim.from, k0 = clamp((hideAnim.t - 0.12) / 0.42, 0, 1), k = k0 * k0 * (3 - 2 * k0);
+    if (hideAnim.t > HIDE_T || !f) hideAnim.t = -1;
+    else { cx = f.x + (cx - f.x) * k; cy = f.y + (cy - f.y) * k; h = f.h + (h - f.h) * k; yaw = lerpAngle(f.yaw, yaw, k); pitch = f.pitch + (pitch - f.pitch) * k; }
+  }
   // dancing (js/team.js): the camera slides out in front of you and turns round to watch you (the mouse turns it around you)
   const dancing = p.dance >= 0 && !p.hidden && !p.down && !p.dead;
   danceCam.k = clamp(danceCam.k + lastDt * (dancing ? 2.2 : -4), 0, 1);
@@ -116,13 +139,23 @@ function render3D(t) {
     }
   }
   // wardrobe doors: only the one you're in ever opens (in the scene). From inside, closed doors are drawn as the slats overlay.
-  for (const c of closets) if (c.doors) for (const d of c.doors) {
-    const mine = p.hidden && p.closet === c, k = mine && closetScene && d.side < 0 ? sceneDoor(closetScene.t) : d.side < 0 ? scareDoorOpen(c) : 0;
-    d.pivot.rotation.y = d.side * k * 1.9; d.leaf.visible = !mine || k > 0.12;
+  for (const c of closets) if (c.doors) {
+    const sw = c.swingT >= 0 ? doorSwing(c.swingT) : 0;          // (someone getting in or out: both doors swing)
+    if (c.swingT >= 0) { c.swingT += lastDt; if (c.swingT > HIDE_T) c.swingT = -1; }
+    for (const d of c.doors) {
+      const mine = p.hidden && p.closet === c, k = Math.max(mine && closetScene && d.side < 0 ? sceneDoor(closetScene.t) : d.side < 0 ? scareDoorOpen(c) : 0, sw * 0.62);
+      d.pivot.rotation.y = d.side * k * 1.9; d.leaf.visible = !mine || k > 0.12;
+    }
   }
   updateMyFigure();
   // teammates
-  if (MP.on) for (const o of MP.others.values()) { if (!o.av) continue;
+  if (MP.on) for (const o of MP.others.values()) {
+    if (!!o.hidden !== !!o.wasHidden) {             // a teammate getting into or out of a wardrobe: its doors swing
+      o.wasHidden = !!o.hidden; let best = null, bd = T * 1.2;
+      for (const c of closets) { const d = Math.hypot(c.x - o.x, c.y - o.y); if (d < bd) { bd = d; best = c; } }
+      startSwing(best);
+    }
+    if (!o.av) continue;
     o.av.obj.position.set(o.x * S, 0, o.y * S); o.av.obj.rotation.y = Math.PI / 2 - o.ang;
     o.av.update(lastDt, { speed: o.spd * S, sprinting: o.sprinting, down: o.down, dead: o.dead, hidden: o.hidden, away: o.away, pitch: o.pitch, lightOn: settings.quality !== 'low',
       dance: o.dance >= 0 && DANCES[o.dance] ? DANCES[o.dance][2] : null });

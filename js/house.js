@@ -83,8 +83,13 @@ function build(THREE, env) {
   const trimTex = tex(woodCanvas(P.trim, 256, 32, false), true);
   const trimMat = std({ map: trimTex, roughness: style === 'wood' ? 0.45 : 0.55 });
   const trim = new Merge(THREE);
-  const strip = (f, y0, y1, d, slope) => {
-    const len = Math.hypot(f.x1 - f.x0, f.z1 - f.z0), cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2, ry = Math.atan2(f.nx, f.nz);
+  const strip = (f, y0, y1, d, slope, a0 = 0, a1 = 1) => {
+    if (!slope && f === env.exitFace && y0 < 2.45) {       // (the exit door's wall: the trim stops either side of the door)
+      if (a0 === 0 && a1 === 1) { strip(f, y0, y1, d, slope, 0, 0.19); strip(f, y0, y1, d, slope, 0.81, 1); }
+      if (a0 === 0 && a1 === 1) return;
+    }
+    const full = Math.hypot(f.x1 - f.x0, f.z1 - f.z0), len = full * (a1 - a0), am = (a0 + a1) / 2;
+    const cx = f.x0 + (f.x1 - f.x0) * am, cz = f.z0 + (f.z1 - f.z0) * am, ry = Math.atan2(f.nx, f.nz);
     if (slope) {                                         // crown molding: a sloped board under the ceiling
       const g = new THREE.BoxGeometry(len + 0.02, (y1 - y0) * 1.35, 0.02);
       const m = new THREE.Matrix4().compose(new THREE.Vector3(cx + f.nx * d * 0.5, (y0 + y1) / 2, cz + f.nz * d * 0.5),
@@ -101,6 +106,11 @@ function build(THREE, env) {
     if (style === 'tile') strip(f, 0.84, 0.9, 0.028);
     if (style === 'workshop') strip(f, 0.93, 0.97, 0.05);
     if (style !== 'concrete' && style !== 'attic') strip(f, H - 0.12, H, 0.1, true);
+  }
+  if (env.exitFace) {                                       // a proper frame round the exit door
+    const f = env.exitFace, tx = f.x1 - f.x0, tz = f.z1 - f.z0, tl = Math.hypot(tx, tz), cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2, ry = Math.atan2(f.nx, f.nz);
+    for (const s of [-1, 1]) trim.box(0.11, 2.42, 0.05, cx + tx / tl * s * 0.63 + f.nx * 0.025, 1.21, cz + tz / tl * s * 0.63 + f.nz * 0.025, ry);
+    trim.box(1.37, 0.13, 0.055, cx + f.nx * 0.0275, 2.4, cz + f.nz * 0.0275, ry);
   }
 
   /* ---------- doorways: between the rooms of the maze, a framed opening with a header wall above it ---------- */
@@ -119,7 +129,7 @@ function build(THREE, env) {
     frame.box(L, 0.12, 0.34, cx, DOOR_H + 0.03, cz, ry);
   }
   const frameMat = std({ map: tex(woodCanvas({ wood: '#a39680', tile: '#3a2616', concrete: '#3a2c20', attic: '#3a2a1c', workshop: '#2a1d14' }[style], 64, 256, true), true), roughness: 0.7 });
-  const headerMat = env.wallMat.clone(); headerMat.vertexColors = false;   // (the walls' own corner shading doesn't apply here)
+  const headerMat = env.wallMat.clone(); headerMat.vertexColors = false; headerMat.userData = { wallSurface: true };   // (the walls' own corner shading doesn't apply here)
   [trim.mesh(trimMat, false), frame.mesh(frameMat, true), header.mesh(headerMat, true)].forEach(m => { if (m) group.add(m); });
 
   /* ---------- lamps ---------- */
@@ -420,7 +430,7 @@ function build(THREE, env) {
   }
   function dispose() {
     const seen = new Set();
-    group.traverse(o => { if (o.geometry && !seen.has(o.geometry)) { seen.add(o.geometry); o.geometry.dispose(); }
+    group.traverse(o => { if (o.geometry && !o.userData.sharedGeo && !seen.has(o.geometry)) { seen.add(o.geometry); o.geometry.dispose(); }   // (a doll's geometry is the loaded model's)
       if (o.material && !seen.has(o.material)) { seen.add(o.material); for (const k of ['map', 'alphaMap']) if (o.material[k] && o.material[k] !== env.glowTex) o.material[k].dispose(); o.material.dispose(); } });
     if (beam) { if (beam.parent) beam.parent.remove(beam); beam.geometry.dispose(); beam.material.dispose(); }
   }
@@ -433,6 +443,25 @@ function makeDoll(THREE, env, p, seed) {
   // a porcelain doll sitting against the wall, about 45 cm tall
   const g = new THREE.Group(), y0 = p.y || 0;
   const dresses = [0x9fb4e6, 0xe6a8b8, 0xf0ece0, 0xb6d4c0], hairs = [0x1a120c, 0xd8b06a, 0x5a2a14, 0x0b0b0b];
+  if (env.doll) {                                          // the model made in Blender (models/doll.glb): its lowest point is at 0, so it sits on the floor or the table
+    const d = env.doll.clone(true), glowEyes = seed % 3 === 0, faceTex = env.toTex(dollFaceCanvas(glowEyes));
+    faceTex.wrapS = faceTex.wrapT = THREE.ClampToEdgeWrapping;
+    const aged = [0x4d5f91, 0x93505f, 0xa49a84, 0x4f7560];     // (the model's dresses: older, dirtier colours than the stand-in's)
+    d.traverse(o => { if (!o.isMesh) return; o.material = o.material.clone();
+      const n = o.material.name;
+      if (n === 'Dress') { o.material.color.setHex(aged[seed % 4]); o.material.roughness = 0.9; }
+      else if (n === 'Hair') o.material.color.setHex(hairs[(seed >> 1) % 4]);
+      else if (n === 'Lace') o.material.color.setHex(0xb9ae98);          // (yellowed)
+      else if (n === 'Socks') o.material.color.setHex(0xbdb8ae);
+      else if (n === 'Porcelain' && o.name !== 'DollHead') { o.material.color.setHex(0xcfc4bb); o.material.roughness = 0.35; }
+      else if (n === 'Porcelain' && o.name === 'DollHead') { o.material.map = faceTex; o.material.color.setHex(0xd9d0c8); o.material.roughness = 0.35;
+        if (glowEyes) { o.material.emissive = new THREE.Color(0x3a90c0); o.material.emissiveMap = faceTex; o.material.emissiveIntensity = 0.5; } }
+    });
+    d.traverse(o => { if (o.isMesh) o.userData.sharedGeo = true; });   // (the model keeps its geometry)
+    const head = d.getObjectByName('DollHeadPivot') || d;
+    g.add(d); g.position.set(p.x, y0, p.z); g.rotation.y = p.ry; g.updateMatrixWorld(true);
+    return { obj: g, head, ry: p.ry, target: 0, headWorld: head.getWorldPosition(new THREE.Vector3()) };
+  }
   const dress = new THREE.MeshStandardMaterial({ color: dresses[seed % 4], roughness: 0.85 });
   const porcelain = new THREE.MeshStandardMaterial({ color: 0xf2ebe4, roughness: 0.25 });
   const hairM = new THREE.MeshStandardMaterial({ color: hairs[(seed >> 1) % 4], roughness: 0.7 });

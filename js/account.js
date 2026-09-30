@@ -135,8 +135,10 @@ function renderProfileControls() {
   const choices = (label, key, list, names) => row(label, c => list.forEach((v, j) => { const b = document.createElement('button'); b.className = 'ch' + (l[key] === v ? ' on' : '');
     b.textContent = names[j]; b.dataset.k = key; b.dataset.v = v; b.onclick = () => { setLook(Object.assign({}, account.look, { [key]: v })); focusOn(key); renderProfileControls(); }; c.appendChild(b); }));
   const toggle = (label, key) => choices(label, key, [false, true], ['No', 'Yes']);
-  colours('Shirt', 'shirt', O.shirt, true); colours('Trousers', 'pants', O.pants, true); colours('Shoes', 'shoes', O.shoes, true);
-  choices('Hair', 'hairStyle', O.hairStyle, ['Short', 'Long']); colours('Hair colour', 'hair', O.hair, true);
+  choices('Top', 'top', O.top, ['T-shirt', 'Long sleeves', 'Hoodie']); colours('Top colour', 'shirt', O.shirt, true);
+  choices('Bottoms', 'bottom', O.bottom, ['Trousers', 'Shorts', 'Skirt']); colours('Bottoms colour', 'pants', O.pants, true);
+  colours('Shoes', 'shoes', O.shoes, true);
+  choices('Hair', 'hairStyle', O.hairStyle, ['Buzz cut', 'Short', 'Bob', 'Long', 'Ponytail', 'Bun', 'Curly']); colours('Hair colour', 'hair', O.hair, true);
   colours('Skin', 'skin', O.skin, false); colours('Eyes', 'eyes', O.eyes, false);
   choices('Beard', 'beard', O.beard, ['None', 'Stubble', 'Beard', 'Moustache', 'Goatee']);
   choices('Glasses', 'glasses', O.glasses, ['None', 'Round', 'Square']);
@@ -196,7 +198,7 @@ async function startPreview() {
     const s = account.look ? account.look.height : 1.1, z = pv.zoom * pv.zoom * (3 - 2 * pv.zoom), top = 1.6 * s, eye = 1.469 * s;
     const ty = top * 0.5 + (eye - 0.015 - top * 0.5) * z, d = (top * 0.5 + 0.16) / Math.tan(Math.PI / 12) * (1 - z) + 0.62 * z, cy = ty + 0.3 * (1 - z) + 0.02 * z;
     pv.cam.position.set(Math.sin(pv.yaw) * d, cy, Math.cos(pv.yaw) * d); pv.cam.lookAt(0, ty, 0);
-    if (pv.fig) pv.fig.update(dt, { speed: 0, lightOn: false });
+    if (pv.fig) pv.fig.update(dt, { speed: 0, stand: true, lightOn: false });
     pv.r.render(pv.scene, pv.cam); };
   pv.raf = requestAnimationFrame(loop);
 }

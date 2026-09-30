@@ -11,7 +11,7 @@
 
 let breathHeld = false, breathSndT = 0, halluT = 12, fearTxt = '', breathTxt = '', lastHid = false, fearFilter = '';
 const stealth = { hallu: 0, gasps: 0 };                 // (counts, for the tests)
-const BOARD_ACROSS = 10, BOARD_ALONG = 15;              // how close your feet have to come to a board's middle, across it and along it
+const BOARD_ACROSS = 10;                                  // how close your feet have to come to a board's middle, across it (along it: its half length + 3)
 
 function updateStealth(dt) {
   updateHolding(dt);
@@ -50,13 +50,13 @@ function updateBoards() {
   const p = player; if (p.hidden || p.down || p.dead) return;
   for (let k = 0; k < creaks.length; k++) {
     const b = creaks[k], dx = Math.abs(p.x - b.x), dy = Math.abs(p.y - b.y);
-    const on = (b.along ? dx : dy) < BOARD_ACROSS && (b.along ? dy : dx) < BOARD_ALONG;
+    const on = (b.along ? dx : dy) < BOARD_ACROSS && (b.along ? dy : dx) < b.len / 2 + 3;
     if (on && !b.on) stepOnBoard(k, p.sprinting);
     b.on = on;
   }
 }
 function stepOnBoard(k, run) {
-  const b = creaks[k]; sfx.board(b, run ? 1 : 0.75); fstat.creaks++;
+  const b = creaks[k]; sfx.board(b, run ? 1 : 0.75); if (!b.mid) fstat.creaks++;   // (the ones across a corridor can't be avoided: they don't spoil "Light feet")
   if (MP.on) toHost({ t: 'creak', k, r: run ? 1 : 0 }); else boardNoise(b, allPlayers()[0].id, run);
 }
 const boardNoise = (b, id, run) => makeNoise(b.x, b.y, id, (run ? 650 : 450) * DF().hear);

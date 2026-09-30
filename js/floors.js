@@ -7,6 +7,8 @@ let state = 'title', floorIdx = 0, fuses = [], notes = [], closets = [], decals 
 let player, monster, fusesGot = 0, powerOn = false, runTime = 0, huntTimer = 0, creakTimer = 5;
 let phoneCool = 0, popT = 0, closetScene = null, sceneCool = 0, levelTime = 0, runFrom = 0, lastFuseAt = 0;
 let shake = 0, deadT = 0, flicker = 1, flickTarget = 1, flickT = 0, hbTimer = 0, stepTimer = 0;
+// loose floorboards (js/stealth.js): how long one is (world units); the long ones right across a corridor, and how often a board is one
+const BOARD_LEN = 24, BOARD_MID_LEN = 46, BOARD_MID_CHANCE = 0.1;
 let musicTimer = 0, musicI = 0, hideTarget = null, hideCool = 0, breathShown = false, deathReason = '';
 let titleEyes = null, titleT = 0, reviveTarget = null, revP = 0, lastDt = 0.016, reviveHeld = false;
 
@@ -37,13 +39,22 @@ function generateFloor(i, n, diff) {
   const pick = shuffle(NOTE_POOL[i].map((_, k) => k)).slice(0, NOTES_PER_FLOOR);
   const notesD = nc.slice(0, pick.length).map((c, j) => { used.add(c.join(',')); return [c[0], c[1], +rnd(-0.6, 0.6).toFixed(2), pick[j]]; });
   // loose floorboards: in the rooms and the corridors between them (never at the start, the door, a wardrobe or a puzzle).
-  // Each lies to one side of its tile, so there is room to step around it
+  // About nine in ten lie along one side of their tile, with plenty of room to step around them. Now and then (one board in
+  // ten) a long one lies right across the middle of a corridor, from wall to wall: there's no way round that one.
+  // A board: [x, y, along (its length runs along y), length]
   const open = [];
   for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) if (!grid[y][x] && !used.has(x + ',' + y) && (x > 4 || y > 4) && dist[idx(x, y)] > 2) open.push([x, y]);
-  const creaksD = shuffle(open).slice(0, Math.round(CELLS.length / 10 * D.creaks) + i).map(([x, y]) => {
-    const along = isWall(x - 1, y) && isWall(x + 1, y) ? 1 : isWall(x, y - 1) && isWall(x, y + 1) ? 0 : Math.random() < 0.5 ? 1 : 0;   // (lengthwise along a corridor)
-    const side = (Math.random() < 0.5 ? -1 : 1) * rnd(7, 11);
-    return [Math.round(x * T + T / 2 + (along ? side : rnd(-4, 4))), Math.round(y * T + T / 2 + (along ? rnd(-4, 4) : side)), along]; });
+  const nBoards = Math.round(CELLS.length / 10 * D.creaks) + i, cells = shuffle(open);
+  const vertical = (x, y) => isWall(x - 1, y) && isWall(x + 1, y), horizontal = (x, y) => isWall(x, y - 1) && isWall(x, y + 1);
+  const corridors = cells.filter(([x, y]) => vertical(x, y) !== horizontal(x, y));   // (walls on two opposite sides only)
+  let nMid = 0; for (let k = 0; k < nBoards; k++) if (Math.random() < BOARD_MID_CHANCE) nMid++;
+  const midCells = corridors.slice(0, nMid), inMid = new Set(midCells.map(c => c.join()));
+  const creaksD = midCells.map(([x, y]) => { const v = vertical(x, y), a = rnd(-8, 8);          // (across: its length runs from wall to wall)
+    return [Math.round(x * T + T / 2 + (v ? 0 : a)), Math.round(y * T + T / 2 + (v ? a : 0)), v ? 0 : 1, BOARD_MID_LEN]; })
+  .concat(cells.filter(c => !inMid.has(c.join())).slice(0, nBoards - midCells.length).map(([x, y]) => {
+    const along = vertical(x, y) ? 1 : horizontal(x, y) ? 0 : Math.random() < 0.5 ? 1 : 0;   // (lengthwise along a corridor)
+    const side = (Math.random() < 0.5 ? -1 : 1) * rnd(11, 13);                                 // (right against one side)
+    return [Math.round(x * T + T / 2 + (along ? side : rnd(-4, 4))), Math.round(y * T + T / 2 + (along ? rnd(-4, 4) : side)), along, BOARD_LEN]; }));
 
   const decalsD = [];
   CELLS.forEach(c => { if (Math.random() > 0.35) return;
@@ -70,7 +81,7 @@ function applyFloor(d, slot) {
   fuses = d.fuses.map(([tx, ty]) => ({ tx, ty, ...center([tx, ty]), got: false }));
   applyPuzzles(d.puzzles);
   notes = d.notes.map(([tx, ty, rot, k]) => ({ ...center([tx, ty]), read: false, text: NOTE_POOL[d.i][k], id: d.i + '-' + k, rot }));
-  creaks = (d.creaks || []).map(([x, y, along]) => ({ x, y, along, on: false }));
+  creaks = (d.creaks || []).map(([x, y, along, len]) => ({ x, y, along, len: len || BOARD_LEN, mid: len > BOARD_LEN, on: false }));
   decals = d.decals;
   const sp = d.spawns[Math.min(slot, d.spawns.length - 1)];
   player = { x: sp[0], y: sp[1], ang: d.a0, pitch: 0, hideYaw: 0, hidePitch: 0, stam: 1, exhausted: false, hidden: false, closet: null,

@@ -178,18 +178,33 @@ const CLIPS = {
 };
 
 /* ---------- teammates (multiplayer): the same rig, all motion capture ---------- */
-// her O-legs are hers alone: the teammates' legs are straightened
-function straightLegs(P) { P.sym('upperleg01', 0, 0, -12).sym('lowerleg01', 0, 0, 13).sym('foot', 0, 0, -5); }
+// her O-legs are hers alone: the teammates' legs are straightened. The rig's shins are bowed at rest (the lower shin turns in
+// about 23 degrees), so that bend is taken out, and the feet turned back flat. stand: the standing capture keeps its knees
+// wide apart, so they come in (measured: tests/out/legs.mjs, the thigh and both halves of the shin seen from the front)
+function straightLegs(P, stand) {
+  const t = stand ? -20.5 : 0, k = stand ? 25.5 : 0;
+  P.sym('upperleg01', 0, 0, -12 + t).sym('lowerleg01', 0, 0, 13 + k).sym('lowerleg02', 0, 0, 23).sym('foot', 0, 0, -5 - 23 - t - k);
+}
 // the right arm holds the flashlight out in front (so it doesn't swing around with the walk)
 function torchArm(P, w) {
   P.sideSet('upperarm01', -1, -62, 0, -14, w).sideSet('lowerarm01', -1, -38, 0, 0, w).sideSet('wrist', -1, -6, 0, 0, w);
   P.hand(-1, 0.75, 0);
 }
 const PLAYER_CLIPS = {
-  p_idle: { loop: true, mocap: 'p_idle', over(t, P) { P.hand(-1, 0.75, 0); P.hand(1, 0.3, 3); straightLegs(P); } },   // looking around with the flashlight
+  p_idle: { loop: true, mocap: 'p_idle', over(t, P) { P.hand(-1, 0.75, 0); P.hand(1, 0.3, 3); straightLegs(P, true); } },   // looking around with the flashlight
   p_walk: { loop: true, mocap: 'p_walk', over(t, P) { torchArm(P, 0.85); P.hand(1, 0.35, 3); straightLegs(P); } },
   p_jog: { loop: true, mocap: 'p_jog', over(t, P) { torchArm(P, 0.8); P.hand(1, 0.5, 2); straightLegs(P); } },
   p_run: { loop: true, mocap: 'p_run', over(t, P) { torchArm(P, 0.7); P.hand(1, 0.6, 2); straightLegs(P); } },
+  // standing calmly (the profile and the lobby): weight shifting a little, breathing, looking round now and then
+  p_stand: { dur: 6, loop: true, fn(t, P) {
+    const k = t / 6 * TAU;
+    straightLegs(P);
+    P.spine(1.5 + sin(k * 2) * 0.8, sin(k) * 4, sin(k) * 1.2).neck(-2, sin(k + 1) * 14, 0).rot('head', 0, sin(k * 2 + 0.5) * 4, 0);
+    P.move(sin(k) * 0.006, sin(k * 2) * 0.002, 0);
+    P.sym('shoulder01', 0, 0, -4).sym('upperarm01', 2, 0, -6).sym('lowerarm01', -12, 0, 0).sym('wrist', 0, 0, 4);
+    P.side('upperleg01', 1, 0, 0, sin(k) * 1.5).side('upperleg01', -1, 0, 0, -sin(k) * 1.5);
+    P.hand(1, 0.25, 3).hand(-1, 0.3, 3);
+  } },
   // down: lying on the back, one hand reaching up for help (the whole body is laid down by rotating the root)
   p_down: { dur: 3, loop: true, fn(t, P) {
     const k = t / 3 * TAU;

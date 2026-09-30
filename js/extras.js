@@ -13,7 +13,7 @@ const ACH = [
   ['fast', 'In a hurry', 'Escape a floor in under 3 minutes.'],
   ['nohide', 'Never hid', 'Escape a floor without hiding once.'],
   ['unseen', 'Unseen', 'Escape a floor without her ever chasing you.'],
-  ['light', 'Light feet', 'Escape a floor without stepping on a loose floorboard.'],
+  ['light', 'Light feet', 'Escape a floor without stepping on a loose floorboard you could have gone round.'],
   ['calm', 'Steady hands', 'Escape a floor without your fear ever going over half.'],
   ['lost', 'Lost her', 'Get away from her in a chase.'],
   ['breath', 'Not a sound', 'Hold your breath while she listens at your wardrobe.'],

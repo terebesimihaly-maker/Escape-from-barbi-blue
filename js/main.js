@@ -36,7 +36,7 @@ function frame(now) {
 }
 init3D(); renderer.info.autoReset = false;
 addEventListener('resize', resize); resize(); applySettings();
-loadBarbi();
+loadBarbi(); loadDollTemplate(); loadBoardsTemplate();
 loadBest(); updateRejoinBtn();
 startAccount();                                          // (sign in, or play as a guest: js/account.js)
 requestAnimationFrame(frame);

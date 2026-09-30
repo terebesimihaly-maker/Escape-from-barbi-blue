@@ -168,7 +168,23 @@ function zoneBody(THREE, mesh) {
   g.setAttribute('aZone', new THREE.BufferAttribute(z, 1));
 }
 // the body gets trousers, a long-sleeved top and shoes painted on, by body part
-function dressBody(THREE, mat, look) {
+function dressBody(THREE, mat, look, feetOnly) {
+  if (feetOnly) {
+    // real clothes over it: the feet are painted the shoes' colour (in case a toe pokes through), and the skin isn't drawn at
+    // all where the clothes always cover it (the body at rest, in metres: the torso from under the neckline to above the hem,
+    // the legs from the waist to the trousers' or shorts' hems) - otherwise the chest pokes through the shirt
+    const legTo = look.bottom === 'trousers' ? 0.13 : look.bottom === 'shorts' ? 0.6 : 9;
+    mat.onBeforeCompile = sh => {
+      sh.uniforms.uShoe = { value: new THREE.Color(look.shoe) }; sh.uniforms.uLegTo = { value: legTo };
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aZone;\nvarying float vZone;\nvarying vec3 vRest;').replace('#include <begin_vertex>', '#include <begin_vertex>\n  vZone = aZone; vRest = position;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vZone;\nvarying vec3 vRest;\nuniform vec3 uShoe;\nuniform float uLegTo;')
+        .replace('#include <map_fragment>', `#include <map_fragment>
+  if (vZone > 1.5 && vZone < 2.5) diffuseColor.rgb = uShoe;
+  if (vRest.y > 0.9 && vRest.y < 1.215 && abs(vRest.x) < 0.145) discard;                       // (under the top)
+  if (vRest.y < 0.93 && vRest.y > uLegTo && abs(vRest.x) < 0.2 && vZone > 2.5 && vZone < 3.5) discard;   // (under trousers or shorts)`);
+    };
+    mat.customProgramCacheKey = () => 'feet' + legTo; return;
+  }
   mat.onBeforeCompile = sh => {
     sh.uniforms.uPants = { value: new THREE.Color(look.pants) }; sh.uniforms.uSleeve = { value: new THREE.Color(look.jacket) };
     sh.uniforms.uShoe = { value: new THREE.Color(look.shoe) };
@@ -403,13 +419,19 @@ const LOOK_OPTIONS = {
   shoes: [0x161616, 0x241b14, 0xd8d8d8, 0x7a2a2a, 0x2a3a6a, 0x5a4a3a],
   hair: HAIRS.concat([0x8a8a86, 0xb4b2ac, 0x2a4aa8, 0xc0508a, 0x7a2a9a]),
   skin: SKINS, eyes: [0x5a3a1e, 0x3b2412, 0x6b4a2a, 0x2f5d8a, 0x4a7fa8, 0x4f7a4a, 0x7a6a3a, 0x5f6a70],
-  hairStyle: ['short', 'long'], beard: ['none', 'stubble', 'beard', 'moustache', 'goatee'], glasses: ['none', 'round', 'square'],
+  hairStyle: ['buzz', 'short', 'bob', 'long', 'ponytail', 'bun', 'curly'], beard: ['none', 'stubble', 'beard', 'moustache', 'goatee'], glasses: ['none', 'round', 'square'],
+  top: ['tee', 'long', 'hoodie'], bottom: ['trousers', 'shorts', 'skirt'],
   body: ['a', 'b'], height: [1.02, 1.18] };
+// (the meshes in models/player.glb for each choice; buzz is the scalp cap alone)
+const TOP_MESH = { tee: 'Tee', long: 'LongTop', hoodie: 'Hoodie' }, BOTTOM_MESH = { trousers: 'Trousers', shorts: 'ShortPants', skirt: 'Skirt' };
+const HAIR_MESH = { buzz: null, short: 'HairShort', bob: 'HairBob', long: 'HairLong', ponytail: 'HairPony', bun: 'HairBun', curly: 'HairCurly' };
 // a random look (a new guest, "Randomize"): the face from the seed, and clothes to go with it
 function randomLook(seed) {
   const f = faceSpec(seed), r = rng(seed + ':clothes'), pick = a => a[r() * a.length | 0], O = LOOK_OPTIONS;
   return { v: 1, seed: String(seed), shirt: pick(O.shirt), pants: pick(O.pants), shoes: pick(O.shoes), hair: f.hair, skin: f.skin, eyes: f.iris,
-    hairStyle: f.long ? 'long' : 'short', beard: f.beard, glasses: f.glasses ? (f.glasses.round ? 'round' : 'square') : 'none',
+    hairStyle: f.masc ? pick(['buzz', 'short', 'short', 'curly', f.long ? 'long' : 'short']) : f.long ? pick(['long', 'long', 'bob', 'ponytail', 'bun', 'curly']) : pick(['bob', 'short', 'ponytail', 'bun']),
+    beard: f.beard, glasses: f.glasses ? (f.glasses.round ? 'round' : 'square') : 'none',
+    top: pick(O.top), bottom: f.masc ? pick(['trousers', 'trousers', 'shorts']) : pick(O.bottom),
     body: f.masc ? 'b' : 'a', freckles: !!f.freckles, makeup: !!f.liner, height: +f.scale.toFixed(3) };
 }
 function sanitizeLook(l) {
@@ -420,6 +442,7 @@ function sanitizeLook(l) {
     skin: one(o.skin, O.skin, def.skin), eyes: one(o.eyes, O.eyes, def.eyes), hairStyle: one(o.hairStyle, O.hairStyle, def.hairStyle),
     beard: one(o.beard, O.beard, def.beard), glasses: one(o.glasses, O.glasses, def.glasses), body: one(o.body, O.body, def.body),
     freckles: typeof o.freckles === 'boolean' ? o.freckles : def.freckles, makeup: typeof o.makeup === 'boolean' ? o.makeup : def.makeup,
+    top: one(o.top, O.top, def.top), bottom: one(o.bottom, O.bottom, def.bottom),
     height: Number.isFinite(o.height) ? Math.min(O.height[1], Math.max(O.height[0], o.height)) : def.height };
 }
 // the face for a look: made from its seed, then everything you chose on top
@@ -437,7 +460,8 @@ function createHuman(THREE, opts) {
   const face = L ? faceForLook(L) : faceSpec(seed);
   // (the clothes still go by lobby slot, so the four of you stay easy to tell apart; everything else is the face's)
   const look = Object.assign({}, LOOKS[slot], { hair: face.hair, skin: face.skin, long: face.long, scale: face.scale, flat: face.flat },
-    L ? { jacket: L.shirt, pants: L.pants, shoe: L.shoes } : {});
+    L ? { jacket: L.shirt, pants: L.pants, shoe: L.shoes, top: L.top, bottom: L.bottom, hairStyle: L.hairStyle }
+      : { top: ['long', 'tee', 'hoodie', 'long'][slot], bottom: 'trousers', hairStyle: face.long ? 'long' : 'short' });
   const model = THREE.cloneSkinned(opts.template);
   model.position.set(0, 0, 0); model.rotation.set(0, 0, 0); model.scale.setScalar(look.scale);
   // (her eye glow isn't theirs; collect first, then remove: removing while walking the tree skips and breaks)
@@ -445,15 +469,37 @@ function createHuman(THREE, opts) {
   sprites.forEach(o => o.parent.remove(o));
   const meshes = {};
   model.traverse(o => { if (o.isMesh) { meshes[o.name] = o; o.material = o.material.clone(); o.castShadow = true; o.frustumCulled = false; } });
-  if (meshes.Body) { zoneBody(THREE, meshes.Body); dressBody(THREE, meshes.Body.material, look); meshes.Body.material.color.set(look.skin); }
+  // models/player.glb (made in Blender: tools/blender/) has real clothes and hair to choose from; the older model only her
+  // top and shorts, with trousers and sleeves painted on
+  const dressed = !!meshes.Tee;
+  if (meshes.Body) { zoneBody(THREE, meshes.Body); dressBody(THREE, meshes.Body.material, look, dressed); meshes.Body.material.color.set(look.skin); }
   if (meshes.Head) meshes.Head.material.color.set(look.skin);
-  if (meshes.Top) recolor(THREE, meshes.Top.material, look.jacket, 1);
-  if (meshes.Shorts) recolor(THREE, meshes.Shorts.material, look.pants, 1);
-  if (meshes.Hair) { recolor(THREE, meshes.Hair.material, look.hair, 2); meshes.Hair.visible = look.long; }
-  if (meshes.HairCap) recolor(THREE, meshes.HairCap.material, look.hair, 2);
+  if (dressed) {
+    const top = TOP_MESH[look.top] || 'Tee', bottom = BOTTOM_MESH[look.bottom] || 'Trousers', hair = HAIR_MESH[look.hairStyle];
+    for (const n of [...Object.values(TOP_MESH), ...Object.values(BOTTOM_MESH)]) if (meshes[n]) meshes[n].visible = n === top || n === bottom;
+    for (const n of Object.values(HAIR_MESH)) if (n && meshes[n]) meshes[n].visible = n === hair;
+    if (meshes.Hair) meshes.Hair.visible = false;
+    if (meshes.Top) meshes.Top.visible = false;
+    if (meshes.Shorts) { meshes.Shorts.visible = bottom === 'Skirt'; recolor(THREE, meshes.Shorts.material, 0x1c1c1e, 1); }   // (under a skirt)
+    if (meshes.BodyFill) meshes.BodyFill.material.color.set(look.skin).multiply(new THREE.Color().setRGB(0.345, 0.259, 0.235, THREE.SRGBColorSpace));   // (the body texture's average skin, tinted like the body)
+    const cloth = (m, c) => { if (!m) return; m.material.color.set(c); m.material.side = THREE.DoubleSide; };   // (both sides: you can see into a sleeve)
+    cloth(meshes[top], look.jacket); cloth(meshes[bottom], look.pants); cloth(meshes.Sneakers, look.shoe);
+    for (const n of [...Object.values(HAIR_MESH), 'HairCap']) if (n && meshes[n]) {
+      const m = meshes[n].material;
+      if (n === 'HairCap') recolor(THREE, m, look.hair, 2);
+      else { m.color.set(look.hair).multiplyScalar(1.2); m.alphaTest = 0.45; m.transparent = false; m.depthWrite = true; m.side = THREE.DoubleSide; }   // (hair cards: a neutral strand texture, cut out, no sorting)
+    }
+  } else {
+    if (meshes.Top) recolor(THREE, meshes.Top.material, look.jacket, 1);
+    if (meshes.Shorts) recolor(THREE, meshes.Shorts.material, look.pants, 1);
+    if (meshes.Hair) { recolor(THREE, meshes.Hair.material, look.hair, 2); meshes.Hair.visible = look.long; }
+    if (meshes.HairCap) recolor(THREE, meshes.HairCap.material, look.hair, 2);
+  }
   const bone = n => model.getObjectByName(n);
   for (const n of ['breastL', 'breastR']) { const b = bone(n); if (b) b.scale.setScalar(look.flat); }
   const own = meshes.Head ? makeFace(THREE, meshes, bone('head'), face, seed) : null;
+  model.updateMatrixWorld(true);
+  for (const n of ['footL', 'footR', 'toe1-1L', 'toe1-1R', 'toe3-1L', 'toe3-1R', 'toe5-1L', 'toe5-1R']) { const b = bone(n); if (b) b.userData.restY = b.getWorldPosition(new THREE.Vector3()).y; }
   const anim = window.BarbiAnim.build(THREE, model, { mocap: opts.mocap, scale: look.scale, set: 'player', maxTime: 2.2 });
   const root = new THREE.Group(); root.add(model);
 
@@ -508,18 +554,38 @@ function createHuman(THREE, opts) {
     const v = s.speed || 0, lying = s.down || s.dead;
     fall += ((lying ? 1 : 0) - fall) * Math.min(1, dt * 6);
     tag.position.y = tagH - (tagH - 0.75) * fall;
-    let clip = v < 0.35 ? 'p_idle' : v < 2.4 ? 'p_walk' : v < 5.4 ? 'p_jog' : 'p_run';
+    let clip = v < 0.35 ? (s.stand && anim.actions.p_stand ? 'p_stand' : 'p_idle') : v < 2.4 ? 'p_walk' : v < 5.4 ? 'p_jog' : 'p_run';   // (stand: calm, for the profile and the lobby)
     const dancing = !!s.dance && !lying && v < 1.2 && !!anim.actions[s.dance];   // (a dance from the wheel, standing still)
     if (dancing) clip = s.dance;
     if (lying) clip = s.dead ? 'p_dead' : 'p_down';
     anim.play(clip, lying ? 0.5 : 0.25); if (dancing) anim.setSpeed(0); else anim.setSpeed(v);
     anim.update(dt);
+    ground(dt, lying);
     if (!lying && !dancing) {
       root.updateMatrixWorld(true);
       _ax.set(1, 0, 0).applyQuaternion(root.getWorldQuaternion(new THREE.Quaternion()));
       const pitch = s.pitch || 0;
       turnWorld(arm, _ax, -pitch * 0.9); turnWorld(head, _ax, -pitch * 0.5);
     }
+  }
+  // Standing on the floor: the captured motion and the hand-made dances each hold the body at their own height, so every
+  // frame the lowest foot is put on the floor (the feet's bones, less how high each sits above the sole at rest).
+  // Lying down, a fixed height (the pose lies flat).
+  const feet = ['footL', 'footR', 'toe1-1L', 'toe1-1R', 'toe3-1L', 'toe3-1R', 'toe5-1L', 'toe5-1R'].map(n => bone(n)).filter(Boolean), _gp = new THREE.Vector3();
+  let lift = 0, restH = null;
+  function ground(dt, lying) {
+    if (!feet.length) return;
+    root.updateMatrixWorld(true);
+    const rootY = root.getWorldPosition(_gp).y;
+    if (!restH) {                                       // (once: each bone's height above the lowest point of the body at rest)
+      const body = meshes.Body; if (!body) return; body.geometry.computeBoundingBox();
+      const floorY = body.geometry.boundingBox.min.y * look.scale;
+      restH = feet.map(b => b.userData.restY - floorY);
+    }
+    let gap = Infinity;
+    feet.forEach((b, i) => { gap = Math.min(gap, b.getWorldPosition(_gp).y - rootY - lift - restH[i]); });
+    const want = lying ? -0.1 * look.scale : -gap;
+    lift += (want - lift) * Math.min(1, dt * 14); model.position.y = lift;
   }
   function dispose() {
     root.traverse(o => { if (o.material) { if (o.isSprite && o.material.map) o.material.map.dispose(); o.material.dispose(); } });

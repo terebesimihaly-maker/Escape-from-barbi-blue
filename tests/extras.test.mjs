@@ -37,27 +37,40 @@ check(await p.evaluate(() => JSON.parse(localStorage.getItem('bb_progress')).not
 
 console.log('== loose floorboards');
 const boards = await p.evaluate(() => {
-  const bad = [];
+  const bad = []; let side = 0, mid = 0, minLane = 99;
   for (let i = 0; i < FLOORS.length; i++) for (const diff of ['easy', 'medium', 'hard']) for (let s = 0; s < 10; s++) {
     const d = generateFloor(i, 1, diff), rows = d.rows, wall = (x, y) => rows[y] === undefined || rows[y][x] !== '0';
     const taken = new Set([...d.closets.map(c => c[0] + ',' + c[1]), ...d.puzzles.map(z => z.cell.join()), d.exit.join(), ...d.notes.map(n => n[0] + ',' + n[1])]);
     if (!d.creaks.length) bad.push('floor ' + (i + 1) + ' has none');
-    for (const [x, y, along] of d.creaks) {
+    for (const [x, y, along, len] of d.creaks) {
       const tx = Math.floor(x / T), ty = Math.floor(y / T);
       if (wall(tx, ty)) bad.push('a board in a wall'); if (taken.has(tx + ',' + ty)) bad.push('a board on a wardrobe, puzzle, note or the door');
       if (tx <= 3 && ty <= 3) bad.push('a board at the start');
-      // room to walk past: somewhere across the tile a player (radius 11) stands clear of the board
-      const off = along ? x - (tx * T + T / 2) : y - (ty * T + T / 2); let lane = false;
-      for (let a = -(T / 2 - 11); a <= T / 2 - 11; a++) if (Math.abs(a - off) >= BOARD_ACROSS) lane = true;
-      if (!lane) bad.push('no room to step around a board');
+      // where a player (radius 11) can stand across the tile without stepping on it
+      const off = along ? x - (tx * T + T / 2) : y - (ty * T + T / 2); let lane = 0;
+      for (let a = -(T / 2 - 11); a <= T / 2 - 11; a++) if (Math.abs(a - off) >= BOARD_ACROSS) lane++;
+      if (len > BOARD_LEN) {                                   // one right across a corridor: from wall to wall, no way round
+        mid++;
+        const v = wall(tx - 1, ty) && wall(tx + 1, ty), h = wall(tx, ty - 1) && wall(tx, ty + 1);
+        if (v === h) bad.push('a long board that is not in a corridor');
+        if (along !== (v ? 0 : 1)) bad.push('a long board lying along the corridor, not across it');
+        if ((v ? Math.abs(x - (tx * T + T / 2)) : Math.abs(y - (ty * T + T / 2))) > 0.5) bad.push('a long board off the middle');
+        if (len / 2 + 3 < T / 2 - 11) bad.push('a long board you could squeeze past');
+      } else { side++; minLane = Math.min(minLane, lane); if (lane < 14) bad.push('not enough room to step around a board: ' + lane); }
     }
   }
-  return [...new Set(bad)];
+  return { bad: [...new Set(bad)], side, mid, share: mid / (side + mid), minLane };
 });
-check(boards.length === 0, 'on every floor and difficulty: boards in the open, never on anything important, always with room to step around', boards);
+check(boards.bad.length === 0, 'on every floor and difficulty: boards in the open, never on anything important', boards.bad);
+check(boards.share > 0.04 && boards.share < 0.18, 'about one in ten lies right across a corridor, wall to wall (no way round): ' + boards.mid + ' of ' + (boards.side + boards.mid), boards);
+check(boards.minLane >= 14, 'the others: always a wide lane to walk past (at least ' + boards.minLane + ' of 28 units)', boards);
+const b3d = await until(p, () => typeof boardsTemplate !== 'undefined' && boardsTemplate, null, 60000) && await p.evaluate(() => { startFloor(0); state = 'play'; notes.forEach(n => n.read = true); const m = bb.monster; m.active = false; m.spawnT = 1e9;
+  const groups = bb.level.group.children.filter(g => g.children && g.children.some(c => /^Board(Short|Long)$/.test(c.name)));
+  return { n: creaks.length, groups: groups.length, long: groups.filter(g => g.children.some(c => c.name === 'BoardLong')).length, mid: creaks.filter(c => c.mid).length }; });
+check(b3d && b3d.groups === b3d.n && b3d.long === b3d.mid, 'every loose board is a real 3D board (made in Blender), a long one wherever it lies across a corridor', b3d);
 await p.evaluate(() => { window.__boards = 0; const o = sfx.board; sfx.board = (...a) => { window.__boards++; return o(...a); }; });
 const bd = await p.evaluate(() => {
-  const b0 = creaks[0], m = bb.monster; m.active = true; m.spawnT = 0; m.state = 'wander'; m.x = b0.x + (b0.along ? 0 : 150); m.y = b0.y + (b0.along ? 150 : 0);
+  const b0 = window.__b0 = creaks.find(b => !b.mid) || creaks[0], m = bb.monster; m.active = true; m.spawnT = 0; m.state = 'wander'; m.x = b0.x + (b0.along ? 0 : 150); m.y = b0.y + (b0.along ? 150 : 0);
   if (bb.isWall(Math.floor(m.x / T), Math.floor(m.y / T))) { m.x = b0.x; m.y = b0.y; }
   // beside it first (the other side of the corridor), then on it
   const off = b0.along ? b0.x - (Math.floor(b0.x / T) * T + T / 2) : b0.y - (Math.floor(b0.y / T) * T + T / 2), side = off > 0 ? -12 : 12;
@@ -69,8 +82,13 @@ const bd = await p.evaluate(() => {
 check(bd.beside === 0, 'walking past beside a board: silent');
 check(bd.on === 1 && bd.again === 1, 'stepping on it: one loud creak (not again while you stand on it)', bd);
 check(bd.st === 'hunt' && bd.last && bd.last.x === bd.b[0] && bd.last.y === bd.b[1], 'she heard it and comes to the board', bd);
-await p.evaluate(() => { bb.player.x += 60; updateBoards(); bb.player.x -= 60; bb.player.y = creaks[0].y; bb.player.x = creaks[0].x; updateBoards(); });
+await p.evaluate(() => { const b0 = window.__b0; bb.player.x += 60; updateBoards(); bb.player.x -= 60; bb.player.y = b0.y; bb.player.x = b0.x; updateBoards(); });
 check(await p.evaluate(() => window.__boards === 2), 'step off and on again: it creaks again');
+const across = await p.evaluate(() => {                    // one right across a corridor: it creaks, but it doesn't spoil "Light feet"
+  const p0 = bb.player, n0 = window.__boards, c0 = fstat.creaks, b = { x: p0.x + 80, y: p0.y, along: 1, len: BOARD_MID_LEN, mid: true, on: false };
+  creaks.push(b); p0.x += 80; p0.y += 20; updateBoards(); const r = { creak: window.__boards - n0, counted: fstat.creaks - c0 };
+  creaks.pop(); p0.x -= 80; p0.y -= 20; return r; });
+check(across.creak === 1 && across.counted === 0, 'a long board across a corridor: it creaks too (even 20 units off its middle), but it doesn\'t count against "Light feet"', across);
 await p.screenshot({ path: OUT + '/board.png' });
 
 console.log('== holding your breath');

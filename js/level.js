@@ -9,10 +9,12 @@ function disposeLevel() {
   scene.remove(level.group);
   const seen = new Set();
   level.group.traverse(o => {
+    if (o.userData.shared) return;                         // (copies of a loaded model: the model keeps its geometry, materials and textures)
     if (o.geometry && !seen.has(o.geometry)) { seen.add(o.geometry); o.geometry.dispose(); }
     const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
     for (const m of ms) { if (seen.has(m)) continue; seen.add(m);
-      for (const k of ['map', 'emissiveMap', 'bumpMap']) if (m[k] && m[k] !== glowTex && !seen.has(m[k])) { seen.add(m[k]); m[k].dispose(); }
+      for (const k of ['map', 'emissiveMap', 'bumpMap', 'normalMap', 'roughnessMap']) if (m[k] && m[k] !== glowTex && !seen.has(m[k])) { seen.add(m[k]); m[k].dispose(); }
+      if (m.userData && m.userData.overlay) m.userData.overlay.dispose();
       m.dispose(); }
   });
   if (level.door) { level.door.openMat.map.dispose(); level.door.openMat.dispose(); level.door.lockedMat.map.dispose(); level.door.lockedMat.dispose(); }
@@ -34,24 +36,92 @@ function buildLevel() {
   const wallTx = wallTexture(F);
   const walls = new THREE.Mesh(wallGeometry(faces), new THREE.MeshLambertMaterial({ map: wallTx, bumpMap: wallTx.userData.bump, bumpScale: 3,
     vertexColors: true, color: new THREE.Color().setScalar(wallKind(F) === 'tile' ? 2.2 : wallKind(F) === 'attic' ? 1.4 : 1) }));
-  walls.castShadow = walls.receiveShadow = true; G.add(walls);
+  walls.castShadow = walls.receiveShadow = true; G.add(walls); walls.material.userData.wallSurface = true;
   // the house around the maze: woodwork, doorways, lamps, furniture and props (js/house.js)
   const pzFaces = puzzleFaces(), onPuzzleFace = f => pzFaces.has(f.x + ',' + f.y + ',' + f.nx + ',' + f.nz);   // (walls with a labyrinth box)
   const keep = new Set([...closets.map(c => Math.floor(c.x / T) + ',' + Math.floor(c.y / T)), exit.tx + ',' + exit.ty]);
-  level.house = House.build(THREE, { style: F.style, L, H: WALL_H, GW, GH, isWall, faces, keep, wallMat: walls.material, hash, toTex, glowTex,
+  level.house = House.build(THREE, { style: F.style, L, H: WALL_H, GW, GH, isWall, faces, keep, wallMat: walls.material, hash, toTex, glowTex, exitFace: faces.find(isExitFace), doll: dollTemplate || null,
     decorFace: f => onPuzzleFace(f) || hash(f.x * 7 + f.nx, f.y * 7 + f.nz, 91) < F.frames + 0.045, quality: settings.quality, lowq: LOWQ });
   G.add(level.house.group);
   if (level.house.beam) { level.house.beam.position.copy(flash.position); camera.add(level.house.beam); }
-  wallDecor(G, F, faces, level.house.doorTiles, onPuzzleFace);
+  wallDecor(G, F, faces, level.house.doorTiles, f => onPuzzleFace(f) || isExitFace(f));   // (no picture on the exit door's wall)
   const wt = wardrobeMaterials();
   for (const c of closets) G.add(makeWardrobe(c, wt));
   makeExit(G);
+  upgradeSurfaces(F, floor.material, G);                 // (the textures baked in Blender, when they've loaded: tools/blender/map_textures.py)
   buildPuzzles3D(G);                                     // the labyrinth boxes on the walls (js/puzzles.js)
   notes.forEach(n => { const o = makeNote(n); n.obj = o; G.add(o); });
+  if (boardsTemplate) for (const b of creaks) G.add(makeBoard(b));    // (the loose floorboards, in 3D; otherwise painted on the floor)
   level.prints = makePrints(); G.add(level.prints);
   scene.add(G);
 }
 
+/* ---------- the surfaces baked in Blender (textures/, made by tools/blender/map_textures.py) ----------
+   Colour, normal map (the relief: the gaps between boards and tiles, the grain, the wall panels) and roughness, for the floor
+   and the walls of each floor of the house. Until they've loaded (or if they can't be), the painted textures stay. */
+const SURFACES = [
+  { floor: ['floor_wood1', 'floor_wood'], wall: ['wall_paper1', 'wall_paper'] },
+  { floor: ['floor_tile2', 'floor_tile'], wall: ['wall_tile2', 'wall_tile'] },
+  { floor: ['floor_concrete3', 'floor_concrete'], wall: ['wall_brick3', 'wall_brick'] },
+  { floor: ['floor_wood4', 'floor_wood'], wall: ['wall_attic4', 'wall_attic'] },
+  { floor: ['floor_tile5', 'floor_tile'], wall: ['wall_shop5', 'wall_shop'] },
+];
+const surfCache = new Map();
+function surfaceSet([colour, relief]) {
+  const key = colour + '|' + relief; if (surfCache.has(key)) return surfCache.get(key);
+  // (the game's three.js has no TextureLoader: a plain image, wrapped as a texture)
+  const one = (file, srgb) => new Promise(res => { const img = new Image();
+    img.onload = () => { const t = new THREE.CanvasTexture(img); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+      if (srgb) t.colorSpace = THREE.SRGBColorSpace; res(t); };
+    img.onerror = () => res(null); img.src = 'textures/' + file + '.webp'; });
+  const p = Promise.all([one(colour + '_color', true), one(relief + '_normal'), one(relief + '_rough')]).then(([map, normalMap, roughnessMap]) => map && normalMap ? { map, normalMap, roughnessMap } : null);
+  surfCache.set(key, p); return p;
+}
+function upgradeSurfaces(F, floorMat, G) {
+  const set = SURFACES[floorIdx]; if (!set || settings.quality === 'low') return;   // (low quality: the painted ones, lighter)
+  const lv = level;
+  surfaceSet(set.floor).then(s => {
+    if (!s || level !== lv) return;
+    // the floor: the baked boards/tiles (one texture per tile), with the painted shade, stains and words multiplied over it
+    const rep = t => { const c = t.clone(); c.repeat.set(GW, GH); c.needsUpdate = true; return c; };
+    const ov = floorOverlay(F);
+    floorMat.map = rep(s.map); floorMat.normalMap = rep(s.normalMap); floorMat.roughnessMap = s.roughnessMap && rep(s.roughnessMap);
+    floorMat.bumpMap = null; floorMat.roughness = 1; floorMat.color.setScalar(1.25); floorMat.normalScale.set(1, 1);
+    floorMat.userData.overlay = ov;
+    floorMat.onBeforeCompile = sh => {
+      sh.uniforms.uOverlay = { value: ov };
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vOvUv;').replace('#include <uv_vertex>', '#include <uv_vertex>\n  vOvUv = uv;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vOvUv;\nuniform sampler2D uOverlay;')
+        .replace('#include <map_fragment>', '#include <map_fragment>\n  diffuseColor.rgb *= texture2D(uOverlay, vOvUv).rgb;');
+    };
+    floorMat.customProgramCacheKey = () => 'floorOverlay'; floorMat.needsUpdate = true;
+  });
+  surfaceSet(set.wall).then(s => {
+    if (!s || level !== lv) return;
+    G.traverse(o => { const m = o.material; if (!m || !m.userData || !m.userData.wallSurface) return;
+      m.map = s.map.clone(); m.normalMap = s.normalMap.clone(); m.bumpMap = null; m.color.setScalar(1.15); m.needsUpdate = true; });   // (clones: the level's own, disposed with it)
+  });
+}
+// what the painted floor adds over the baked one: shade in the corners, stains, petals, words, the loose boards (white = nothing)
+function floorOverlay(F) {
+  const res = Math.min(1, 1024 / (Math.max(GW, GH) * T));
+  const c = mkCanvas(Math.ceil(GW * T * res), Math.ceil(GH * T * res)), g = c.getContext('2d');
+  g.setTransform(res * T / PT, 0, 0, res * T / PT, 0, 0);
+  g.fillStyle = '#fff'; g.fillRect(0, 0, GW * PT, GH * PT);
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (!grid[y][x]) paintShade(g, x, y);
+  for (const d of decals) paintDecal(g, d);
+  if (!boardsTemplate) for (const b of creaks) paintBoard(g, b);
+  return toTex(c);
+}
+
+// a loose floorboard section (models/boards.glb): lengthwise along x, turned when it runs along y; a long one across a corridor
+function makeBoard(b) {
+  const pre = b.mid ? 'BoardLong' : 'BoardShort', g = new THREE.Group();
+  for (const n of [pre, pre + 'Nails', pre + 'Gap']) { const o = boardsTemplate.getObjectByName(n); if (o) { const c = o.clone(); c.traverse(q => { q.userData.shared = true; }); g.add(c); } }
+  g.position.set(b.x * S, 0, b.y * S); g.rotation.y = (b.along ? Math.PI / 2 : 0) + (hash(b.x, b.y, 7) - 0.5) * 0.05;
+  if (hash(b.x, b.y, 8) < 0.5) g.rotation.y += Math.PI;   // (which end is lifted, which plank broken: either way round)
+  return g;
+}
 // the floor is painted once per floor, tile by tile, into one big texture
 function floorTexture(F) {
   const res = Math.min(2, (LOWQ ? 1536 : 2048) / (Math.max(GW, GH) * T));
@@ -61,12 +131,12 @@ function floorTexture(F) {
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (!grid[y][x]) paintFloor(g, F, x, y);
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (!grid[y][x]) paintShade(g, x, y);
   for (const d of decals) paintDecal(g, d);
-  for (const b of creaks) paintBoard(g, b);                 // the loose floorboards (js/stealth.js): dark, cracked, nails sticking up
+  if (!boardsTemplate) for (const b of creaks) paintBoard(g, b);   // the loose floorboards (js/stealth.js): painted, unless the 3D ones are here
   return toTex(c);
 }
 // a loose floorboard: two short dark planks, cracked, with a black gap around them and nails sticking up. Easy to learn, easy to miss when running
 function paintBoard(g, b) {
-  const k = PT / T, w = 13 * k, l = 24 * k;
+  const k = PT / T, w = 13 * k, l = b.len * k;
   g.save(); g.translate(b.x * k, b.y * k); if (b.along) g.rotate(Math.PI / 2);
   g.fillStyle = 'rgba(0,0,0,.85)'; g.fillRect(-l / 2 - 1, -w / 2 - 1, l + 2, w + 2);
   for (const [y0, sh] of [[-w / 2, '#3a2616'], [0.3, '#2c1c10']]) {
@@ -427,7 +497,7 @@ function makeWardrobe(c, wt) {
   body.castShadow = body.receiveShadow = crown.castShadow = true;
   g.add(body, crown);
   // two doors on hinges at the outer edges. Seen from inside, the door on your right is at local -x.
-  c.doors = [];
+  c.doors = []; c.swingT = -1;
   for (const side of [-1, 1]) {
     const pivot = new THREE.Group(); pivot.position.set(side * 0.575, 1.125, 0.305);
     const leaf = new THREE.Mesh(wt.leafGeo, side < 0 ? wt.leafR : wt.leafL); leaf.position.x = -side * 0.2875; leaf.castShadow = true;
@@ -446,12 +516,17 @@ function closetBlocked(x, y, r) {
   }
   return false;
 }
-function makeExit(G) {
+// which wall of the exit tile the door is on: the back wall of the dead end (or any wall of that tile)
+function exitDir() {
   const cx = exit.tx, cy = exit.ty;
-  // the door goes on the back wall of the dead end (or any wall of that tile)
   const open = DIRS.filter(([dx, dy]) => !isWall(cx + dx, cy + dy));
   const cand = DIRS.filter(([dx, dy]) => isWall(cx + dx, cy + dy));
-  const dir = cand.find(([dx, dy]) => open.some(([ox, oy]) => ox === -dx && oy === -dy)) || cand[0] || [0, -1];
+  return cand.find(([dx, dy]) => open.some(([ox, oy]) => ox === -dx && oy === -dy)) || cand[0] || [0, -1];
+}
+// (a wall face is the exit door's: the face of the exit tile whose normal points away from the door's wall)
+const isExitFace = f => { const [dx, dy] = exitDir(); return f.x === exit.tx && f.y === exit.ty && Math.round(f.nx) === -dx && Math.round(f.nz) === -dy; };
+function makeExit(G) {
+  const dir = exitDir();
   const ld = doorTexture(false), lockedMat = new THREE.MeshLambertMaterial({ map: ld, bumpMap: ld, bumpScale: 3 }), openMat = new THREE.MeshBasicMaterial({ map: doorTexture(true) });
   const door = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 2.3), lockedMat);
   const px = exit.x * S + dir[0] * (TILE_M / 2 - 0.015), pz = exit.y * S + dir[1] * (TILE_M / 2 - 0.015);

@@ -12,7 +12,7 @@ let renderer = null, scene, camera, flash, aura, exitLight, dustPts, glowTex, le
 let composer = null, renderPass = null, bloomPass = null, useBloom = false, flashCookie = null;
 let titleScene, titleCam, titleLight, titleBulb, titleBulbLight, titleKey, titleAim = null, barbi = null, deathCam = null;
 let mocapData = null, playerTemplate = null, playerTemplateLoad = null;   // (teammates in multiplayer: models/barbi.glb, the same skeleton as hers)
-const HER_MODEL = 'models/character_mobile.glb', MATE_MODEL = 'models/barbi.glb';
+const HER_MODEL = 'models/character_mobile.glb', MATE_MODEL = 'models/player.glb', MATE_OLD = 'models/barbi.glb';   // (player.glb: made in Blender, tools/blender/)
 let dust = [], prints = [], stepPhase = 0;
 const mkCanvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
 function toTex(c, rep) {
@@ -134,14 +134,40 @@ function loadBarbi() {
   err => { console.error(err); setupBarbi(standInDoll(), null); done();
     $('loadMsg').textContent = "Couldn't load her model (" + HER_MODEL + "), so a stand-in is chasing you. The game has to be opened from a web server, not as a local file."; });
 }
+// a loader that can read the compressed models (tools/compress-glb.mjs: meshopt, decoded by lib/meshopt_decoder.js)
+function gltfLoader() { const l = new THREE.GLTFLoader(); if (typeof MeshoptDecoder !== 'undefined') l.setMeshoptDecoder(MeshoptDecoder); return l; }
+// the porcelain doll (models/doll.glb, made in Blender: tools/blender/doll.py). Its face is painted on in js/house.js, so the head
+// gets UVs here: round the head from the front (the face covers the front 200 degrees; the back is under the bonnet)
+let dollTemplate = null;
+function loadDollTemplate() {
+  if (dollTemplate !== null || !renderer) return; dollTemplate = false;
+  gltfLoader().load('models/doll.glb', g => {
+    const head = g.scene.getObjectByName('DollHead');
+    if (head && head.geometry) {
+      const pos = head.geometry.attributes.position, uv = new Float32Array(pos.count * 2), c = new THREE.Vector3(0, 0.045, 0), p = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) { p.fromBufferAttribute(pos, i).sub(c); const r = p.length() || 1;
+        uv[i * 2] = 0.5 + Math.atan2(p.x, p.z) / (Math.PI * 200 / 180); uv[i * 2 + 1] = 0.5 + Math.asin(Math.max(-1, Math.min(1, p.y / r))) / Math.PI; }
+      head.geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    }
+    g.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    dollTemplate = g.scene; }, undefined, e => { console.error(e); });
+}
+// the loose floorboards (models/boards.glb, made in Blender: tools/blender/boards.py): BoardShort and BoardLong (right across a corridor)
+let boardsTemplate = null;
+function loadBoardsTemplate() {
+  if (boardsTemplate !== null || !renderer) return; boardsTemplate = false;
+  gltfLoader().load('models/boards.glb', g => { g.scene.traverse(o => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = true; } }); boardsTemplate = g.scene; },
+    undefined, e => { console.error(e); });
+}
 // the teammates' model: only downloaded when you go to play together (single player never needs it)
 function loadPlayerTemplate() {
   if (playerTemplateLoad || !renderer) return playerTemplateLoad;
-  playerTemplateLoad = new Promise(res => new THREE.GLTFLoader().load(MATE_MODEL, g => {
+  playerTemplateLoad = new Promise(res => { const load = (url, again) => gltfLoader().load(url, g => {
     // (as dark and matte as they always were: they used to share her materials, which setupBarbi darkens)
     g.scene.traverse(o => { if (o.isMesh && o.material && o.material.color) { o.material.color.multiplyScalar(0.72); if (o.material.roughness !== undefined) o.material.roughness = Math.max(o.material.roughness, 0.72); } });
     playerTemplate = g.scene; refreshAvatars(); res(); },
-    undefined, e => { console.error(e); res(); }));
+    undefined, e => { console.error(e); if (again) load(again); else res(); });   // (the new model missing: the old one)
+    load(MATE_MODEL, MATE_OLD); });
   return playerTemplateLoad;
 }
 function setupBarbi(model, anim) {

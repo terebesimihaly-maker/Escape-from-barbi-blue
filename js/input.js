@@ -187,6 +187,7 @@ function toggleHide() {
   if (puzzleTarget !== null && !hideTarget) { openPuzzle(puzzleTarget); return; }   // (the button says USE next to a puzzle)
   if (!hideTarget) return;
   if (closetTaken(hideTarget)) { lockedOut(); return; }
+  startHideAnim('in', hideTarget);                     // (the doors open, the camera steps in, the doors close: js/render.js)
   p.hidden = true; p.closet = hideTarget; p.x = hideTarget.x; p.y = hideTarget.y; hideCool = 0.5; p.hideYaw = p.hidePitch = 0; fstat.hid = true;
   sfx.creak(0.12);
   const m = monster, d = Math.hypot(m.x - p.x, m.y - p.y);
@@ -196,6 +197,7 @@ function toggleHide() {
   $('hide').textContent = 'LEAVE';
 }
 function exitHide() { closetScene = null; const p = player, c = p.closet;
+  if (c) startHideAnim('out', c);
   if (c) { p.x = c.x + c.ox * (CLOSET_FRONT + 14); p.y = c.y + c.oy * (CLOSET_FRONT + 14); p.ang = Math.atan2(c.oy, c.ox); p.pitch = 0; }   // step out in front of the doors
   p.hidden = false; p.closet = null; p.holding = false; breathHeld = false; hideCool = 0.3; sfx.creak(0.1); $('hide').textContent = 'HIDE'; breathShown = false; }
 

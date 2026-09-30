@@ -28,7 +28,14 @@ await click(p, '#profileBtn');
 check(await until(p, () => !document.querySelector('#panel section[data-panel=profile]').classList.contains('hidden'), null, 10000), 'clicking it opens your profile');
 check(await until(p, () => pv.r && pv.fig, null, 90000), 'your character, in 3D', await p.evaluate(() => document.getElementById('pfLoading').textContent));
 const ctl = await p.evaluate(() => [...document.querySelectorAll('#pfCtl .pfrow > span')].map(s => s.textContent));
-check(['Shirt', 'Trousers', 'Shoes', 'Hair', 'Hair colour', 'Skin', 'Eyes', 'Beard', 'Glasses', 'Freckles', 'Make-up', 'Build', 'Height'].every(k => ctl.includes(k)), 'you can change: ' + ctl.join(', '));
+check(['Top', 'Top colour', 'Bottoms', 'Bottoms colour', 'Shoes', 'Hair', 'Hair colour', 'Skin', 'Eyes', 'Beard', 'Glasses', 'Freckles', 'Make-up', 'Build', 'Height'].every(k => ctl.includes(k)), 'you can change: ' + ctl.join(', '));
+// the real clothes and hair (models/player.glb, made in Blender): what you pick is what the character wears
+await p.evaluate(() => { document.querySelector('#pfCtl .ch[data-k=top][data-v=hoodie]').click(); document.querySelector('#pfCtl .ch[data-k=bottom][data-v=skirt]').click(); document.querySelector('#pfCtl .ch[data-k=hairStyle][data-v=ponytail]').click(); });
+const worn = await until(p, () => { const f = pv.fig, v = n => { const o = f && f.obj.getObjectByName(n); return !!(o && o.visible); };
+  return f && f.look.top === 'hoodie' && v('Hoodie') && !v('Tee') && !v('LongTop') && v('Skirt') && !v('Trousers') && v('HairPony') && !v('HairLong') && v('Sneakers'); }, null, 30000);
+check(worn, 'a hoodie, a skirt and a ponytail: the character wears exactly those', await p.evaluate(() => { const r = {}; pv.fig && pv.fig.obj.traverse(o => { if (o.isMesh && /^(Tee|LongTop|Hoodie|Trousers|ShortPants|Skirt|Hair|Sneakers)/.test(o.name)) r[o.name] = o.visible; }); return r; }));
+const hairs = await p.evaluate(async () => { const seen = []; for (const h of PlayerModel.LOOK_OPTIONS.hairStyle) { setLook(Object.assign({}, account.look, { hairStyle: h })); await new Promise(r => setTimeout(r, 50)); seen.push(h); } return seen; });
+check(hairs.length === 7, 'seven hairstyles to choose from: ' + hairs.join(', '));
 const pick = await p.evaluate(() => { const b = [...document.querySelectorAll('#pfCtl .sw[data-k=shirt]')].find(b => +b.dataset.v !== account.look.shirt); b.click(); return +b.dataset.v; });
 check(await p.evaluate(v => account.look.shirt === v && JSON.parse(localStorage.getItem('bb_look')).shirt === v, pick), 'a new shirt colour: chosen and kept on this device');
 check(await until(p, v => pv.fig && pv.fig.look.jacket === v, pick, 20000), 'the 3D character wears it');

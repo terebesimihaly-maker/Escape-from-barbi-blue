@@ -102,7 +102,7 @@ function openPanel(name) {
 const closePanel = () => {
   if (typeof rebinding !== 'undefined') rebinding = null;
   if (typeof stopPreview === 'function') stopPreview();          // (the profile's 3D preview: js/account.js)
-  if (!document.querySelector('#panel section[data-panel="keys"]').classList.contains('hidden')) { openPanel('settings'); return; }   // (Controls → back to Settings)
+  if (!$('panel').classList.contains('hidden') && !document.querySelector('#panel section[data-panel="keys"]').classList.contains('hidden')) { openPanel('settings'); return; }   // (Controls → back to Settings; only if it's really open)
   show('panel', false); stopTest(); };
 document.querySelectorAll('nav [data-panel]').forEach(b => b.onclick = () => openPanel(b.dataset.panel));
 $('panelBack').onclick = closePanel;
