@@ -79,11 +79,9 @@ def eyes_on_screen(sc, cam, head):
     for u in (0.36, 0.64):
         lon = (u - 0.5) * math.radians(200); lat = (0.53 - 0.5) * math.pi
         dirv = Vector((math.sin(lon) * math.cos(lat), -math.cos(lon) * math.cos(lat), math.sin(lat)))
-        # (march out from the centre to the head's surface)
-        best = None
-        for k in range(200):
-            r = 0.05 + k * 0.0003; p = c + dirv * r
-            if min((head.matrix_world @ v.co - p).length for v in head.data.vertices[::7]) < 0.004: best = p
+        # (cast in from outside onto the head's surface)
+        mi = head.matrix_world.inverted(); o = mi @ (c + dirv * 0.4); d = (mi.to_3x3() @ -dirv).normalized()
+        ok, loc, nrm, idx = head.ray_cast(o, d); best = head.matrix_world @ loc if ok else None
         p = best or c + dirv * 0.078
         v = world_to_camera_view(sc, cam, p); out.append((v.x, 1 - v.y))
     return out
@@ -97,10 +95,10 @@ def oil(src, dst):
     weave = 0.93 + 0.07 * (np.sin(x * 1.9) * np.sin(y * 1.9))
     rng = np.random.default_rng(3); cr = np.ones((h, w), np.float32)
     im2 = Image.new('L', (w, h), 255); d = ImageDraw.Draw(im2)
-    for _ in range(140):
+    for _ in range(420):                                 # (a fine craquelure: many short, faint hairlines)
         px, py = rng.uniform(0, w), rng.uniform(0, h); pts = [(px, py)]
-        for __ in range(6): px += rng.normal(0, 9); py += rng.normal(0, 9); pts.append((px, py))
-        d.line(pts, fill=int(rng.uniform(150, 215)), width=1)
+        for __ in range(4): px += rng.normal(0, 5); py += rng.normal(0, 5); pts.append((px, py))
+        d.line(pts, fill=int(rng.uniform(212, 238)), width=1)
     cr = np.asarray(im2).astype(np.float32) / 255
     varnish = np.array([1.0, 0.9, 0.7])                  # (old yellowed varnish, darker at the edges)
     vig = 1 - 0.45 * (((x - w / 2) / (w / 2)) ** 2 + ((y - h / 2) / (h / 2)) ** 2)
@@ -140,11 +138,11 @@ def framed(art, dst):
     me = bpy.data.meshes.new('frame'); me.from_pydata(verts, [], faces); me.update()
     fr = bpy.data.objects.new('frame', me); sc.collection.objects.link(fr); fr.data.materials.append(gold)
     for p in fr.data.polygons: p.use_smooth = False
-    # carved ornaments at the corners and the middle of each side
-    for (x, y) in corners + [(0, H / 2 - bw / 2), (0, -H / 2 + bw / 2), (W / 2 - bw / 2, 0), (-W / 2 + bw / 2, 0)]:
+    # small carved rosettes in the corners only
+    for (x, y) in corners:
         x = x - (0.028 if x > 0.1 else -0.028 if x < -0.1 else 0) ; y = y - (0.028 if y > 0.2 else -0.028 if y < -0.2 else 0)
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.018, location=(x, y, 0.022), segments=12, ring_count=8); o = bpy.context.object; o.scale = (1, 1, 0.45); o.data.materials.append(gold)
-        bpy.ops.mesh.primitive_torus_add(major_radius=0.02, minor_radius=0.004, location=(x, y, 0.02)); t = bpy.context.object; t.data.materials.append(gold)
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.011, location=(x, y, 0.02), segments=16, ring_count=8); o = bpy.context.object; o.scale = (1, 1, 0.4); o.data.materials.append(gold)
+        bpy.ops.mesh.primitive_torus_add(major_radius=0.013, minor_radius=0.0025, location=(x, y, 0.018)); t = bpy.context.object; t.data.materials.append(gold)
     sc.world = bpy.data.worlds.new('w'); sc.world.color = (0.02, 0.018, 0.016)
     L = bpy.data.objects.new('L', bpy.data.lights.new('L', 'AREA')); L.data.energy = 6; L.data.size = 0.6; L.location = (-0.35, 0.4, 0.6)
     L.rotation_euler = (Vector((0, 0, 0)) - L.location).to_track_quat('-Z', 'Y').to_euler(); sc.collection.objects.link(L)
