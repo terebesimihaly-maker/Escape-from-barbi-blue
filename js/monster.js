@@ -190,7 +190,7 @@ function updateMonster(dt) {
       if (prints.length > 90) prints.shift(); } }
 
   const dMe = Math.hypot(p.x - m.x, p.y - m.y);
-  if (p.hidden && kcId !== me.id && dMe < 115 && !breathShown && herQuiet() < 0.5) { breathShown = true; showMsg(canLock ? "She's close. Hold your breath: hold Space." : "She's close. Hold your breath: hold BREATH.", 2.5); }
+  if (p.hidden && kcId !== me.id && dMe < 115 && !breathShown && herQuiet() < 0.5) { breathShown = true; showMsg(canLock ? "She's close. Hold your breath: " + keyLabel('breath', true).toLowerCase() + '.' : "She's close. Hold your breath: hold BREATH.", 2.5); }
   if (m.screamT > 0) return;
   for (const q of alive) {
     if (dist(q) < 24 && (!q.hidden || kcId === q.id) && !(q.inv > 0)) {

@@ -1,7 +1,8 @@
 /* Escape from Barbi Blue: Playing together: pings, emotes, and helping from beyond.
      ping   - Q (or the 📍 button) marks the spot you're looking at, for everyone, for 8 seconds. Looking at her it says
               "She's here!", at a puzzle box "Puzzle". A marker off the screen sits at its edge, pointing the way.
-     emotes - 2 to 7 (or the 💬 button): a quick message over your head, and in everyone's messages.
+     emotes - hold R (or tap 💬): a wheel of six. Point at one with the mouse and let go (or click, or tap it): it pops up
+              over your head and in everyone's messages.
      beyond - out of the game you watch the others (click / tap, or ← →, to switch), and once every 30 seconds you can
               warn them (G, or WARN): everyone sees where she is, right now.
    (The game is split over several plain scripts that share one scope; index.html loads them in order.) */
@@ -13,7 +14,7 @@ const PING_LIFE = 8, WARN_COOL = 30, PING_KINDS = {
   go: { label: 'Here', col: '232,236,255' }, ghost: { label: "👻 She's here", col: '143,208,255' } };
 const team = { pings: [], bubbles: new Map(), sentAt: {}, warnCool: 0, sent: 0 };
 
-function resetTeam() { team.pings = []; team.bubbles.clear(); team.warnCool = 0; showEmoteBar(false); }
+function resetTeam() { team.pings = []; team.bubbles.clear(); team.warnCool = 0; closeWheel(false); }
 // (no spamming: one ping, and one emote, every 0.6 seconds, in real time)
 function teamReady(k) { const now = performance.now(); if (now - (team.sentAt[k] || 0) < 600) return false; team.sentAt[k] = now; return true; }
 function updateTeam(dt) {
@@ -29,13 +30,40 @@ function teamButtons(ping, emote, warn) {
   const k = [ping, emote, warn, warn && team.warnCool > 0 ? Math.ceil(team.warnCool) : 0].join();
   if (k === teamBtnState) return; teamBtnState = k;
   show('pingBtn', ping); show('emoteBtn', emote); show('warnBtn', warn);
-  if (!emote) showEmoteBar(false);
+  if (!emote) closeWheel(false);
   if (warn) { const b = $('warnBtn'); b.disabled = team.warnCool > 0; b.textContent = team.warnCool > 0 ? Math.ceil(team.warnCool) + 's' : 'WARN'; }
 }
-const showEmoteBar = on => { show('emoteBar', on); $('emoteBtn').classList.toggle('on', on); };
-// the quick messages, as buttons (on a computer, keys 2 to 7)
-EMOTES.forEach(([txt, icon], i) => { const b = document.createElement('button'); b.textContent = icon + ' ' + txt; b.dataset.key = i + 2;
-  b.addEventListener('pointerdown', e => { e.preventDefault(); doEmote(i); }); $('emoteBar').appendChild(b); });
+/* ---------- the emote wheel ---------- */
+// six emotes in a ring, the first at the top, clockwise. With the mouse captured, moving it points at one (it doesn't turn
+// the view while the wheel is open); letting go of the key, or a click, sends it. With a cursor or a finger: point, or tap one
+const wheel = { open: false, byKey: false, vx: 0, vy: 0, sel: -1 };
+EMOTES.forEach(([txt, icon], i) => { const b = document.createElement('button'), a = i / EMOTES.length * Math.PI * 2;
+  b.className = 'seg'; b.dataset.i = i; b.innerHTML = '<i></i><span></span>'; b.firstChild.textContent = icon; b.lastChild.textContent = txt;
+  b.style.left = (50 + Math.sin(a) * 36) + '%'; b.style.top = (50 - Math.cos(a) * 36) + '%';
+  b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); wheel.sel = i; closeWheel(true); });
+  b.addEventListener('pointerenter', () => { if (wheel.open) { wheel.sel = i; wheelShow(); } });
+  $('emoteRing').appendChild(b); });
+function openWheel(byKey) {
+  if (!MP.on || !MP.inGame || state !== 'play' || MP.menu || pzOpen || wheel.open) return;
+  Object.assign(wheel, { open: true, byKey, vx: 0, vy: 0, sel: -1 }); show('emoteRing', true); $('emoteBtn').classList.add('on'); wheelShow();
+}
+function closeWheel(send) {
+  if (!wheel.open) return; wheel.open = false; show('emoteRing', false); $('emoteBtn').classList.remove('on');
+  if (send && wheel.sel >= 0) doEmote(wheel.sel);
+}
+function wheelMove(dx, dy) {
+  wheel.vx = clamp(wheel.vx + dx, -150, 150); wheel.vy = clamp(wheel.vy + dy, -150, 150);
+  const d = Math.hypot(wheel.vx, wheel.vy), n = EMOTES.length;
+  wheel.sel = d < 30 ? -1 : ((Math.round(Math.atan2(wheel.vx, -wheel.vy) / (Math.PI * 2 / n)) % n) + n) % n;
+  wheelShow();
+}
+function wheelShow() {
+  document.querySelectorAll('#emoteRing .seg').forEach(b => b.classList.toggle('on', +b.dataset.i === wheel.sel));
+  $('emoteHub').textContent = wheel.sel >= 0 ? EMOTES[wheel.sel][0] : (canLock ? 'point with the mouse' : 'tap one');
+}
+// a click with the mouse captured sends what's pointed at; a click on the empty middle closes it
+document.addEventListener('mousedown', e => { if (wheel.open && locked()) { e.stopImmediatePropagation(); closeWheel(true); } }, true);
+$('emoteRing').addEventListener('pointerdown', e => { if (e.target.id === 'emoteRing' || e.target.id === 'emoteHub') closeWheel(false); });
 
 /* ---------- sending ---------- */
 function doPing() {
@@ -47,7 +75,7 @@ function doPing() {
 }
 function doEmote(e) {
   if (!MP.on || !MP.inGame || state !== 'play' || !EMOTES[e] || !teamReady('emote')) return;
-  team.sent++; showEmoteBar(false); toHost({ t: 'emote', e });
+  team.sent++; toHost({ t: 'emote', e });
 }
 function warnTeam() {
   if (!MP.on || !player.dead || team.warnCool > 0) return;

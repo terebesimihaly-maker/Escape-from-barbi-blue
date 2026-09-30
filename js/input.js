@@ -33,6 +33,7 @@ document.addEventListener('mousemove', e => {
   if (lockSkip > 0) { lockSkip--; return; }
   const dx = e.movementX || 0, dy = e.movementY || 0;
   if (Math.abs(dx) > 250 || Math.abs(dy) > 250) return;   // (no hand moves a mouse that far between two events)
+  if (wheel.open) { wheelMove(dx, dy); return; }          // (the emote wheel is open: the mouse picks, it doesn't look)
   lookBy(dx * MOUSE_SENS * settings.sens, dy * MOUSE_SENS * settings.sens);
 });
 // left side of the screen: a joystick to walk; right side (or a mouse drag, if the cursor isn't locked): look around
@@ -71,7 +72,7 @@ $('breath').addEventListener('pointerdown', e => { e.preventDefault(); breathHel
 // playing together: ping, emotes, and (out of the game) warning the others (js/team.js)
 $('pingBtn').addEventListener('pointerdown', e => { e.preventDefault(); doPing(); });
 $('warnBtn').addEventListener('pointerdown', e => { e.preventDefault(); warnTeam(); });
-$('emoteBtn').addEventListener('pointerdown', e => { e.preventDefault(); showEmoteBar($('emoteBar').classList.contains('hidden')); });
+$('emoteBtn').addEventListener('pointerdown', e => { e.preventDefault(); if (wheel.open) closeWheel(false); else openWheel(false); });
 ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => $('revive').addEventListener(ev, () => { reviveHeld = false; }));
 
 // the phone: one text a minute. If she's chasing you, she drops everything and leaves for 15 seconds.
@@ -93,39 +94,80 @@ function usePhone() {
   }, 900);
 }
 
-addEventListener('keydown', e => { keys[e.code] = true;
-  if (e.code === 'F3') { e.preventDefault(); setPerf(!settings.perf); return; }          // the performance overlay (js/extras.js)
-  if (e.code === 'Space' && state === 'play') e.preventDefault();                        // (Space holds your breath: it mustn't press a button)
-  if (!e.repeat && (e.code === 'KeyE' || e.code === 'Space' || e.code === 'Enter') && !$('note').classList.contains('hidden')) { closeNote(); return; }
+addEventListener('keydown', e => {
+  if (rebinding) { e.preventDefault(); e.stopImmediatePropagation(); finishRebind(e.code); return; }   // (Settings → Controls: waiting for a key)
+  const c = normKey(e.code); keys[c] = true;
+  if (isKey(c, 'perf')) { e.preventDefault(); if (!e.repeat) setPerf(!settings.perf); return; }        // the performance overlay (js/extras.js)
+  if (state === 'play' && (c === 'Space' || c === 'Tab' || c.startsWith('Arrow'))) e.preventDefault(); // (game keys mustn't press a button or scroll)
+  if (!e.repeat && (isKey(c, 'use') || c === 'Space' || c === 'Enter') && !$('note').classList.contains('hidden')) { closeNote(); return; }
   if (state === 'title') {
-    if (e.code === 'Escape' && !$('panel').classList.contains('hidden')) closePanel();
-    else if (e.code === 'Enter' && $('panel').classList.contains('hidden') && !$('play').disabled && document.activeElement.tagName !== 'BUTTON' && document.activeElement.tagName !== 'A') $('play').click();
+    if (c === 'Escape' && !$('panel').classList.contains('hidden')) closePanel();
+    else if (c === 'Enter' && $('panel').classList.contains('hidden') && !$('play').disabled && document.activeElement.tagName !== 'BUTTON' && document.activeElement.tagName !== 'A') $('play').click();
   }
-  if (e.code === 'KeyE' && !e.repeat && !reviveTarget) toggleHide();   // next to a downed teammate, E revives instead
-  if ((e.code === 'Digit1' || e.code === 'Numpad1') && !e.repeat) usePhone();
+  if (isKey(c, 'use') && !e.repeat && !reviveTarget) toggleHide();   // next to a downed teammate, the same key revives instead
+  if (isKey(c, 'phone') && !e.repeat) usePhone();
   if (MP.on && state === 'play' && !e.repeat) {                                          // playing together (js/team.js)
-    const n = /^(Digit|Numpad)([2-7])$/.exec(e.code);
-    if (n) doEmote(+n[2] - 2);
-    if (e.code === 'KeyQ') doPing();
-    if (e.code === 'KeyG' && player.dead) warnTeam();
-    if (player.dead && (e.code === 'ArrowLeft' || e.code === 'KeyA')) MP.spec--;       // out of the game: watch someone else
-    if (player.dead && (e.code === 'ArrowRight' || e.code === 'KeyD')) MP.spec++;
+    if (isKey(c, 'emote')) openWheel(true);
+    if (isKey(c, 'ping')) doPing();
+    if (isKey(c, 'warn') && player.dead) warnTeam();
+    if (player.dead && (c === 'ArrowLeft' || isKey(c, 'left'))) MP.spec--;             // out of the game: watch someone else
+    if (player.dead && (c === 'ArrowRight' || isKey(c, 'right'))) MP.spec++;
   }
-  if ((e.code === 'Escape' || e.code === 'KeyP') && state === 'play') pause(); });
-addEventListener('keyup', e => { keys[e.code] = false; });
-// Ctrl runs too, but Ctrl+W closes a browser tab and no website can stop that. So while you're in a game, the browser asks
+  if ((c === 'Escape' || isKey(c, 'pause')) && state === 'play') { if (wheel.open) closeWheel(false); else pause(); } });
+addEventListener('keyup', e => { const c = normKey(e.code); keys[c] = false; if (wheel.open && wheel.byKey && isKey(c, 'emote')) closeWheel(true); });
+// Ctrl can run, but Ctrl+W closes a browser tab and no website can stop that. So while you're in a game, the browser asks
 // "Leave site?" first instead of just closing it
 addEventListener('beforeunload', e => { if (state === 'play' || state === 'paused' || state === 'note' || (MP.on && MP.inGame)) { e.preventDefault(); e.returnValue = ''; } });
 // (the window losing focus, e.g. that question popping up, mustn't leave a key held down)
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+// the arrow keys: ← → turn, unless you've given them to something else in the settings
+const freeKey = c => !KEY_ACTIONS.some(([a]) => bound(a).includes(c));
 function readInput() {
-  let kx = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
-  let ky = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0);
+  let kx = (keyDown('right') ? 1 : 0) - (keyDown('left') ? 1 : 0);
+  let ky = (keyDown('back') ? 1 : 0) - (keyDown('forward') ? 1 : 0);
   if (kx || ky) { const d = Math.hypot(kx, ky); input.x = kx / d; input.y = ky / d; }
   else { input.x = joy.x; input.y = joy.y; }
-  input.sprintKey = !!(keys.ShiftLeft || keys.ShiftRight || keys.ControlLeft || keys.ControlRight);   // (Shift or Ctrl runs)
-  input.turn = (keys.ArrowRight ? 1 : 0) - (keys.ArrowLeft ? 1 : 0);
+  input.sprintKey = keyDown('run');
+  input.turn = (keys.ArrowRight && freeKey('ArrowRight') ? 1 : 0) - (keys.ArrowLeft && freeKey('ArrowLeft') ? 1 : 0);
 }
+
+/* ---------- Settings → Controls: pick a key for each action ---------- */
+let rebinding = null;                                    // { a: action, i: which of its two keys } while waiting for a key
+function renderControls() {
+  const ul = $('keyList'); ul.textContent = '';
+  for (const [a, label] of KEY_ACTIONS) {
+    const li = document.createElement('li'), t = document.createElement('span'); t.textContent = label; li.appendChild(t);
+    for (const i of [0, 1]) { const b = document.createElement('button'); b.className = 'kb' + (rebinding && rebinding.a === a && rebinding.i === i ? ' wait' : '');
+      b.dataset.a = a; b.dataset.i = i; b.textContent = rebinding && rebinding.a === a && rebinding.i === i ? 'Press a key…' : keyName(settings.keys[a][i]);
+      b.onclick = () => { rebinding = { a, i }; $('keyMsg').textContent = 'Press the key for "' + label + '". Esc cancels, Backspace clears it.'; renderControls(); };
+      li.appendChild(b); }
+    ul.appendChild(li);
+  }
+}
+function finishRebind(code) {
+  const { a, i } = rebinding; rebinding = null; const c = normKey(code), label = KEY_ACTIONS.find(x => x[0] === a)[1];
+  if (c === 'Escape') { $('keyMsg').textContent = ''; renderControls(); return; }
+  if (c === 'Backspace' || c === 'Delete') { settings.keys[a][i] = ''; $('keyMsg').textContent = '"' + label + '" key cleared.'; }
+  else {
+    // the key was already doing something else: it moves here, and that action loses it
+    let moved = '';
+    for (const [b, bl] of KEY_ACTIONS) settings.keys[b].forEach((k, j) => { if (k === c && !(b === a && j === i)) { settings.keys[b][j] = ''; moved = bl; } });
+    settings.keys[a][i] = c;
+    $('keyMsg').textContent = keyName(c) + ' now: ' + label + (moved ? ' (it no longer does "' + moved + '")' : '') + '.';
+  }
+  saveSettings(); renderControls(); applyKeyHints();
+}
+$('keysReset').onclick = () => { for (const a in DEFAULT_KEYS) settings.keys[a] = DEFAULT_KEYS[a].slice(); rebinding = null; saveSettings(); renderControls(); applyKeyHints(); $('keyMsg').textContent = 'Back to the default keys.'; };
+$('openKeys').onclick = () => { rebinding = null; $('keyMsg').textContent = ''; renderControls(); openPanel('keys'); };
+// the keys shown next to the buttons, and in "How to play", follow the settings
+function applyKeyHints() {
+  const set = (id, a, hold) => { const el = $(id); if (el) el.dataset.key = keyLabel(a, hold); };
+  set('run', 'run'); set('hide', 'use'); set('phone', 'phone'); set('revive', 'use', true); set('breath', 'breath', true);
+  set('pingBtn', 'ping'); set('emoteBtn', 'emote', true); set('warnBtn', 'warn');
+  document.querySelectorAll('[data-keyof]').forEach(el => { el.textContent = keyLabel(el.dataset.keyof); });
+  document.querySelectorAll('[data-keyname]').forEach(el => { el.textContent = keyName(bound(el.dataset.keyname)[0]); });
+}
+applyKeyHints();
 
 // one person per wardrobe: if a teammate is already inside, it's locked
 function closetTaken(c) {

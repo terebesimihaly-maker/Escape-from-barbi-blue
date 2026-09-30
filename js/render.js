@@ -230,7 +230,7 @@ function drawTeamFx(t) {
     ctx.fillText('Reviving ' + reviveTarget.name + '…', cx, cy + r + 18 * D);
   } else if (reviveTarget) {
     ctx.fillStyle = 'rgba(255,220,215,.85)'; ctx.font = '600 ' + (13 * D) + 'px system-ui, sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText((canLock ? 'Hold E' : 'Hold REVIVE') + ' to get ' + reviveTarget.name + ' up', cw / 2, ch / 2 + 60 * D);
+    ctx.fillText((canLock ? keyLabel('use', true) : 'Hold REVIVE') + ' to get ' + reviveTarget.name + ' up', cw / 2, ch / 2 + 60 * D);
   }
 }
 function drawClosetLine(t) {

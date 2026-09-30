@@ -93,7 +93,7 @@ function applyFloor(d, slot) {
 function startFloor(i) { applyFloor(generateFloor(i, 1, settings.difficulty), 0); }
 function updateFuseHud() { $('hFuse').textContent = (powerOn ? '🔓 ' : '🧩 ') + fusesGot + '/' + fuses.length; }
 function setHud(on) { ['hud', 'stam', 'run', 'phone', 'fearBar'].forEach(id => show(id, on));
-  if (!on) ['hide', 'breath', 'breathBar', 'pingBtn', 'emoteBtn', 'warnBtn', 'emoteBar'].forEach(id => show(id, false)); lastHid = false; teamBtnState = ''; }
+  if (!on) ['hide', 'breath', 'breathBar', 'pingBtn', 'emoteBtn', 'warnBtn'].forEach(id => show(id, false)); closeWheel(false); lastHid = false; teamBtnState = ''; }
 
 let msgTimer = 0;
 function showMsg(t, dur) { const m = $('msg'); m.textContent = t; m.style.opacity = 1; msgTimer = dur || 2.5; }

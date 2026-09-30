@@ -66,14 +66,42 @@ $('setVol').oninput = e => { settings.vol = +e.target.value; applySettings(); sa
 $('setFov').oninput = e => { settings.fov = +e.target.value; applySettings(); saveSettings(); };
 $('setInvert').onchange = e => { settings.invert = e.target.checked; saveSettings(); };
 $('setCalm').onchange = e => { settings.calm = e.target.checked; saveSettings(); };
-const calm = () => !!settings.calm;          // "Calm effects": no strobing or shaking (for anyone sensitive to flashing)
+const calm = () => !!settings.calm;
+/* ---------- controls: which key does what (Settings → Controls; two keys per action, kept on this device) ---------- */
+const KEY_ACTIONS = [
+  ['forward', 'Walk forward', ['KeyW', 'ArrowUp']], ['back', 'Walk back', ['KeyS', 'ArrowDown']],
+  ['left', 'Step left', ['KeyA', '']], ['right', 'Step right', ['KeyD', '']],
+  ['run', 'Run', ['ShiftLeft', 'ControlLeft']], ['use', 'Hide / use / revive', ['KeyE', '']],
+  ['breath', 'Hold your breath (in a wardrobe)', ['Space', '']], ['phone', 'Phone', ['Digit1', 'Numpad1']],
+  ['ping', 'Ping (together)', ['KeyQ', '']], ['emote', 'Emote wheel (together, hold)', ['KeyR', '']],
+  ['warn', 'Warn the others (when out)', ['KeyG', '']], ['pause', 'Pause (Esc always works)', ['KeyP', '']],
+  ['perf', 'Performance overlay', ['F3', '']],
+];
+const DEFAULT_KEYS = Object.fromEntries(KEY_ACTIONS.map(([a, , k]) => [a, k.slice()]));
+settings.keys = Object.assign({}, DEFAULT_KEYS, settings.keys || {});
+for (const a in DEFAULT_KEYS) if (!Array.isArray(settings.keys[a]) || settings.keys[a].length !== 2) settings.keys[a] = DEFAULT_KEYS[a].slice();
+// (left and right Shift / Ctrl / Alt count as the same key)
+const normKey = c => String(c || '').replace(/(Shift|Control|Alt|Meta)Right$/, '$1Left');
+const bound = a => (settings.keys[a] || []).filter(Boolean);
+const isKey = (code, a) => bound(a).includes(normKey(code));
+const keyDown = a => bound(a).some(c => keys[c]);
+function keyName(c) {
+  if (!c) return '—';
+  const m = { Space: 'Space', ShiftLeft: 'Shift', ControlLeft: 'Ctrl', AltLeft: 'Alt', MetaLeft: 'Win', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→',
+    Escape: 'Esc', Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/', Backslash: '\\', Enter: 'Enter', Tab: 'Tab', CapsLock: 'Caps' }[c];
+  return m || c.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad/, 'Num ');
+}
+const keyLabel = (a, hold) => (hold ? 'Hold ' : '') + (bound(a).map(keyName).join(' / ') || '—');          // "Calm effects": no strobing or shaking (for anyone sensitive to flashing)
 document.querySelectorAll('#qSeg button').forEach(b => b.onclick = () => { settings.quality = b.dataset.q; applySettings(); saveSettings(); });
 // the menu's "How to play" and "Settings" panels
 function openPanel(name) {
   document.querySelectorAll('#panel section').forEach(sec => sec.classList.toggle('hidden', sec.dataset.panel !== name));
   show('panel', true); $('panelBack').focus();
 }
-const closePanel = () => { show('panel', false); stopTest(); };
+const closePanel = () => {
+  if (typeof rebinding !== 'undefined') rebinding = null;
+  if (!document.querySelector('#panel section[data-panel="keys"]').classList.contains('hidden')) { openPanel('settings'); return; }   // (Controls → back to Settings)
+  show('panel', false); stopTest(); };
 document.querySelectorAll('nav [data-panel]').forEach(b => b.onclick = () => openPanel(b.dataset.panel));
 $('panelBack').onclick = closePanel;
 $('panel').addEventListener('click', e => { if (e.target.id === 'panel') closePanel(); });

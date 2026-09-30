@@ -118,8 +118,8 @@ function mazeCanvas(mz, w, h, ball, cv) {
 function updateBall(dt) {
   const o = pzOpen, pz = puzzles[o.k], mz = pz.data, b = o.ball, sp = pz.spec.speed;
   if (o.fall) { o.fall += dt; if (o.fall > 0.8) { o.fall = 0; Object.assign(b, { x: 0.5, y: 0.5, vx: 0, vy: 0 }); } return; }
-  tilt.kx = ((keys.ArrowRight || keys.KeyD) ? 1 : 0) - ((keys.ArrowLeft || keys.KeyA) ? 1 : 0);
-  tilt.ky = ((keys.ArrowDown || keys.KeyS) ? 1 : 0) - ((keys.ArrowUp || keys.KeyW) ? 1 : 0);
+  tilt.kx = ((keys.ArrowRight || keyDown('right')) ? 1 : 0) - ((keys.ArrowLeft || keyDown('left')) ? 1 : 0);
+  tilt.ky = ((keys.ArrowDown || keyDown('back')) ? 1 : 0) - ((keys.ArrowUp || keyDown('forward')) ? 1 : 0);
   const tx = clamp(tilt.mx + tilt.kx + tilt.gx, -1, 1), ty = clamp(tilt.my + tilt.ky + tilt.gy, -1, 1);
   const r = 0.14, wt = 0.06, steps = Math.max(1, Math.ceil(dt / 0.004)), h = dt / steps;
   for (let s = 0; s < steps; s++) {
@@ -148,7 +148,7 @@ function bump(b, x0, y0, x1, y1, r) {
 // 2. the sliding tiles: a doll's portrait, cut up and shuffled (by legal moves, so it can always be put back)
 KINDS.slide = {
   title: 'The portrait',
-  help: pc => 'Slide the pieces back into place to put her portrait together. ' + (pc ? 'Click a piece next to the gap (or use the arrow keys).' : 'Tap a piece next to the gap.'),
+  help: pc => 'Slide the pieces back into place to put her portrait together. ' + (pc ? 'Drag a piece next to the gap into it with the mouse (or click it, or use the arrow keys).' : 'Drag a piece next to the gap into it (or tap it).'),
   build: pz => { const n = pz.spec.n, rnd = seeded(pz.seed), t = Array.from({ length: n * n }, (_, i) => i); let e = n * n - 1, prev = -1; const hist = [];
     for (let m = 0; m < pz.spec.moves; m++) { const ex = e % n, ey = e / n | 0;
       const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [ex + dx, ey + dy]).filter(([x, y]) => x >= 0 && y >= 0 && x < n && y < n && y * n + x !== prev);
@@ -158,14 +158,27 @@ KINDS.slide = {
   start: pz => ({ tiles: pz.data.tiles.slice(), empty: pz.data.empty }),
   draw: (o, pz, cv) => { const g = cv.getContext('2d'), n = pz.data.n, W = cv.width, H = cv.height, s = Math.min(W, H) * 0.9, cs = s / n, ox = (W - s) / 2, oy = (H - s) / 2, P = pz.data.pic;
     g.fillStyle = '#1a1210'; g.fillRect(0, 0, W, H); g.fillStyle = '#5a3a20'; g.fillRect(ox - 8, oy - 8, s + 16, s + 16);
-    o.tiles.forEach((v, i) => { if (v === n * n - 1) return; const x = i % n, y = i / n | 0, sx = v % n, sy = v / n | 0;
-      g.drawImage(P, sx * P.width / n, sy * P.height / n, P.width / n, P.height / n, ox + x * cs + 1, oy + y * cs + 1, cs - 2, cs - 2);
-      if (curDiff === 'easy') { g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(ox + x * cs + 3, oy + y * cs + 3, 18, 16); g.fillStyle = '#fff'; g.font = '12px system-ui'; g.fillText(v + 1, ox + x * cs + 6, oy + y * cs + 15); } });
-    g.fillStyle = '#0a0706'; const ex = o.empty % n, ey = o.empty / n | 0; g.fillRect(ox + ex * cs + 1, oy + ey * cs + 1, cs - 2, cs - 2); },
+    g.fillStyle = '#0a0706'; const ex = o.empty % n, ey = o.empty / n | 0; g.fillRect(ox + ex * cs + 1, oy + ey * cs + 1, cs - 2, cs - 2);
+    const dr = o.drag;
+    o.tiles.forEach((v, i) => { if (v === n * n - 1) return; const sx = v % n, sy = v / n | 0; let x = ox + (i % n) * cs, y = oy + (i / n | 0) * cs;
+      if (dr && dr.j === i) { x += dr.dir[0] * dr.off * cs; y += dr.dir[1] * dr.off * cs; }     // (the piece you're dragging, part way into the gap)
+      g.drawImage(P, sx * P.width / n, sy * P.height / n, P.width / n, P.height / n, x + 1, y + 1, cs - 2, cs - 2);
+      if (dr && dr.j === i) { g.strokeStyle = 'rgba(255,230,180,.8)'; g.lineWidth = 2; g.strokeRect(x + 2, y + 2, cs - 4, cs - 4); }
+      if (curDiff === 'easy') { g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(x + 3, y + 3, 18, 16); g.fillStyle = '#fff'; g.font = '12px system-ui'; g.fillText(v + 1, x + 6, y + 15); } });
+  },
+  // dragging: grab a piece next to the gap and pull it in; past halfway (or a plain click) it slides in, otherwise it springs back
+  down: (o, pz, x, y, cv) => { const n = pz.data.n, s = Math.min(cv.width, cv.height) * 0.9, cs = s / n, ox = (cv.width - s) / 2, oy = (cv.height - s) / 2;
+    const cx = Math.floor((x - ox) / cs), cy = Math.floor((y - oy) / cs), ex = o.empty % n, ey = o.empty / n | 0;
+    if (cx < 0 || cy < 0 || cx >= n || cy >= n || Math.abs(cx - ex) + Math.abs(cy - ey) !== 1) return;
+    o.drag = { j: cy * n + cx, dir: [ex - cx, ey - cy], x0: x, y0: y, off: 0, cs, moved: 0 }; },
+  move: (o, pz, x, y) => { const d = o.drag; if (!d) return; d.moved = Math.max(d.moved, Math.hypot(x - d.x0, y - d.y0));
+    d.off = clamp(((x - d.x0) * d.dir[0] + (y - d.y0) * d.dir[1]) / d.cs, 0, 1); },
+  up: (o, pz) => { const d = o.drag; if (!d) return; o.drag = null; if (d.off > 0.45 || d.moved < 6) slideAt(o, pz, d.j); },
   // a tap: the piece moves into the gap if it's next to it
   click: (o, pz, x, y, cv) => { const n = pz.data.n, s = Math.min(cv.width, cv.height) * 0.9, cs = s / n, ox = (cv.width - s) / 2, oy = (cv.height - s) / 2;
     const cx = Math.floor((x - ox) / cs), cy = Math.floor((y - oy) / cs); if (cx < 0 || cy < 0 || cx >= n || cy >= n) return; slideAt(o, pz, cy * n + cx); },
-  key: (o, pz, code) => { const n = pz.data.n, ex = o.empty % n, ey = o.empty / n | 0, d = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1], KeyA: [1, 0], KeyD: [-1, 0], KeyW: [0, 1], KeyS: [0, -1] }[code];
+  key: (o, pz, code) => { const n = pz.data.n, ex = o.empty % n, ey = o.empty / n | 0, d = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[code] ||
+      (isKey(code, 'left') ? [1, 0] : isKey(code, 'right') ? [-1, 0] : isKey(code, 'forward') ? [0, 1] : isKey(code, 'back') ? [0, -1] : null);
     if (d) { const x = ex + d[0], y = ey + d[1]; if (x >= 0 && y >= 0 && x < n && y < n) slideAt(o, pz, y * n + x); } },
 };
 function slideAt(o, pz, j) {
@@ -363,9 +376,14 @@ addEventListener('pointermove', e => { if (pzOpen && KINDS[puzzles[pzOpen.k].kin
 $('pzBoard').addEventListener('pointerdown', e => {
   if (!pzOpen) return; const pz = puzzles[pzOpen.k], K = KINDS[pz.kind]; e.preventDefault();
   if (K.tilts) { tilt.drag = true; pointTilt(e); return; }
-  if (K.click && !pzOpen.won) { const [x, y] = boardXY(e); K.click(pzOpen, pz, x, y, $('pzBoard')); }
+  const [x, y] = boardXY(e);
+  if (K.down && !pzOpen.won) { K.down(pzOpen, pz, x, y, $('pzBoard')); return; }       // (a piece you can drag)
+  if (K.click && !pzOpen.won) K.click(pzOpen, pz, x, y, $('pzBoard'));
 });
-addEventListener('pointerup', () => { if (tilt.drag) { tilt.drag = false; if (!tilt.gyro) tilt.mx = tilt.my = 0; } });
+addEventListener('pointermove', e => { if (pzOpen && pzOpen.drag) { const K = KINDS[puzzles[pzOpen.k].kind]; if (K.move) { const [x, y] = boardXY(e); K.move(pzOpen, puzzles[pzOpen.k], x, y); } } });
+addEventListener('pointerup', () => {
+  if (pzOpen && pzOpen.drag) { const K = KINDS[puzzles[pzOpen.k].kind]; if (K.up && !pzOpen.won) K.up(pzOpen, puzzles[pzOpen.k]); else pzOpen.drag = null; }
+  if (tilt.drag) { tilt.drag = false; if (!tilt.gyro) tilt.mx = tilt.my = 0; } });
 $('pzGyro').onclick = async () => {
   try { if (window.DeviceOrientationEvent && DeviceOrientationEvent.requestPermission) { if (await DeviceOrientationEvent.requestPermission() !== 'granted') return; } } catch (e) { return; }
   tilt.gyro = true; show('pzGyro', false);
@@ -376,8 +394,8 @@ $('pzGyro').onclick = async () => {
 $('pzClose').onclick = closePuzzle;
 addEventListener('keydown', e => {
   if (!pzOpen) return;
-  if (e.code === 'Escape' || (e.code === 'KeyE' && !e.repeat)) { closePuzzle(); e.stopImmediatePropagation(); return; }
+  if (e.code === 'Escape' || (isKey(e.code, 'use') && !e.repeat)) { closePuzzle(); e.stopImmediatePropagation(); return; }
   const pz = puzzles[pzOpen.k], K = KINDS[pz.kind];
   if (K.key && !e.repeat && !pzOpen.won) K.key(pzOpen, pz, e.code);
-  keys[e.code] = true; e.stopImmediatePropagation();       // (the keys work the puzzle; the player doesn't walk)
+  keys[normKey(e.code)] = true; e.stopImmediatePropagation();       // (the keys work the puzzle; the player doesn't walk)
 }, true);

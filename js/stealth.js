@@ -23,7 +23,7 @@ function updateStealth(dt) {
 /* ---------- holding your breath ---------- */
 function updateHolding(dt) {
   const p = player, can = p.hidden && !p.down && !p.dead && !MP.menu;
-  const want = can && (keys.Space || breathHeld) && !p.gasping;
+  const want = can && (keyDown('breath') || breathHeld) && !p.gasping;
   if (want) { p.breath = Math.max(0, p.breath - dt / DF().breath); if (p.breath <= 0) gasp(); }
   else p.breath = Math.min(1, p.breath + dt / 3.5);
   if (p.gasping && p.breath > 0.4) p.gasping = false;

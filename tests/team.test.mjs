@@ -41,15 +41,27 @@ check(await until(A, () => /Ben: She's here!/.test(document.getElementById('msg'
 check(await A.evaluate(id => team.pings.filter(q => q.by === id).length === 1, benId), 'one ping each: the new one replaced his first');
 await A.evaluate(() => { const m = bb.monster; m.active = false; m.spawnT = 1e9; m.screamT = 0; m.state = 'wander'; });
 
-console.log('== emotes');
-await B.keyboard.press('Digit4');
-check(await until(A, id => team.bubbles.get(id) && team.bubbles.get(id).e === 2, benId, 15000), 'Ben presses 4: "Follow me" pops up over his head for Anna');
+console.log('== the emote wheel');
+await B.keyboard.down('KeyR');
+check(await until(B, () => !document.getElementById('emoteRing').classList.contains('hidden') && document.querySelectorAll('#emoteRing .seg').length === 6, null, 10000),
+  'Ben holds R: the wheel with six emotes opens');
+await B.evaluate(() => wheelMove(70, 40));                                // (the mouse, pointing down and to the right)
+check(await B.evaluate(() => wheel.sel === 2 && document.querySelector('#emoteRing .seg.on').textContent.includes('Follow me') && /Follow me/.test(document.getElementById('emoteHub').textContent)),
+  'pointing with the mouse picks "Follow me" (highlighted)');
+const lookBefore = await B.evaluate(() => bb.player.ang);
+await B.screenshot({ path: OUT + '/emote_wheel.png' });
+await B.keyboard.up('KeyR');
+check(await until(A, id => team.bubbles.get(id) && team.bubbles.get(id).e === 2, benId, 15000), 'letting go of R sends it: "Follow me" pops up over his head for Anna');
 check(await until(A, () => /Ben: 👉 Follow me/.test(document.getElementById('msg').textContent), null, 5000), 'and in her messages');
+check(await B.evaluate(a => document.getElementById('emoteRing').classList.contains('hidden') && Math.abs(bb.player.ang - a) < 0.01, lookBefore), 'the wheel closes; pointing didn\'t turn his view');
+await B.keyboard.down('KeyR'); await B.waitForTimeout(300); await B.keyboard.up('KeyR');
+await A.waitForTimeout(1500);
+check(await A.evaluate(id => team.bubbles.get(id).e === 2, benId), 'opening it and letting go without pointing sends nothing');
 await A.evaluate(() => { document.getElementById('emoteBtn').dispatchEvent(new PointerEvent('pointerdown')); });
-check(await A.evaluate(() => !document.getElementById('emoteBar').classList.contains('hidden') && document.querySelectorAll('#emoteBar button').length === 6), 'the 💬 button opens the six quick messages');
-await A.evaluate(() => { document.querySelectorAll('#emoteBar button')[5].dispatchEvent(new PointerEvent('pointerdown')); });
+check(await A.evaluate(() => !document.getElementById('emoteRing').classList.contains('hidden')), 'on a touch screen, the 💬 button opens the wheel');
+await A.evaluate(() => { document.querySelectorAll('#emoteRing .seg')[5].dispatchEvent(new PointerEvent('pointerdown')); });
 check(await until(B, id => team.bubbles.get(id) && team.bubbles.get(id).e === 5, annaId, 15000), 'Anna taps "Thanks": Ben sees it');
-check(await A.evaluate(() => document.getElementById('emoteBar').classList.contains('hidden')), 'and the bar closes');
+check(await A.evaluate(() => document.getElementById('emoteRing').classList.contains('hidden')), 'and the wheel closes');
 await B.screenshot({ path: OUT + '/emote.png' });
 
 console.log('== holding breath, gasps and loose boards, for the host\'s her');

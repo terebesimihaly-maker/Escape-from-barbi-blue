@@ -230,5 +230,59 @@ await p.screenshot({ path: OUT + '/perf.png' });
 await p.keyboard.press('F3');
 check(await p.evaluate(() => document.getElementById('perf').classList.contains('hidden') && !settings.perf), 'F3 again hides it');
 
+console.log('== the portrait puzzle: drag the pieces with the mouse');
+await p.evaluate(() => { progress.done = [true]; bb.startFloor(1); bb.state = 'play'; const m = bb.monster; m.active = false; m.spawnT = 1e9; openPuzzle(0); });
+check(await until(p, () => pzOpen && puzzles[pzOpen.k].kind === 'slide' && !document.getElementById('puzzle').classList.contains('hidden'), null, 20000), 'the portrait puzzle is open');
+check(await p.evaluate(() => /Drag a piece/.test(document.getElementById('pzHelp').textContent)), 'it says to drag the pieces', await p.evaluate(() => document.getElementById('pzHelp').textContent));
+// (screen position of a board point, and the piece next to the gap)
+const geo = await p.evaluate(() => { const o = pzOpen, n = puzzles[o.k].data.n, cv = document.getElementById('pzBoard'), r = cv.getBoundingClientRect(),
+  s = Math.min(cv.width, cv.height) * 0.9, cs = s / n, ox = (cv.width - s) / 2, oy = (cv.height - s) / 2, ex = o.empty % n, ey = o.empty / n | 0;
+  const [cx, cy] = [[ex - 1, ey], [ex + 1, ey], [ex, ey - 1], [ex, ey + 1]].find(([x, y]) => x >= 0 && y >= 0 && x < n && y < n);
+  const k = r.width / cv.width, at = (x, y) => [r.left + (ox + (x + 0.5) * cs) * k, r.top + (oy + (y + 0.5) * cs) * k];
+  return { from: at(cx, cy), gap: at(ex, ey), j: cy * n + cx, e: o.empty, v: o.tiles[cy * n + cx] }; });
+// a short pull: it springs back
+await p.mouse.move(...geo.from); await p.mouse.down();
+await p.mouse.move(geo.from[0] + (geo.gap[0] - geo.from[0]) * 0.25, geo.from[1] + (geo.gap[1] - geo.from[1]) * 0.25, { steps: 4 });
+check(await p.evaluate(() => pzOpen.drag && pzOpen.drag.off > 0.1 && pzOpen.drag.off < 0.4), 'grabbing a piece next to the gap, it follows the mouse', await p.evaluate(() => pzOpen.drag && pzOpen.drag.off));
+await p.mouse.up();
+check(await p.evaluate(e => pzOpen.empty === e && !pzOpen.drag, geo.e), 'let go early: it springs back');
+// pulled most of the way: it slides into the gap
+await p.mouse.move(...geo.from); await p.mouse.down(); await p.mouse.move(...geo.gap, { steps: 6 }); await p.screenshot({ path: OUT + '/slide_drag.png' }); await p.mouse.up();
+check(await p.evaluate(g => pzOpen.empty === g.j && pzOpen.tiles[g.e] === g.v, geo), 'dragged into the gap: the piece moves there', geo);
+await p.evaluate(() => closePuzzle());
+
+console.log('== Settings → Controls: your own keys');
+await p.evaluate(() => { toTitle(); document.querySelector('nav [data-panel=settings]').click(); });
+await click(p, '#openKeys');
+check(await p.evaluate(() => !document.querySelector('#panel section[data-panel=keys]').classList.contains('hidden') && document.querySelectorAll('#keyList li').length === KEY_ACTIONS.length),
+  'Settings has "Change keys": a list of every action');
+await click(p, '#keyList button[data-a="forward"][data-i="0"]');
+check(await p.evaluate(() => /Press a key/.test(document.querySelector('#keyList button[data-a="forward"][data-i="0"]').textContent)), 'click one: "Press a key…"');
+await p.keyboard.press('KeyI');
+check(await p.evaluate(() => settings.keys.forward[0] === 'KeyI' && JSON.parse(localStorage.getItem('bb_settings')).keys.forward[0] === 'KeyI'), 'press I: walking forward is now I (saved)');
+await click(p, '#keyList button[data-a="use"][data-i="0"]'); await p.keyboard.press('KeyQ');
+check(await p.evaluate(() => settings.keys.use[0] === 'KeyQ' && !settings.keys.ping.includes('KeyQ') && /no longer does "Ping/.test(document.getElementById('keyMsg').textContent)),
+  'giving Q (ping) to "use": ping loses it, and you\'re told', await p.evaluate(() => document.getElementById('keyMsg').textContent));
+check(await p.evaluate(() => document.getElementById('hide').dataset.key === 'Q'), 'the key shown next to the HIDE button follows');
+await click(p, '#keyList button[data-a="left"][data-i="1"]'); await p.keyboard.press('Escape');
+check(await p.evaluate(() => settings.keys.left[1] === '' && !document.getElementById('panel').classList.contains('hidden')), 'Esc cancels (and doesn\'t close the menu)');
+await p.screenshot({ path: OUT + '/controls.png' });
+await click(p, '#panelBack');
+check(await p.evaluate(() => !document.querySelector('#panel section[data-panel=settings]').classList.contains('hidden')), 'Back goes back to Settings');
+await p.evaluate(() => closePanel());
+await startSolo(p, 0); await until(p, () => bb.state === 'play');
+await calmHer();
+const y0 = await p.evaluate(() => { const pl = bb.player, tx = Math.floor(pl.x / T), ty = Math.floor(pl.y / T), d = DIRS.find(([dx, dy]) => !bb.isWall(tx + dx, ty + dy)); pl.ang = Math.atan2(d[1], d[0]); return [pl.x, pl.y]; });
+await p.keyboard.down('KeyI'); await p.waitForTimeout(1500); await p.keyboard.up('KeyI');
+const y1 = await p.evaluate(() => [bb.player.x, bb.player.y]);
+check(Math.hypot(y1[0] - y0[0], y1[1] - y0[1]) > 5, 'in the game, I walks forward', { y0, y1 });
+await p.evaluate(() => { const w = bb.player; window.__w = [w.x, w.y]; });
+await p.keyboard.down('KeyW'); await p.waitForTimeout(1000); await p.keyboard.up('KeyW');
+check(await p.evaluate(() => Math.hypot(bb.player.x - __w[0], bb.player.y - __w[1]) < 1), 'and W does nothing any more');
+await p.evaluate(() => { toTitle(); document.querySelector('nav [data-panel=settings]').click(); });
+await click(p, '#openKeys'); await click(p, '#keysReset');
+check(await p.evaluate(() => settings.keys.forward[0] === 'KeyW' && settings.keys.use[0] === 'KeyE' && settings.keys.ping[0] === 'KeyQ' && document.getElementById('hide').dataset.key === 'E'), '"Default keys" puts everything back');
+await p.evaluate(() => closePanel());
+
 check(pageErrors.length === 0, 'no errors on the page', pageErrors);
 process.exitCode = summary(); await b.close();

@@ -53,7 +53,7 @@ function updateDownMsg() {
   if (p.dead && MP.scareT <= 0) { const w = watched(), n = [...MP.others.values()].filter(o => !o.down && !o.dead && !o.away).length;
     const doing = w ? (w.hidden ? ' (hiding)' : w.sprinting ? ' (running)' : '') : '';
     t = "You didn't make it<small>" + (w ? 'Watching ' + escapeHtml(w.name) + doing + (n > 1 ? (canLock ? ' · ← → to switch' : ' · tap to switch') : '') +
-      ' · ' + (team.warnCool > 0 ? 'warn them again in ' + Math.ceil(team.warnCool) + 's' : (canLock ? 'G' : 'WARN') + ': show them where she is') : 'Nobody is left standing') + '</small>'; }
+      ' · ' + (team.warnCool > 0 ? 'warn them again in ' + Math.ceil(team.warnCool) + 's' : (canLock ? keyLabel('warn') : 'WARN') + ': show them where she is') : 'Nobody is left standing') + '</small>'; }
   else if (p.down && MP.scareT <= 0) { const by = [...MP.others.values()].find(o => o.rv === MP.myId);
     t = (by ? escapeHtml(by.name) + ' is reviving you…' : "You're down · " + Math.ceil(p.downLeft) + 's') + '<small>a teammate can get you back up</small>'; }
   if (t !== downMsgText) { downMsgText = t; $('downMsg').innerHTML = t; show('downMsg', !!t); }
@@ -147,7 +147,7 @@ function updatePlayer(dt) {
   reviveTarget = null;
   if (MP.on && !p.hidden) { let bd = 40;
     for (const o of MP.others.values()) if (o.down && !o.dead) { const d = Math.hypot(o.x - p.x, o.y - p.y); if (d < bd && los(p.x, p.y, o.x, o.y)) { bd = d; reviveTarget = o; } } }
-  const holding = !MP.menu && (keys.KeyE || reviveHeld);
+  const holding = !MP.menu && (keyDown('use') || reviveHeld);
   if (reviveTarget && holding && !p.moving) {
     revP += dt / REVIVE_TIME;
     if (revP >= 1) { toHost({ t: 'revive', id: reviveTarget.id }); revP = 0; }
