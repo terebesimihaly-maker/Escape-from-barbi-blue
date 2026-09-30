@@ -18,6 +18,7 @@ A first-person 3D horror maze for phones and desktop. Solve the puzzles, unlock 
   - `js/team.js`: pings, emotes, watching and warning from beyond (playing together)
   - `js/extras.js`: achievements, the torn notes you've collected, the performance overlay
   - `js/account.js`: signing in (or playing as a guest), and your profile: the character creator with a 3D preview
+  - `js/lobby3d.js`: the lobby: everyone's characters standing together, dances, chat
   - `js/cinematics.js`: the death screen and the title screen; `js/main.js`: the main loop and start-up
 - `js/house.js`: dresses each floor: skirting, rails and crown molding, framed doorways, lamps that really light the rooms (a few flicker or are dead), rugs and a runner carpet, porcelain dolls whose heads turn when you look away, teddy bears, side tables, grandfather clocks, basement pipes, crates, barrels and puddles, the attic's sheet-covered furniture, trunks and cobwebs, the workshop's workbenches, shelves of doll heads, dress forms and dolls hanging on strings, and a flashlight beam you can see in the air
 - `models/character_mobile.glb`: her rigged model (made in Blender)
@@ -30,6 +31,7 @@ A first-person 3D horror maze for phones and desktop. Solve the puzzles, unlock 
 - `audio/chase.mp3`: her chase song. It's faint when she's far away, gets louder as she gets closer, and plays at full volume when she catches you (a different song can be picked on the title screen)
 - `js/player-model.js`: teammates in multiplayer: human figures made from the same rig, animated with motion capture (idle, walk, jog, run) and hand-made dances, plus a downed pose, a working flashlight in the hand and a nametag. Everyone looks the way they made themselves in their profile (see "Accounts and your character"): clothes, hair, skin, eyes, beard, glasses, build and height, on a face made from a seed (so everyone sees the same person): the head reshaped (jaw, chin, nose, cheeks, eyes, mouth, brow, face length) and the face painted (eyebrows, mouth, eyeliner, freckles, blush, a mole, age lines). Anyone without a profile gets a random one from their player id
 - `animations.html`: preview each animation (drag to orbit)
+- Made in Blender (`tools/blender/`, run with Blender's Python module: `pip install bpy`): `models/player.glb` (the players: body, real clothes cut from a rebuilt skin, hair grown as hair cards; `player_clothes.py`, `player_build.py`), `models/doll.glb` (`doll.py`), `models/boards.glb` (the loose floorboards: `boards.py`), `textures/` (floors and walls baked from real geometry: `map_textures.py`; the portraits: `paintings.py`). `tools/compress-glb.mjs` compresses the models (meshopt; `lib/meshopt_decoder.js` reads them). Her model is not made or changed by any of these.
 - `supabase/migrations/`: the account server's database (see "Accounts and your character")
 - `tests/`: browser tests (see "Tests" below)
 - `lib/three.min.js`: three.js r186 + GLTFLoader + post-processing (MIT, see `lib/THREE-LICENSE.txt`)
@@ -108,6 +110,8 @@ The paintings: some portraits have real glass eyes that turn to follow you. Othe
 ## Playing together (up to 4)
 
 Menu → **Play together** → **Create lobby** shows a 6 digit code; the others enter it and press **Join**. Everyone picks a nametag and presses **Ready**; the game starts when everyone is ready. The lobby owner can kick players.
+
+The lobby is a room where everyone's character stands side by side, as they made themselves, lit by a lantern (like Dead by Daylight). Dance from the dance bar (🕺🤖🪩…, ✋ to stop) and talk in the chat: what you say also floats over your character's head. Chat goes through the lobby owner, who keeps it to 120 characters of plain text and drops floods (`js/lobby3d.js`).
 
 - Everyone starts in the same room, in the same house. Teammates are solid (no walking through each other).
 - It's a bit harder together, but fair: she hears a little further and is a little faster (never faster than a sprinting player), she screams a bit more often, and there's one more wardrobe per extra player. She gives the group a few extra seconds at the start, and after catching someone she walks away so the others can revive them.

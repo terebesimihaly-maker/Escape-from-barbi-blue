@@ -381,8 +381,13 @@ function wallDecor(G, F, faces, doorTiles, skip) {
   const makeEye = (x, y) => { const e = new THREE.Group(), s = new THREE.Mesh(eyeGeo, scleraMat), ir = new THREE.Mesh(irisGeo, irisMat), pu = new THREE.Mesh(pupilGeo, pupilMat);
     ir.position.z = 0.0205; pu.position.z = 0.0209; e.add(s, ir, pu); e.position.set(x, y, 0.004); e.rotation.order = 'YXZ'; return e; };
   const pGeo = new THREE.PlaneGeometry(0.44, 0.56), wGeo = new THREE.PlaneGeometry(1.2, 0.6);
-  const pMat = new THREE.MeshLambertMaterial({ map: plain });
-  const eMat = new THREE.MeshLambertMaterial({ map: eyed, emissiveMap: eyeGlow, emissive: 0xffffff, emissiveIntensity: 2.5 });
+  let pMat = new THREE.MeshLambertMaterial({ map: plain });
+  let eMat = new THREE.MeshLambertMaterial({ map: eyed, emissiveMap: eyeGlow, emissive: 0xffffff, emissiveIntensity: 2.5 });
+  // (the portraits painted in Blender, when they've loaded: a different doll in each frame; the watcher's eyes where its sockets are)
+  const P = portraits, pMats = P ? P.plain.map(t => new THREE.MeshLambertMaterial({ map: t })) : null;
+  if (P) { wMat.map = P.watch; cMat.map = P.changed; eMat = new THREE.MeshLambertMaterial({ map: P.plain[0] }); }
+  const eyeAt = k => P ? [P.eyes[k][0] * 1.5, P.eyes[k][1] * 1.5] : [k ? 0.0464 : -0.0464, 0.0307];   // (the watcher's frame is 1.5 times the size)
+  const glowDot = P && new THREE.MeshBasicMaterial({ color: new THREE.Color(0x9fe6ff).multiplyScalar(2.5) }), dotGeo = P && new THREE.CircleGeometry(0.009, 12);
   const words = {};
   const exitFace = f => f.x === exit.tx && f.y === exit.ty;
   faces.forEach((f, i) => {
@@ -392,10 +397,11 @@ function wallDecor(G, F, faces, doorTiles, skip) {
       // (a few of each per floor: every pair of eyes is extra drawing)
       const kind = hash(f.x, f.y, 97), nw = level.paintings.filter(q => q.kind === 'watch').length, nc = level.paintings.length - nw;
       const watch = kind < 0.3 && nw < 6, glow = hash(f.x, f.y, 98) > 0.55;
-      const m = new THREE.Mesh(watch ? wGeoBig : pGeo, watch ? wMat : glow ? eMat : pMat);
+      const m = new THREE.Mesh(watch ? wGeoBig : pGeo, watch ? wMat : glow ? eMat : pMats ? pMats[(hash(f.x, f.y, 99) * 3) | 0] : pMat);
+      if (P && glow && !watch) for (const k of [0, 1]) { const d = new THREE.Mesh(dotGeo, glowDot); d.position.set(P.eyes[k][0], P.eyes[k][1], 0.002); m.add(d); }   // (glowing eyes)
       m.position.set(cx + f.nx * 0.015, watch ? 1.66 : 1.72, cz + f.nz * 0.015); m.rotation.y = rot; G.add(m);
       if (watch) {               // (eye positions: where the eyes are painted in portraitTexture, scaled to this frame)
-        const eyes = [makeEye(-0.0464, 0.0307), makeEye(0.0464, 0.0307)]; m.add(...eyes);
+        const eyes = [makeEye(...eyeAt(0)), makeEye(...eyeAt(1))]; m.add(...eyes);
         level.paintings.push({ kind: 'watch', mesh: m, eyes, x: (cx + f.nx * 0.3) / S, y: (cz + f.nz * 0.3) / S });
       } else if (!glow && kind > 0.55 && nc < 6) level.paintings.push({ kind: 'change', mesh: m, mat: cMat, x: (cx + f.nx * 0.3) / S, y: (cz + f.nz * 0.3) / S, seen: false, away: 0, changed: false });
     } else if (r < F.frames + 0.045) {

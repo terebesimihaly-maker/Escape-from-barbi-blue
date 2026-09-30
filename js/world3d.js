@@ -159,6 +159,14 @@ function loadBoardsTemplate() {
   gltfLoader().load('models/boards.glb', g => { g.scene.traverse(o => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = true; } }); boardsTemplate = g.scene; },
     undefined, e => { console.error(e); });
 }
+// the portraits painted in Blender (tools/blender/paintings.py): three dolls, the changed one, the watcher (and where its eyes go)
+let portraits = null;
+function loadPortraits() {
+  if (portraits !== null || !renderer) return; portraits = false;
+  const img = n => new Promise(res => { const i = new Image(); i.onload = () => { const t = new THREE.CanvasTexture(i); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; res(t); }; i.onerror = () => res(null); i.src = 'textures/portrait_' + n + '.webp'; });
+  Promise.all(['a', 'b', 'c', 'changed', 'watch'].map(img).concat([fetch('textures/portrait_eyes.json').then(r => r.json()).catch(() => null)]))
+    .then(([a, b, c, changed, watch, eyes]) => { if (a && b && c && changed && watch && eyes && eyes.eyes) portraits = { plain: [a, b, c], changed, watch, eyes: eyes.eyes }; });
+}
 // the teammates' model: only downloaded when you go to play together (single player never needs it)
 function loadPlayerTemplate() {
   if (playerTemplateLoad || !renderer) return playerTemplateLoad;

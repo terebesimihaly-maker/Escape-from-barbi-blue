@@ -72,6 +72,7 @@ const nameOf = id => id === MP.myId ? myName : (lobbyPlayer(id) || MP.others.get
 
 function leaveMP(quiet) {
   MP.leaving = true;
+  if (typeof leaveLobby3D === 'function' && LOB.scene) leaveLobby3D();   // (js/lobby3d.js)
   if (MP.lobbyTimer) { clearInterval(MP.lobbyTimer); MP.lobbyTimer = null; }
   if (MP.hostConn) { send(MP.hostConn, { t: 'leave' }); }
   if (MP.host) broadcast({ t: 'bye' });                   // (so the others don't wait for the owner to come back)
@@ -186,6 +187,8 @@ function hostHandle(id, m) {
     case 'ping': hostPing(id, m); break;                                  // (js/team.js)
     case 'warn': hostWarn(id); break;
     case 'pi': send(MP.conns.get(id), { t: 'po', s: m.s }); break;        // (the performance overlay's ping)
+    case 'chat': if (!MP.lobby.started) hostChat(id, m); break;           // (the lobby: js/lobby3d.js)
+    case 'ldance': if (!MP.lobby.started) hostLobbyDance(id, m); break;
   }
 }
 
@@ -386,6 +389,8 @@ function clientHandle(m) {
       if (state === 'lobby') renderLobby();
       break;
     case 'kicked': MP.kicked = true; break;
+    case 'chat': gotChat(m); break;
+    case 'ldance': gotLobbyDance(m); break;
     case 'bye': MP.hostLeft = true; break;
     case 'away': case 'back': {                       // a teammate lost the connection / came back
       const o = MP.others.get(m.id); if (o) o.away = m.t === 'away';

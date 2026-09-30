@@ -25,7 +25,8 @@ function frame(now) {
     else if (locked() && state !== 'note') document.exitPointerLock();   // (reading a note keeps the mouse: a click carries on)
     if (state === 'play' || state === 'note' || state === 'paused') renderGame(gameT);
     else if (state === 'dead') renderDead(dt);
-    else if (state === 'title' || state === 'lobby') renderTitle(dt);
+    else if (state === 'lobby') renderLobby3D(dt);            // (everyone's characters, standing together: js/lobby3d.js)
+    else if (state === 'title') renderTitle(dt);
     else { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cvs.width, cvs.height); }
     if (state !== 'play' && state !== 'note' && state !== 'paused' && fearFilter) setFearFilter(0);   // (the fear tint only in the game)
     perfFrame(ms);
@@ -36,7 +37,7 @@ function frame(now) {
 }
 init3D(); renderer.info.autoReset = false;
 addEventListener('resize', resize); resize(); applySettings();
-loadBarbi(); loadDollTemplate(); loadBoardsTemplate();
+loadBarbi(); loadDollTemplate(); loadBoardsTemplate(); loadPortraits();
 loadBest(); updateRejoinBtn();
 startAccount();                                          // (sign in, or play as a guest: js/account.js)
 requestAnimationFrame(frame);

@@ -521,6 +521,7 @@ function makeBear(THREE, p) {
   s(0.014, dark, -0.035, 0.355, 0.085); s(0.014, dark, 0.035, 0.355, 0.085);
   for (const k of [-1, 1]) { s(0.045, fur, k * 0.12, 0.17, 0.03, 0.8, 1.3, 0.8); s(0.055, fur, k * 0.07, 0.04, 0.12, 0.9, 0.8, 1.3); }
   g.position.set(p.x, 0, p.z); g.rotation.set(0, p.ry + 0.3, 0.12);
+  g.updateMatrixWorld(true); g.position.y = -new THREE.Box3().setFromObject(g).min.y;   // (tilted: sitting on the floor, not sunk into it)
   return g;
 }
 function makeVase(THREE, x, y, z) {
