@@ -24,7 +24,7 @@ button{font-family:inherit;cursor:pointer}
 .screen p{max-width:360px;line-height:1.5;color:#a9a3b8;font-size:15px}
 /* main menu: on a phone the title is at the top, she stands in the middle, the buttons are at the bottom;
    on a wide screen the menu is a column on the left and she stands on the right */
-#title{justify-content:space-between;padding:calc(34px + env(safe-area-inset-top)) 16px calc(26px + env(safe-area-inset-bottom));
+#title{justify-content:space-between;padding:calc(58px + env(safe-area-inset-top)) 16px calc(26px + env(safe-area-inset-bottom));
   background:linear-gradient(rgba(0,0,0,.7),transparent 28%,transparent 55%,rgba(0,0,0,.8))}
 .menu-top,.menu-bottom{width:100%;max-width:380px;display:flex;flex-direction:column;align-items:center}
 .tag{font-style:italic;margin:8px 0 0}
@@ -102,7 +102,7 @@ h2{font-weight:400;letter-spacing:5px;color:#86a8ff;text-transform:uppercase;mar
   min-width:14px;padding:4px 8px;border:1px solid rgba(200,210,255,.45);border-bottom-width:3px;border-radius:5px;background:rgba(10,12,25,.7);
   color:#dfe6ff;font:600 12px/1.2 system-ui,sans-serif;letter-spacing:1px;text-align:center;white-space:nowrap;pointer-events:none}
 /* multiplayer */
-.card input:not([type]),.card input[inputmode]{flex:1;min-width:0;background:rgba(0,0,0,.35);border:1px solid rgba(134,168,255,.35);border-radius:4px;
+.card input:not([type]),.card input[inputmode],.card input[type=password]{flex:1;min-width:0;background:rgba(0,0,0,.35);border:1px solid rgba(134,168,255,.35);border-radius:4px;
   color:#e6ebff;font:15px system-ui,sans-serif;padding:9px 10px;outline:none}
 .card input:focus{border-color:#9fb8ff}
 .big.wide{display:block;width:100%;margin:6px 0 4px}
@@ -226,3 +226,44 @@ h2{font-weight:400;letter-spacing:5px;color:#86a8ff;text-transform:uppercase;mar
 .achlist .i{font-size:20px;width:26px;text-align:center}
 .achlist b{display:block;font-size:14px;color:#e6dcf0}
 .achlist small{display:block;font-size:12px;color:#9a93ad}
+/* the sign-in screen, the profile button and the profile */
+#auth{background:radial-gradient(ellipse at 50% 30%,rgba(20,26,56,.92),rgba(0,0,0,.96) 70%);z-index:12}
+.auth-card{max-width:360px;width:100%;padding:18px 20px}
+.auth-card h1{margin:0 0 12px;text-align:center;font-size:clamp(26px,8vw,40px)}
+.auth-card .seg{display:flex;margin:0 auto 6px;justify-content:center}
+.auth-card .row{margin:9px 0}
+.auth-card .row > span{flex:0 0 92px;font:13px system-ui,sans-serif}
+.auth-card .row input{width:100%;box-sizing:border-box}
+.auth-card .big.wide{padding:11px 20px}
+.auth-card p{margin:6px 0}
+#auMsg{min-height:1.2em}
+#auMsg.err{color:#ff9a9a}
+.or{display:flex;align-items:center;gap:10px;margin:10px 0;color:#6e6a80;font-size:12px;letter-spacing:2px;text-transform:uppercase}
+.or::before,.or::after{content:'';flex:1;height:1px;background:rgba(160,170,220,.2)}
+.big.ghost{background:transparent;border-color:rgba(160,180,255,.35)}
+.pfchip{position:absolute;top:calc(12px + env(safe-area-inset-top));right:14px;display:flex;align-items:center;gap:8px;z-index:2;
+  background:rgba(12,14,28,.65);border:1px solid rgba(160,180,255,.3);border-radius:20px;padding:6px 12px 6px 6px;color:#dfe6ff;font:600 13px system-ui,sans-serif;max-width:60vw}
+.pfchip i{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.6);flex:none}
+.pfchip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card:has(> section[data-panel=profile]:not(.hidden)){max-width:780px;padding:16px 18px}
+section[data-panel=profile] h2{margin-bottom:10px}
+/* the character on the left (it stays in view), the choices on the right; on a narrow screen the character above them */
+.pf{display:grid;grid-template-columns:minmax(170px,5fr) 7fr;gap:14px;align-items:stretch}
+.pfview{position:relative;height:min(58vh,440px);border-radius:8px;background:radial-gradient(circle at 50% 35%,#252a44,#0c0d16)}
+.pfview canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab}
+.pfview .hint{position:absolute;left:0;right:0;top:45%;text-align:center}
+.pfhint{position:absolute;left:0;right:0;bottom:6px;margin:0;text-align:center;font:11px system-ui,sans-serif;color:#8f8aa3;pointer-events:none}
+.pfctl{height:min(58vh,440px);overflow-y:auto;text-align:left;padding-right:4px}
+@media (max-width:620px){ .pf{grid-template-columns:1fr} .pfview{height:30vh;min-height:160px} .pfctl{height:auto;max-height:36vh} }
+.pfrow{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.pfrow > span{flex:0 0 78px;font-size:13px;color:#cfd6f0}
+.pfopts{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.pfopts .sw{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.25);padding:0}
+.pfopts .sw.on{border-color:#fff;box-shadow:0 0 0 2px rgba(130,160,255,.7)}
+.pfopts .swc{width:26px;height:24px;padding:0;border:1px dashed rgba(255,255,255,.4);border-radius:5px;background:none}
+.pfopts .swc.on{border:2px solid #fff}
+.pfopts .ch{padding:4px 9px;border-radius:12px;border:1px solid rgba(160,180,255,.35);background:rgba(20,25,50,.6);color:#dfe6ff;font:600 12px system-ui,sans-serif}
+.pfopts .ch.on{background:rgba(90,120,255,.55);border-color:#fff}
+.pfopts input[type=range]{width:120px}
+.pfopts output{font-size:12px;color:#aab}
+.pfbtns{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:6px 0}

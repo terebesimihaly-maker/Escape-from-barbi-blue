@@ -17,10 +17,53 @@ function testPage() {
   return s.replace(main, '<script src="tests/hooks.js"></script>\n' + main);
 }
 
+// A stand-in for the game's account server (the EFBB Supabase project) at /fake/rest/v1/rpc/<function>: the same five
+// functions, the same answers (supabase/migrations/*_efbb_accounts.sql), kept in memory. The game uses it with ?api=http://…/fake
+import crypto from 'node:crypto';
+const fake = { players: new Map(), sessions: new Map(), calls: [], down: false };
+const sha = t => crypto.createHash('sha256').update(String(t)).digest('hex');
+function newSession(name) { const t = crypto.randomBytes(32).toString('hex'); fake.sessions.set(sha(t), name); return t; }
+function fakeRpc(fn, a) {
+  fake.calls.push(fn);
+  const P = n => fake.players.get(String(n || '').toLowerCase()), who = t => fake.sessions.get(sha(t || ''));
+  switch (fn) {
+    case 'efbb_sign_up': {
+      if (!/^[A-Za-z0-9_]{3,16}$/.test(a.p_username || '')) return { error: 'bad_username' };
+      if (!a.p_password || a.p_password.length < 6 || Buffer.byteLength(a.p_password) > 72) return { error: 'bad_password' };
+      if (P(a.p_username)) return { error: 'taken' };
+      const look = a.p_look && typeof a.p_look === 'object' && !Array.isArray(a.p_look) ? a.p_look : {};
+      fake.players.set(a.p_username.toLowerCase(), { username: a.p_username, pass: sha('salt' + a.p_password), look, failed: 0, locked: 0 });
+      return { token: newSession(a.p_username.toLowerCase()), username: a.p_username, look };
+    }
+    case 'efbb_sign_in': {
+      const p = P(a.p_username); if (!p) return { error: 'bad_login' };
+      if (p.locked > Date.now()) return { error: 'locked' };
+      if (p.pass !== sha('salt' + (a.p_password || ''))) { if (++p.failed >= 8) { p.failed = 0; p.locked = Date.now() + 600000; } return { error: 'bad_login' }; }
+      p.failed = 0; p.locked = 0; return { token: newSession(p.username.toLowerCase()), username: p.username, look: p.look };
+    }
+    case 'efbb_me': { const n = who(a.p_token), p = n && P(n); return p ? { username: p.username, look: p.look } : { error: 'bad_session' }; }
+    case 'efbb_save_look': { const n = who(a.p_token), p = n && P(n); if (!p) return { error: 'bad_session' };
+      if (!a.p_look || typeof a.p_look !== 'object' || Array.isArray(a.p_look)) return { error: 'bad_look' }; p.look = a.p_look; return { ok: true }; }
+    case 'efbb_sign_out': fake.sessions.delete(sha(a.p_token || '')); return { ok: true };
+  }
+  return null;
+}
 export function serve(port = 8766) {
   const server = http.createServer((req, res) => {
     const url = decodeURIComponent(new URL(req.url, 'http://x').pathname);
     if (url === '/game.html') { res.writeHead(200, { 'content-type': 'text/html' }); res.end(testPage()); return; }
+    if (url.startsWith('/fake/')) {                            // (the stand-in account server; /fake/debug shows what's in it)
+      const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'apikey, content-type', 'content-type': 'application/json' };
+      if (req.method === 'OPTIONS') { res.writeHead(204, cors); res.end(); return; }
+      if (url === '/fake/debug') { res.writeHead(200, cors); res.end(JSON.stringify({ players: [...fake.players.values()], calls: fake.calls, sessions: fake.sessions.size })); return; }
+      if (url === '/fake/down') { fake.down = !fake.down; res.writeHead(200, cors); res.end(JSON.stringify({ down: fake.down })); return; }
+      let body = ''; req.on('data', c => { body += c; }); req.on('end', () => {
+        if (fake.down) { req.socket.destroy(); return; }         // (as if the server can't be reached)
+        const m = /^\/fake\/rest\/v1\/rpc\/(\w+)$/.exec(url); let a = {}; try { a = JSON.parse(body || '{}'); } catch (e) {}
+        const out = m && req.headers.apikey ? fakeRpc(m[1], a) : null;
+        res.writeHead(out ? 200 : 404, cors); res.end(JSON.stringify(out || { message: 'not found' })); });
+      return;
+    }
     const file = path.join(ROOT, url === '/' ? 'index.html' : url);
     if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end('not found'); return; }
     res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' });

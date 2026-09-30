@@ -34,7 +34,23 @@
 <div id="reconn" class="hidden"><b>Connection lost</b><span id="reconnTxt">Reconnecting…</span><small>The others keep playing. Your place is kept for you.</small><button class="sbtn" id="reconnLeave">Leave</button></div>
 <div id="msg"></div>
 
-<div id="title" class="screen">
+<div id="auth" class="screen">
+  <div class="card auth-card">
+    <h1><small>ESCAPE FROM</small>BARBI BLUE</h1>
+    <div class="seg" id="authTabs"><button data-t="in" class="on">Sign in</button><button data-t="up">Create account</button></div>
+    <label class="row"><span>Username</span><input id="auUser" maxlength="16" autocomplete="username" spellcheck="false" autocapitalize="off"></label>
+    <label class="row"><span>Password</span><input id="auPass" type="password" maxlength="72" autocomplete="current-password"></label>
+    <label class="row hidden" id="auPass2Row"><span>Password again</span><input id="auPass2" type="password" maxlength="72" autocomplete="new-password"></label>
+    <button class="big wide" id="auGo">Sign in</button>
+    <p class="hint" id="auMsg"></p>
+    <div class="or"><span>or</span></div>
+    <button class="big wide ghost" id="auGuest">Play as a guest</button>
+    <p class="hint">As a guest your character is kept on this device only.</p>
+  </div>
+</div>
+
+<div id="title" class="screen hidden">
+  <button id="profileBtn" class="pfchip" aria-label="Your profile"><i id="pfDot"></i><span id="pfName">Guest</span></button>
   <div class="menu-top">
     <h1><small>ESCAPE FROM</small>BARBI BLUE</h1>
     <p class="tag">She was a porcelain doll once. Blue glass eyes. Someone left her out in the rain&hellip; and she grew.</p>
@@ -93,6 +109,14 @@
       <ol id="lvList" class="lvlist"></ol>
       <p class="hint">Escape a floor to open the next one. <span id="lvNotes"></span></p>
     </section>
+    <section data-panel="profile">
+      <h2>Your character</h2>
+      <div class="pf"><div class="pfview"><canvas id="pfView"></canvas><p class="hint" id="pfLoading">Loading your character…</p><p class="pfhint"><span class="pc-only">Drag to turn · scroll to zoom</span><span class="touch-only">Drag to turn · pinch to zoom</span></p></div><div class="pfctl" id="pfCtl"></div></div>
+      <label class="row" id="pfNameRow"><span>Nametag</span><input id="pfNameIn" maxlength="16" autocomplete="off" spellcheck="false"></label>
+      <p class="hint" id="pfAcct"></p>
+      <div class="pfbtns"><button class="sbtn" id="pfRandom">Randomize</button><button class="sbtn" id="pfFace">New face</button>
+        <button class="sbtn hidden" id="pfSignUp">Create an account</button><button class="sbtn hidden" id="pfSignOut">Sign out</button></div>
+    </section>
     <section data-panel="keys">
       <h2>Controls</h2>
       <p class="hint">Click a key to change it, then press the new key. Each action can have two.</p>
@@ -108,7 +132,7 @@
     <section data-panel="mp">
       <h2>Play together</h2>
       <p>Up to 4 players. One of you creates a lobby and shares its code; the others join with it.</p>
-      <label class="row"><span>Your name</span><input id="mpName" maxlength="14" autocomplete="off" spellcheck="false"></label>
+      <label class="row"><span>Your name</span><input id="mpName" maxlength="16" autocomplete="off" spellcheck="false"></label>
       <button class="big wide" id="mpCreate">Create lobby</button>
       <div class="row"><span>Join with a code</span><input id="mpCode" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="123456" autocomplete="off"><button class="sbtn" id="mpJoin">Join</button></div>
       <p id="mpStatus" class="hint"></p>
@@ -141,7 +165,7 @@
     <div id="lbCode" class="code">000 000</div>
     <p class="hint center">Give this code to your friends. Up to 4 players.</p>
     <ul id="lbList" class="plist"></ul>
-    <label class="row"><span>Your nametag</span><input id="lbName" maxlength="14" autocomplete="off" spellcheck="false"></label>
+    <label class="row"><span>Your nametag</span><input id="lbName" maxlength="16" autocomplete="off" spellcheck="false"></label>
     <label class="row"><span>Floor</span><select id="lbLevel"></select></label>
     <div class="row"><span>Difficulty</span><div class="seg" id="lbDiff"><button data-d="easy">Easy</button><button data-d="medium">Medium</button><button data-d="hard">Hard</button></div></div>
     <p id="lbStatus" class="lbstatus"></p>
@@ -205,6 +229,7 @@
 <script src="js/stealth.js"></script>
 <script src="js/team.js"></script>
 <script src="js/extras.js"></script>
+<script src="js/account.js"></script>
 <script src="js/cinematics.js"></script>
 <script src="js/main.js"></script>
 </body>

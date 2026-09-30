@@ -2,6 +2,7 @@
    window.bb gives the tests access to the game's state; window.bbAudio renders the game's sound offline (for video captures). */
 'use strict';
 
+window.__autoGuest = !/[?&]auth=/.test(location.search);
 window.bb = {
   get state() { return state }, set state(v) { state = v },
   get player() { return player }, get monster() { return monster }, get barbi() { return barbi },

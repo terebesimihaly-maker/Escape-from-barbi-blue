@@ -394,10 +394,50 @@ function makeFace(THREE, meshes, bone, f, seed) {
   return { glasses, geo: head.geometry, tex: head.material.map };
 }
 
+/* ---------- your own look (the profile: js/account.js) ----------
+   A look: { seed (the face), shirt, pants, shoes, hair (colours), skin, eyes, hairStyle, beard, glasses, body, freckles,
+   makeup, height }. Looks arrive from other players too, so they're always cleaned up (sanitizeLook) before use. */
+const LOOK_OPTIONS = {
+  shirt: [0x2d4f96, 0x93302c, 0x2f6e48, 0x9b7526, 0x5a3a7a, 0x1d1d1f, 0xd8d4cc, 0x7a7a7a, 0xc86a2a, 0x2a7a8a, 0xc04a7a, 0x6a4a2a],
+  pants: [0x1b2640, 0x19191b, 0x5b5240, 0x3a3d44, 0x2a4a7a, 0x6a2a2a, 0x4a5a3a, 0xc8c0b0],
+  shoes: [0x161616, 0x241b14, 0xd8d8d8, 0x7a2a2a, 0x2a3a6a, 0x5a4a3a],
+  hair: HAIRS.concat([0x8a8a86, 0xb4b2ac, 0x2a4aa8, 0xc0508a, 0x7a2a9a]),
+  skin: SKINS, eyes: [0x5a3a1e, 0x3b2412, 0x6b4a2a, 0x2f5d8a, 0x4a7fa8, 0x4f7a4a, 0x7a6a3a, 0x5f6a70],
+  hairStyle: ['short', 'long'], beard: ['none', 'stubble', 'beard', 'moustache', 'goatee'], glasses: ['none', 'round', 'square'],
+  body: ['a', 'b'], height: [1.02, 1.18] };
+// a random look (a new guest, "Randomize"): the face from the seed, and clothes to go with it
+function randomLook(seed) {
+  const f = faceSpec(seed), r = rng(seed + ':clothes'), pick = a => a[r() * a.length | 0], O = LOOK_OPTIONS;
+  return { v: 1, seed: String(seed), shirt: pick(O.shirt), pants: pick(O.pants), shoes: pick(O.shoes), hair: f.hair, skin: f.skin, eyes: f.iris,
+    hairStyle: f.long ? 'long' : 'short', beard: f.beard, glasses: f.glasses ? (f.glasses.round ? 'round' : 'square') : 'none',
+    body: f.masc ? 'b' : 'a', freckles: !!f.freckles, makeup: !!f.liner, height: +f.scale.toFixed(3) };
+}
+function sanitizeLook(l) {
+  const O = LOOK_OPTIONS, o = l && typeof l === 'object' && !Array.isArray(l) ? l : {};
+  const seed = String(o.seed || '').replace(/[^\w-]/g, '').slice(0, 40) || 'look', def = randomLook(seed);
+  const col = (v, d) => Number.isInteger(v) && v >= 0 && v <= 0xffffff ? v : d, one = (v, list, d) => list.includes(v) ? v : d;
+  return { v: 1, seed, shirt: col(o.shirt, def.shirt), pants: col(o.pants, def.pants), shoes: col(o.shoes, def.shoes), hair: col(o.hair, def.hair),
+    skin: one(o.skin, O.skin, def.skin), eyes: one(o.eyes, O.eyes, def.eyes), hairStyle: one(o.hairStyle, O.hairStyle, def.hairStyle),
+    beard: one(o.beard, O.beard, def.beard), glasses: one(o.glasses, O.glasses, def.glasses), body: one(o.body, O.body, def.body),
+    freckles: typeof o.freckles === 'boolean' ? o.freckles : def.freckles, makeup: typeof o.makeup === 'boolean' ? o.makeup : def.makeup,
+    height: Number.isFinite(o.height) ? Math.min(O.height[1], Math.max(O.height[0], o.height)) : def.height };
+}
+// the face for a look: made from its seed, then everything you chose on top
+function faceForLook(L) {
+  const f = faceSpec(L.seed);
+  Object.assign(f, { skin: L.skin, hair: L.hair, long: L.hairStyle === 'long', scale: L.height, flat: L.body === 'a' ? 0.62 : 0.2, masc: L.body === 'b',
+    iris: L.eyes, beard: L.beard, glasses: L.glasses === 'none' ? null : { round: L.glasses === 'round', col: (f.glasses && f.glasses.col) || 0x151515 },
+    freckles: L.freckles, liner: L.makeup, blush: L.makeup, shadow: L.makeup ? (f.shadow || 0x6a4a60) : 0 });
+  return f;
+}
+
 function createHuman(THREE, opts) {
-  const slot = (opts.slot || 0) % 4, seed = String(opts.face || 'slot' + slot), face = faceSpec(seed);
+  // opts.look: a look someone made (their profile); otherwise a face from opts.face (their id) and clothes by lobby slot
+  const slot = (opts.slot || 0) % 4, L = opts.look ? sanitizeLook(opts.look) : null, seed = L ? L.seed : String(opts.face || 'slot' + slot);
+  const face = L ? faceForLook(L) : faceSpec(seed);
   // (the clothes still go by lobby slot, so the four of you stay easy to tell apart; everything else is the face's)
-  const look = Object.assign({}, LOOKS[slot], { hair: face.hair, skin: face.skin, long: face.long, scale: face.scale, flat: face.flat });
+  const look = Object.assign({}, LOOKS[slot], { hair: face.hair, skin: face.skin, long: face.long, scale: face.scale, flat: face.flat },
+    L ? { jacket: L.shirt, pants: L.pants, shoe: L.shoes } : {});
   const model = THREE.cloneSkinned(opts.template);
   model.position.set(0, 0, 0); model.rotation.set(0, 0, 0); model.scale.setScalar(look.scale);
   // (her eye glow isn't theirs; collect first, then remove: removing while walking the tree skips and breaks)
@@ -486,8 +526,8 @@ function createHuman(THREE, opts) {
     tube.geometry.dispose(); lens.geometry.dispose();
     if (own) { own.geo.dispose(); own.tex.dispose(); if (own.glasses) own.glasses.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
   }
-  return { obj: root, setName, update, light, dispose, anim, human: true, face };
+  return { obj: root, setName, update, light, dispose, anim, human: true, face, look };
 }
 
-window.PlayerModel = { create, createHuman, TAGS, faceSpec };
+window.PlayerModel = { create, createHuman, TAGS, faceSpec, LOOK_OPTIONS, sanitizeLook, randomLook };
 })();

@@ -22,7 +22,7 @@ function loadRejoin() {
 function clearRejoin() { try { localStorage.removeItem(REJOIN_KEY); } catch (e) {} updateRejoinBtn(); }
 function updateRejoinBtn() { const r = !MP.on && loadRejoin(); show('rejoinBtn', !!r);
   if (r) $('rejoinBtn').textContent = 'Rejoin game ' + r.code.slice(0, 3) + ' ' + r.code.slice(3); }
-const cleanName = t => String(t || '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 14);
+const cleanName = t => String(t || '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 16);   // (16: as long as an account name)
 let myName = '';
 try { myName = cleanName(localStorage.getItem('bb_name')); } catch (e) {}
 if (!myName) myName = 'Player ' + (10 + Math.random() * 89 | 0);
@@ -96,7 +96,7 @@ async function createLobby() {
   const peer = new peerjs.Peer(PEER_PREFIX + code, peerOptions()); MP.peer = peer;
   peer.on('open', id => {
     Object.assign(MP, { on: true, host: true, myId: id, code, overSent: false });
-    MP.lobby = { code, players: [{ id, name: myName, ready: false }], count: 0, started: false,
+    MP.lobby = { code, players: [{ id, name: myName, ready: false, look: myLook() }], count: 0, started: false,
       level: 0, diff: DIFFS[settings.difficulty] ? settings.difficulty : 'medium' };      // (the owner picks the floor and the difficulty)
     mpStatus(''); showLobby(); hostLobbyChanged();
   });
@@ -167,8 +167,8 @@ function hostHandle(id, m) {
   switch (m.t) {
     case 'hello':
       if (!pl && MP.conns.has(id) && MP.lobby.players.length < MAX_PLAYERS && !MP.lobby.started) {
-        MP.lobby.players.push({ id, name: cleanName(m.name) || 'Player', ready: false }); hostLobbyChanged(); }
-      else if (pl && MP.conns.has(id)) hostWelcomeBack(id, pl);
+        MP.lobby.players.push({ id, name: cleanName(m.name) || 'Player', ready: false, look: m.look ? PlayerModel.sanitizeLook(m.look) : null }); hostLobbyChanged(); }
+      else if (pl && MP.conns.has(id)) { if (m.look) pl.look = PlayerModel.sanitizeLook(m.look); hostWelcomeBack(id, pl); }
       break;
     case 'name': if (pl) { pl.name = cleanName(m.name) || pl.name; hostLobbyChanged(); } break;
     case 'ready': if (pl && !MP.lobby.started) { pl.ready = !!m.ready; hostLobbyChanged(); } break;
@@ -249,7 +249,7 @@ function joinLobby(r) {
 function openHostConn(peer, code, onIn, onFail) {
   const conn = peer.connect(PEER_PREFIX + code, { reliable: true }); MP.hostConn = conn;
   let inside = false;
-  conn.on('open', () => { send(conn, { t: 'hello', name: myName }); if (onFail) onFail('owner'); });
+  conn.on('open', () => { send(conn, { t: 'hello', name: myName, look: myLook() }); if (onFail) onFail('owner'); });
   conn.on('data', d => {
     if (MP.hostConn !== conn) return;
     if (d && d.t === 'reject') { MP.rejected = d.why; if (onFail) onFail(d.why); return; }
@@ -344,7 +344,7 @@ function hostStartFloor(i, first) {
   const L = MP.lobby; if (!L) return;
   const d = generateFloor(i, L.players.length, L.diff);
   if (first) d.first = true;
-  d.order = L.players.map(p => p.id); d.names = L.players.map(p => p.name);
+  d.order = L.players.map(p => p.id); d.names = L.players.map(p => p.name); d.looks = L.players.map(p => p.look || null);   // (everyone's character: js/account.js)
   MP.floorData = d;                                   // (kept, for anyone who reconnects during this floor)
   MP.floorDone = false; MP.overSent = false;
   hostEmit({ t: 'floor', d });
@@ -356,20 +356,23 @@ function hostEndMatch() {
   for (const p of L.players.filter(p => p.away)) hostDrop(p.id, true);   // (still gone at the end: they leave the lobby)
   hostSendLobby();
 }
-function makeOther(id, slot, name) {
+function makeOther(id, slot, name, look) {
   let o = MP.others.get(id);
   if (!o) { o = { id, x: 0, y: 0, tx: 0, ty: 0, ang: 0, pitch: 0, hidden: false, closet: -1, moving: false, sprinting: false,
     down: false, dead: false, downLeft: 0, inv: 0, rv: '', spd: 0, px: 0, py: 0, av: null, dance: -1 }; MP.others.set(id, o); }
   o.slot = slot; o.name = name;
-  if (renderer && (!o.av || o.avSlot !== slot || (playerTemplate && !o.avHuman))) {
+  const lk = look ? PlayerModel.sanitizeLook(look) : null, lkKey = lk ? JSON.stringify(lk) : ''; if (look !== undefined) o.look = lk;
+  if (renderer && (!o.av || o.avSlot !== slot || (playerTemplate && !o.avHuman) || (look !== undefined && o.avLook !== lkKey))) {
     removeAvatar(o);
-    try { o.av = playerTemplate ? PlayerModel.createHuman(THREE, { slot, name, template: playerTemplate, mocap: mocapData, face: id }) : PlayerModel.create(THREE, { slot, name }); }   // (face: their own, from their id)
+    try { o.av = playerTemplate ? PlayerModel.createHuman(THREE, { slot, name, template: playerTemplate, mocap: mocapData, face: id, look: o.look }) : PlayerModel.create(THREE, { slot, name }); }   // (their own character, or a face from their id)
     catch (e) { console.error(e); o.av = PlayerModel.create(THREE, { slot, name }); }
-    o.avSlot = slot; o.avHuman = !!playerTemplate; scene.add(o.av.obj); }
+    o.avSlot = slot; o.avHuman = !!playerTemplate; o.avLook = o.look ? JSON.stringify(o.look) : ''; scene.add(o.av.obj); }
   return o;
 }
 // the teammates' model arrived after they were made (a quick start): swap the stand-ins for the real figures
 function refreshAvatars() { for (const o of MP.others.values()) if (o.av && !o.avHuman) makeOther(o.id, o.slot, o.name); }
+// your own look, to send to the others (null if the profile code isn't there)
+const myLook = () => typeof account !== 'undefined' && account.look ? account.look : null;
 function removeAvatar(o) { if (o.av) { scene.remove(o.av.obj); o.av.dispose(); o.av = null; } }
 const meOrOther = id => id === MP.myId ? player : MP.others.get(id);
 
@@ -406,7 +409,7 @@ function clientHandle(m) {
       const d = m.d, slot = Math.max(0, d.order.indexOf(MP.myId)); MP.mySlot = slot;
       for (const [id, o] of MP.others) if (!d.order.includes(id)) { removeAvatar(o); MP.others.delete(id); }
       d.order.forEach((id, i) => { if (id === MP.myId) return;
-        const o = makeOther(id, i, d.names[i]), sp = d.spawns[Math.min(i, d.spawns.length - 1)];
+        const o = makeOther(id, i, d.names[i], d.looks && d.looks[i]), sp = d.spawns[Math.min(i, d.spawns.length - 1)];
         Object.assign(o, { x: sp[0], y: sp[1], tx: sp[0], ty: sp[1], ang: d.a0, down: false, dead: false, downLeft: 0, hidden: false, closet: -1, inv: 0, dance: -1, heardAt: performance.now() }); });
       MP.lastW = performance.now();
       MP.n = d.order.length; MP.inGame = true; MP.menu = false; MP.exitAsked = false; MP.scareT = 0; MP.spec = 0;

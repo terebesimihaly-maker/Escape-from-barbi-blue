@@ -17,6 +17,7 @@ A first-person 3D horror maze for phones and desktop. Solve the puzzles, unlock 
   - `js/stealth.js`: holding your breath, loose floorboards, fear
   - `js/team.js`: pings, emotes, watching and warning from beyond (playing together)
   - `js/extras.js`: achievements, the torn notes you've collected, the performance overlay
+  - `js/account.js`: signing in (or playing as a guest), and your profile: the character creator with a 3D preview
   - `js/cinematics.js`: the death screen and the title screen; `js/main.js`: the main loop and start-up
 - `js/house.js`: dresses each floor: skirting, rails and crown molding, framed doorways, lamps that really light the rooms (a few flicker or are dead), rugs and a runner carpet, porcelain dolls whose heads turn when you look away, teddy bears, side tables, grandfather clocks, basement pipes, crates, barrels and puddles, the attic's sheet-covered furniture, trunks and cobwebs, the workshop's workbenches, shelves of doll heads, dress forms and dolls hanging on strings, and a flashlight beam you can see in the air
 - `models/character_mobile.glb`: her rigged model (made in Blender)
@@ -27,8 +28,9 @@ A first-person 3D horror maze for phones and desktop. Solve the puzzles, unlock 
   head held level and tilted, head and arms moving in stop-motion jerks. `scream`, `lunge` (the kill), `peek` and `lean` are hand-made too.
 - `models/mocap.json`: the motion capture, already retargeted onto her rig (made with `tools/retarget-mocap.mjs`)
 - `audio/chase.mp3`: her chase song. It's faint when she's far away, gets louder as she gets closer, and plays at full volume when she catches you (a different song can be picked on the title screen)
-- `js/player-model.js`: teammates in multiplayer: human figures made from the same rig, animated with motion capture (idle, walk, jog, run) and hand-made dances, plus a downed pose, a working flashlight in the hand and a nametag. Clothes go by lobby slot; everything else is a face of their own, made from their player id (so everyone sees the same person): skin tone, hair colour and length, the head reshaped (jaw, chin, nose, cheeks, eyes, mouth, brow, face length), the face repainted (eyebrows, mouth, eye colour, eyeliner, stubble or a beard, freckles, blush, a mole, age lines) and glasses for some
+- `js/player-model.js`: teammates in multiplayer: human figures made from the same rig, animated with motion capture (idle, walk, jog, run) and hand-made dances, plus a downed pose, a working flashlight in the hand and a nametag. Everyone looks the way they made themselves in their profile (see "Accounts and your character"): clothes, hair, skin, eyes, beard, glasses, build and height, on a face made from a seed (so everyone sees the same person): the head reshaped (jaw, chin, nose, cheeks, eyes, mouth, brow, face length) and the face painted (eyebrows, mouth, eyeliner, freckles, blush, a mole, age lines). Anyone without a profile gets a random one from their player id
 - `animations.html`: preview each animation (drag to orbit)
+- `supabase/migrations/`: the account server's database (see "Accounts and your character")
 - `tests/`: browser tests (see "Tests" below)
 - `lib/three.min.js`: three.js r186 + GLTFLoader + post-processing (MIT, see `lib/THREE-LICENSE.txt`)
 - `lib/peerjs.min.js`: PeerJS 1.5.5 for multiplayer (MIT, see `lib/PEERJS-LICENSE.txt`)
@@ -78,6 +80,16 @@ The game doesn't stop while you play: she can come. Close a puzzle half done (to
 
 Wear headphones: sounds come from where they happen. You hear her footsteps (heavy, bare, the dragging foot scraping) from her direction, muffled behind walls; the music box and her song come from her side. Your own steps sound different on each floor (creaky boards, tiles, wet concrete), and you hear your teammates walking.
 
+## Accounts and your character
+
+The first thing the game shows is **Sign in** / **Create account**, with **Play as a guest** below it.
+
+- An account is a username (3 to 16 letters, numbers or _) and a password (at least 6 characters). There's no email address, so a forgotten password can't be reset.
+- **Your profile**: click your name in the top right corner of the menu. Your character in 3D (drag to turn it round) and everything about it: shirt, trousers and shoes (a colour from the row, or any colour you like), hair (short or long, and its colour), skin, eyes, beard, glasses, freckles, make-up, build and height. **New face** gives a different face and keeps the rest; **Randomize** changes everything.
+- Signed in, your character is saved to your account, so it's the same on any device, and the game signs you in by itself next time (for 90 days). As a guest it's kept on this device only; create an account later and it comes with you.
+- Playing together, everyone sees everyone else's character.
+- The server is a Supabase project (EFBB), set up by `supabase/migrations/`. The game only calls five database functions (sign up, sign in, who am I, save my character, sign out) with the project's public key; the tables are in a schema the API doesn't expose. Passwords are stored only as bcrypt hashes. Signing in gives the device a random session token (only its SHA-256 is stored on the server). 8 wrong passwords in a row lock an account for 10 minutes, and one address can create at most 10 accounts an hour.
+
 ## Settings
 
 Look sensitivity, volume, field of view, invert looking up and down, graphics quality, her song, **Calm effects**: no strobing, no screen shake, gentler flicker, no swaying when afraid (for anyone sensitive to flashing or motion), and **Show performance** (also F3): frames per second, frame time, resolution, draw calls, and playing together your ping (the lobby owner sees everyone's).
@@ -114,11 +126,13 @@ Takes used: 77_05 (standing, player idle), 16_15 (walk), 16_35 (jog), 09_02 (run
 
 ## Tests
 
-Browser tests with Playwright: single player, multiplayer (4 browsers and a local PeerJS server), her AI, sprint and the scares, the floors and puzzles, rejoining, the stealth features, fear, paintings and achievements (`extras`), and pings, emotes and spectating (`team`).
+Browser tests with Playwright: single player, multiplayer (4 browsers and a local PeerJS server), her AI, sprint and the scares, the floors and puzzles, rejoining, the stealth features, fear, paintings and achievements (`extras`), pings, dances and spectating (`team`), and accounts and the character creator (`account`, against a stand-in for the account server in `tests/server.mjs`, so the tests never touch the real one).
 
     cd tests && npm install && npm test          # or: node run.mjs features   (only the suites with "features" in the name)
 
 `CHROME=/path/to/chrome` picks the browser. By default the 3D is drawn in software (slow, but works on any machine, including servers without a graphics card). On your own computer, `GPU=1` uses your installed Chrome (or Edge) and your graphics card, in visible windows; add `HEADLESS=1` to hide them. On Windows (PowerShell):
 
-    cd tests; npm install; $env:GPU=1; npm test Screenshots go to `tests/out/`. `tests/server.mjs` serves the game with test hooks (`tests/hooks.js`) at `/game.html`; the real game never loads them.
+    cd tests; npm install; $env:GPU=1; npm test
+
+Screenshots go to `tests/out/`. `tests/server.mjs` serves the game with test hooks (`tests/hooks.js`) at `/game.html`; the real game never loads them.
 

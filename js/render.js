@@ -54,10 +54,10 @@ const specCam = { on: false, id: '', x: 0, y: 0, h: 0, yaw: 0, pitch: 0 }, dance
 // your own figure (playing together): only shown while you dance, when the camera is out in front of you
 function updateMyFigure() {
   if (!MP.on || !playerTemplate || !renderer) return;
-  const slot = MP.mySlot || 0;
-  if (!MP.meAv || MP.meAvSlot !== slot) {
+  const slot = MP.mySlot || 0, lk = myLook(), key = lk ? JSON.stringify(lk) : '';
+  if (!MP.meAv || MP.meAvSlot !== slot || MP.meAvLook !== key) {
     if (MP.meAv) { scene.remove(MP.meAv.obj); MP.meAv.dispose(); }
-    MP.meAv = PlayerModel.createHuman(THREE, { slot, name: myName, template: playerTemplate, mocap: mocapData, face: MP.myId }); MP.meAvSlot = slot; scene.add(MP.meAv.obj);
+    MP.meAv = PlayerModel.createHuman(THREE, { slot, name: myName, template: playerTemplate, mocap: mocapData, face: MP.myId, look: lk }); MP.meAvSlot = slot; MP.meAvLook = key; scene.add(MP.meAv.obj);
   }
   const p = player, av = MP.meAv, on = danceCam.k > 0.05 && !p.hidden && !p.down && !p.dead;
   av.obj.position.set(p.x * S, 0, p.y * S); av.obj.rotation.y = Math.PI / 2 - p.ang;

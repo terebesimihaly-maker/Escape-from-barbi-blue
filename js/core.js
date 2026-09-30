@@ -97,10 +97,11 @@ document.querySelectorAll('#qSeg button').forEach(b => b.onclick = () => { setti
 // the menu's "How to play" and "Settings" panels
 function openPanel(name) {
   document.querySelectorAll('#panel section').forEach(sec => sec.classList.toggle('hidden', sec.dataset.panel !== name));
-  show('panel', true); $('panelBack').focus();
+  show('panel', true); $('panelBack').focus({ preventScroll: true }); document.querySelector('#panel .card').scrollTop = 0;   // (open at the top, not scrolled down to Back)
 }
 const closePanel = () => {
   if (typeof rebinding !== 'undefined') rebinding = null;
+  if (typeof stopPreview === 'function') stopPreview();          // (the profile's 3D preview: js/account.js)
   if (!document.querySelector('#panel section[data-panel="keys"]').classList.contains('hidden')) { openPanel('settings'); return; }   // (Controls → back to Settings)
   show('panel', false); stopTest(); };
 document.querySelectorAll('nav [data-panel]').forEach(b => b.onclick = () => openPanel(b.dataset.panel));
