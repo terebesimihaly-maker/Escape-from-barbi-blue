@@ -21,7 +21,7 @@ function frame(now) {
   try {
     if (MP.on) mpTick(dt);
     if (state === 'play') { gameT += dt; update(dt); }
-    else if (locked()) document.exitPointerLock();
+    else if (locked() && state !== 'note') document.exitPointerLock();   // (reading a note keeps the mouse: a click carries on)
     if (state === 'play' || state === 'note' || state === 'paused') renderGame(gameT);
     else if (state === 'dead') renderDead(dt);
     else if (state === 'title' || state === 'lobby') renderTitle(dt);

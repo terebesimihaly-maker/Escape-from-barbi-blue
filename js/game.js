@@ -130,8 +130,7 @@ function updatePlayer(dt) {
     if (MP.on) { if (!f.asked) { f.asked = true; toHost({ t: 'fuse', k }); } } else applyFuse(k); } });
   for (const n of notes) if (!n.read && Math.hypot(n.x - p.x, n.y - p.y) < 20) {
     n.read = true; setSprint(false); joy.id = null; joy.x = joy.y = 0;
-    if (MP.on) MP.menu = true; else state = 'note';                 // (in multiplayer the game keeps going while you read)
-    $('paper').innerHTML = '<b>A TORN NOTE</b>'; $('paper').appendChild(document.createTextNode(n.text)); show('note', true); return;
+    openNote(n.text); return;
   }
   const de = Math.hypot(exit.x - p.x, exit.y - p.y);
   if (de < 18) {

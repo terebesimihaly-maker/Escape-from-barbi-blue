@@ -53,6 +53,25 @@ check(await p.evaluate(() => progress.done[0] === true && JSON.parse(localStorag
 await click(p, '#tGo');
 check(await until(p, () => bb.state === 'play' && bb.floorIdx === 1), 'on to floor 2');
 check(await p.evaluate(() => !document.getElementById('phone').disabled && document.getElementById('phone').textContent === 'PHONE'), 'the phone button is ready again on the new floor (it used to stay stuck)', await p.evaluate(() => document.getElementById('phone').textContent));
+console.log('== torn notes: carry on with a click or E, the mouse stays captured');
+await p.evaluate(() => { const cv = document.getElementById('c'); window.__exits = 0; window.__origExit = document.exitPointerLock;
+  document.exitPointerLock = () => { window.__exits++; };
+  Object.defineProperty(document, 'pointerLockElement', { configurable: true, get: () => cv });     // (as if the mouse were captured)
+  const m = bb.monster; m.active = false; m.spawnT = 1e9; const n = notes.find(n => !n.read); bb.player.x = n.x; bb.player.y = n.y; });
+check(await until(p, () => bb.state === 'note' && !document.getElementById('note').classList.contains('hidden'), null, 20000), 'walking onto a note opens it');
+await p.waitForTimeout(1500);
+check(await p.evaluate(() => window.__exits === 0), 'the mouse stays captured while the note is open', await p.evaluate(() => window.__exits));
+check(await p.evaluate(() => /click or press E/.test(document.querySelector('#note .tip').textContent)), 'the note says "click or press E" on a computer');
+await p.evaluate(() => document.dispatchEvent(new MouseEvent('mousedown')));
+check(await until(p, () => bb.state === 'play' && document.getElementById('note').classList.contains('hidden'), null, 5000), 'a click (with the mouse captured) closes the note');
+await p.evaluate(() => { const n = notes.find(n => !n.read); if (n) { bb.player.x = n.x; bb.player.y = n.y; } });
+if (await until(p, () => bb.state === 'note', null, 20000)) {
+  await p.waitForTimeout(800);
+  await p.evaluate(() => dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' })));
+  check(await until(p, () => bb.state === 'play' && document.getElementById('note').classList.contains('hidden'), null, 5000), 'pressing E closes the note too');
+  check(await p.evaluate(() => !bb.player.hidden), '(and E did not also climb into a wardrobe)');
+}
+await p.evaluate(() => { dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' })); delete document.pointerLockElement; document.exitPointerLock = window.__origExit; });
 await p.evaluate(() => toTitle());
 await click(p, '#play');
 const locks2 = await p.evaluate(() => [...document.querySelectorAll('#lvList button')].map(b => b.disabled));

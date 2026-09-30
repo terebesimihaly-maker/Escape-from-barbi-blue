@@ -87,6 +87,7 @@ function usePhone() {
 }
 
 addEventListener('keydown', e => { keys[e.code] = true;
+  if (!e.repeat && (e.code === 'KeyE' || e.code === 'Space' || e.code === 'Enter') && !$('note').classList.contains('hidden')) { closeNote(); return; }
   if (state === 'title') {
     if (e.code === 'Escape' && !$('panel').classList.contains('hidden')) closePanel();
     else if (e.code === 'Enter' && $('panel').classList.contains('hidden') && !$('play').disabled && document.activeElement.tagName !== 'BUTTON' && document.activeElement.tagName !== 'A') $('play').click();
@@ -176,10 +177,23 @@ $('tGo').onclick = () => { unlockAudio(); show('trans', false); startFloor(floor
 $('again').onclick = () => { show('win', false); if (MP.on) { showLobby(); return; } toTitle(); };
 $('pause').onclick = pause;
 $('resume').onclick = () => { show('paused', false); unlockAudio(); if (MP.on) MP.menu = false; else state = 'play'; lockMouse(); };
-$('note').onclick = () => { show('note', false); if (MP.on) MP.menu = false; else state = 'play'; lockMouse(); };
+// a torn note: click anywhere, tap, or press E / Space / Enter to carry on. On a computer the mouse stays captured the whole time
+// (it used to be released too late, or in multiplayer not at all, so there was no cursor to click the note with)
+let noteAt = 0;
+function openNote(text) {
+  if (MP.on) MP.menu = true; else state = 'note';                   // (in multiplayer the game keeps going while you read)
+  $('paper').innerHTML = '<b>A TORN NOTE</b>'; $('paper').appendChild(document.createTextNode(text)); show('note', true); noteAt = performance.now();
+}
+function closeNote() {
+  if ($('note').classList.contains('hidden') || performance.now() - noteAt < 350) return false;   // (not the click you were already making)
+  show('note', false); if (MP.on) MP.menu = false; else state = 'play'; lockMouse(); return true;
+}
+$('note').onclick = closeNote;
+document.addEventListener('mousedown', () => { if (locked()) closeNote(); });   // (with the mouse captured, clicks go to the game, not the note)
 function pause() {
   if (state !== 'play') return;
   setSprint(false);
+  if (locked()) document.exitPointerLock();          // (the menu needs a cursor: in multiplayer the game doesn't stop to release it)
   // together the game can't stop for one player: the menu opens over the running game
   if (MP.on) { MP.menu = true; $('pText').textContent = 'The game keeps going for everyone while this is open.'; show('paused', true); return; }
   state = 'paused'; show('paused', true); if (ac) ac.suspend();
