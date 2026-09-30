@@ -30,7 +30,7 @@ check(await until(A, id => { const o = bb.MP.others.get(id); return o && !o.away
 
 console.log('== closing the page and rejoining');
 await A.evaluate(() => bb.hostEmit({ t: 'fuseGot', k: 0, by: bb.MP.myId }));         // (some progress to come back to)
-check(await until(B, () => bb.fusesGot === 1, null, 10000), 'a fuse was found');
+check(await until(B, () => bb.fusesGot === 1, null, 10000), 'a labyrinth box was solved');
 const posBefore = await B.evaluate(() => { bb.player.x += 5; return [bb.player.x, bb.player.y]; });
 await B.waitForTimeout(800);                                                                  // (let the host hear where Ben is)
 await B.reload({ waitUntil: 'domcontentloaded' });
@@ -42,17 +42,17 @@ await click(B, '#rejoinBtn');
 check(await until(B, () => bb.state === 'play' && bb.MP.inGame, null, 90000), 'Ben is back in the game', await text(B, 'mpStatus'));
 const [ga, gb] = await Promise.all([A, B].map(P => P.evaluate(() => bb.grid.map(r => r.join('')).join('|'))));
 check(ga === gb, 'on the same floor as Anna');
-check(await B.evaluate(() => bb.fusesGot === 1 && bb.fuses[0].got), 'with the fuse already found');
+check(await B.evaluate(() => bb.fusesGot === 1 && bb.fuses[0].got), 'with that box already solved');
 const posAfter = await B.evaluate(() => [bb.player.x, bb.player.y]);
 check(Math.hypot(posAfter[0] - posBefore[0], posAfter[1] - posBefore[1]) < 30, 'where he was', { posBefore, posAfter });
 check(await until(A, id => { const o = bb.MP.others.get(id); return o && !o.away; }, benId, 15000), 'Anna sees Ben back again');
 check(await B.evaluate(id => bb.MP.myId === id, benId), 'as the same player');
 
-console.log('== every fuse on the basement (2 players, Hard: 7 fuses)');
-const fz = await A.evaluate(() => bb.fuses.map((f, k) => ({ k, x: f.x, y: f.y, got: f.got })));
-check(fz.length === 7, 'the basement has 7 fuses for 2 players on Hard', fz.length);
-for (const f of fz.filter(f => !f.got)) { await B.evaluate(f => { bb.player.x = f.x; bb.player.y = f.y; }, f); await until(A, k => bb.fuses[k].got, f.k, 20000); }
-check((await Promise.all([A, B].map(P => until(P, () => bb.fusesGot === 7 && bb.powerOn, null, 20000)))).every(Boolean), 'Ben walks over all 7: both have 7 of 7, the door opens');
+console.log('== every labyrinth box on the basement (2 players, Hard)');
+const fz = await A.evaluate(() => bb.fuses.map((f, k) => ({ k, got: f.got })));
+check(fz.length === 3, 'the basement has 3 labyrinth boxes on Hard', fz.length);
+for (const f of fz.filter(f => !f.got)) { await B.evaluate(k => { openPuzzle(k); if (pzOpen) pzOpen.won = 0.001; }, f.k); await until(A, k => bb.fuses[k].got, f.k, 20000); }
+check((await Promise.all([A, B].map(P => until(P, () => bb.fusesGot === 3 && bb.powerOn, null, 20000)))).every(Boolean), 'Ben solves all 3: both see 3 of 3, the door opens');
 
 console.log('== a player who never comes back');
 await B.context().close();

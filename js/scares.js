@@ -3,14 +3,18 @@
      phantom - at the far end of a long corridor, she's peeking around the corner. The flashlight stutters and she's gone.
                (only an apparition: it only happens while the real her is far away and out of sight)
      ceiling - heavy footsteps cross the floor above you, dust comes down, then something is dragged away.
+     dark    - every light dies. When they come back, she is standing right in front of you. Then dark again, and she's gone.
+     dash    - she sprints across a junction ahead of you, and is gone.
+     breath  - breathing right behind you. Turn around: nothing there.
+     door    - a wardrobe door nearby creaks open by itself... and slams shut.
    Each player gets their own (in multiplayer they're not shared). */
 'use strict';
 
-const scares = { next: 30, active: null, doll: null, phantom: null, steps: null, dim: 1, log: [], dust: null };
-const SCARE_GAP = [50, 85];                  // seconds between two scares
+const scares = { next: 30, active: null, doll: null, phantom: null, steps: null, dim: 1, log: [], dust: null, app: null, s: null };
+const SCARE_GAP = [35, 60];                  // seconds between two scares
 
 function resetScares() {
-  scares.next = rnd(28, 40); scares.active = null; scares.doll = null; scares.phantom = null; scares.steps = null; scares.dim = 1;
+  scares.next = rnd(20, 30); scares.active = null; scares.doll = null; scares.phantom = null; scares.steps = null; scares.dim = 1; scares.app = null; scares.s = null;
   if (scares.dust) scares.dust.visible = false;
 }
 // is this point (in world units, at height h metres) in front of you, and not behind a wall?
@@ -91,10 +95,78 @@ function updatePhantom(dt) {
 }
 // render3D calls this after placing her: while the apparition is up, she's drawn there instead
 function drawPhantom() {
-  const s = scares.phantom; if (!s || !barbi) return;
+  const s = scares.app || scares.phantom; if (!barbi) return;
+  if (scares.app && !scares.app.show) { barbi.obj.visible = false; return; }
+  if (!s) return;
   barbi.obj.visible = true; barbi.obj.position.set(s.x * S, 0, s.y * S); barbi.obj.rotation.y = Math.PI / 2 - s.ang;
   setEyes(0.9);
 }
+// she's far away and can't see you (the apparitions need her out of the way)
+const herAway = () => { const m = monster, p = player; return !m.active || (Math.hypot(m.x - p.x, m.y - p.y) > T * 8 && !los(p.x, p.y, m.x, m.y)); };
+
+/* ---------- every light dies; she's in front of you when they come back ---------- */
+function startDark() {
+  const p = player; if (!barbi || !herAway()) return false;
+  const x = p.x + Math.cos(p.ang) * 50, y = p.y + Math.sin(p.ang) * 50;          // (about 2 m in front)
+  if (blocked(x, y, 10) || !los(p.x, p.y, x, y)) return false;
+  scares.s = { t: 0, x, y, stung: false }; sfx.buzz(); return true;
+}
+function updateDark(dt) {
+  const s = scares.s, p = player; s.t += dt;
+  const out = s.t < 1.7 || (s.t > 2.25 && s.t < (calm() ? 2.25 : 2.55));             // (dark, her, dark, light)
+  scares.dim = out ? (calm() ? Math.max(0.15, 1 - s.t) : 0) : 1;
+  if (s.t >= 1.7 && s.t < 2.25) {                          // the lights are back: she's right there, looking at you
+    scares.app = { x: s.x, y: s.y, ang: Math.atan2(p.y - s.y, p.x - s.x), anim: 'idle', show: true };
+    if (!s.stung) { s.stung = true; sfx.sting(1); if (!songOn) sfx.scream(0.35); shake = Math.max(shake, 6); if (navigator.vibrate) navigator.vibrate([80, 40, 160]); }
+  } else if (s.t >= 2.25) scares.app = { show: false };
+  if (s.t > 2.7) { scares.dim = 1; scares.app = null; scares.s = null; endScare(true); }
+}
+
+/* ---------- she runs across a junction ahead ---------- */
+function startDash() {
+  const p = player; if (!barbi || !herAway()) return false;
+  const q = Math.round(p.ang / (Math.PI / 2)), a = q * Math.PI / 2; if (Math.abs(angDiff(p.ang, a)) > 0.4) return false;
+  const dx = Math.round(Math.cos(a)), dy = Math.round(Math.sin(a));
+  let tx = Math.floor(p.x / T), ty = Math.floor(p.y / T);
+  for (let n = 1; n <= 5; n++) { tx += dx; ty += dy; if (isWall(tx, ty)) return false;
+    if (n >= 2 && !isWall(tx - dy, ty + dx) && !isWall(tx + dy, ty - dx)) {            // a crossing: open on both sides
+      const cx = (tx + 0.5) * T, cy = (ty + 0.5) * T, side = Math.random() < 0.5 ? 1 : -1;
+      scares.s = { t: 0, x0: cx - dy * side * T * 1.2, y0: cy + dx * side * T * 1.2, x1: cx + dy * side * T * 1.2, y1: cy - dx * side * T * 1.2, stepT: 0 };
+      if (!los(p.x, p.y, cx, cy)) return false; return true; } }
+  return false;
+}
+function updateDash(dt) {
+  const s = scares.s; s.t += dt; const k = Math.min(1, s.t / 0.6), x = s.x0 + (s.x1 - s.x0) * k, y = s.y0 + (s.y1 - s.y0) * k;
+  scares.app = { x, y, ang: Math.atan2(s.y1 - s.y0, s.x1 - s.x0), anim: 'chase', show: k < 1 };
+  s.stepT -= dt; if (s.stepT <= 0 && k < 1) { s.stepT = 0.14; sfx.herStep(x, y, true, false); }
+  if (s.t > 1) { scares.app = null; scares.s = null; endScare(true); }
+}
+
+/* ---------- breathing right behind you ---------- */
+function startBreath() { if (!herAway()) return false; scares.s = { t: 0, n: 0, a0: player.ang }; return true; }
+function updateBreath(dt) {
+  const s = scares.s, p = player; s.t += dt;
+  const bx = p.x - Math.cos(p.ang) * 16, by = p.y - Math.sin(p.ang) * 16;           // (always just behind your head)
+  if (s.n < 3 && s.t > s.n * 1.1) { s.n++; sfx.breath({ x: bx, y: by, h: 1.7 }); if (s.n === 3) shake = Math.max(shake, 1.5); }
+  // you turn around: nothing. A giggle from somewhere else.
+  if (s.t > 1 && Math.abs(angDiff(p.ang, s.a0)) > 2.2 && !s.turned) { s.turned = true; sfx.whisper(0.08, { x: p.x + Math.cos(p.ang) * 150, y: p.y + Math.sin(p.ang) * 150, h: 1.5 }); }
+  if (s.t > 5) { scares.s = null; endScare(true); }
+}
+
+/* ---------- a wardrobe door opens by itself ---------- */
+function startDoor() {
+  const c = closets.find(c => c.doors && !(player.hidden && player.closet === c) && Math.hypot(c.x - player.x, c.y - player.y) < T * 4 && inView(c.x, c.y, 1.2, 0.6));
+  if (!c) return false; scares.s = { t: 0, c, creak: false, slam: false }; return true;
+}
+function updateDoor(dt) {
+  const s = scares.s; s.t += dt;
+  if (!s.creak) { s.creak = true; sfx.creak(0.2, { x: s.c.x, y: s.c.y, h: 1.2 }); }
+  s.open = s.t < 2.5 ? (s.t / 2.5) * 0.7 : s.t < 4 ? 0.7 : Math.max(0, 0.7 - (s.t - 4) * 6);
+  if (s.t > 4.1 && !s.slam) { s.slam = true; sfx.thump(0.8); shake = Math.max(shake, 4); }
+  if (s.t > 4.5) { scares.s = null; endScare(true); }
+}
+// (js/render.js asks how far a wardrobe's door is open)
+const scareDoorOpen = c => scares.active === 'door' && scares.s && scares.s.c === c ? scares.s.open || 0 : 0;
 
 /* ---------- footsteps on the floor above ---------- */
 function startCeiling() {
@@ -128,7 +200,8 @@ function dropDust(x, y) {
 }
 
 /* ---------- the director ---------- */
-const SCARES = { doll: [startDoll, updateDoll], phantom: [startPhantom, updatePhantom], ceiling: [startCeiling, updateCeiling] };
+const SCARES = { doll: [startDoll, updateDoll], phantom: [startPhantom, updatePhantom], ceiling: [startCeiling, updateCeiling],
+  dark: [startDark, updateDark], dash: [startDash, updateDash], breath: [startBreath, updateBreath], door: [startDoor, updateDoor] };
 function startScare(k) { if (!SCARES[k][0]()) return false; scares.active = k; scares.log.push(k); return true; }
 function endScare(counted) { scares.active = null; scares.doll = null; scares.next = counted === false ? rnd(8, 15) : rnd(SCARE_GAP[0], SCARE_GAP[1]); }
 function updateScares(dt) {
@@ -136,7 +209,7 @@ function updateScares(dt) {
   if (scares.active) {
     if (!scareCalm() && scares.active !== 'ceiling') {   // she's after you: drop it (a doll that moved stays where it is)
       if (scares.active === 'doll' && scares.doll.phase === 'behind') scares.doll.d.obj.visible = false;
-      scares.phantom = null; endScare(false); return; }
+      scares.phantom = null; scares.app = null; scares.s = null; scares.dim = 1; endScare(false); return; }
     SCARES[scares.active][1](dt); return;
   }
   if (scares.dust && scares.dust.visible) updateCeilingDustOnly(dt);
@@ -153,4 +226,4 @@ function updateCeilingDustOnly(dt) {
   for (let i = 0; i < pos.count; i++) { v[i] += dt * 1.6; const y = Math.max(0.02, pos.getY(i) - v[i] * dt); pos.setY(i, y); if (y > 0.02) any = true; }
   pos.needsUpdate = true; if (!any) dp.visible = false;
 }
-scares.force = k => { scares.active = null; scares.phantom = null; scares.doll = null; return startScare(k); };
+scares.force = k => { scares.active = null; scares.phantom = null; scares.doll = null; scares.app = null; scares.s = null; scares.dim = 1; return startScare(k); };

@@ -1,4 +1,4 @@
-/* Escape from Barbi Blue: Building a floor in 3D: floor, walls, ceiling, wardrobes, the exit door, fuses, notes and footprints.
+/* Escape from Barbi Blue: Building a floor in 3D: floor, walls, ceiling, wardrobes, the exit door, notes and footprints (the puzzles: js/puzzles.js).
    (The game is split over several plain scripts that share one scope; index.html loads them in order.) */
 'use strict';
 
@@ -36,17 +36,17 @@ function buildLevel() {
     vertexColors: true, color: new THREE.Color().setScalar(wallKind(F) === 'tile' ? 2.2 : wallKind(F) === 'attic' ? 1.4 : 1) }));
   walls.castShadow = walls.receiveShadow = true; G.add(walls);
   // the house around the maze: woodwork, doorways, lamps, furniture and props (js/house.js)
+  const pzFaces = puzzleFaces(), onPuzzleFace = f => pzFaces.has(f.x + ',' + f.y + ',' + f.nx + ',' + f.nz);   // (walls with a labyrinth box)
   const keep = new Set([...closets.map(c => Math.floor(c.x / T) + ',' + Math.floor(c.y / T)), exit.tx + ',' + exit.ty]);
   level.house = House.build(THREE, { style: F.style, L, H: WALL_H, GW, GH, isWall, faces, keep, wallMat: walls.material, hash, toTex, glowTex,
-    decorFace: f => hash(f.x * 7 + f.nx, f.y * 7 + f.nz, 91) < F.frames + 0.045, quality: settings.quality, lowq: LOWQ });
+    decorFace: f => onPuzzleFace(f) || hash(f.x * 7 + f.nx, f.y * 7 + f.nz, 91) < F.frames + 0.045, quality: settings.quality, lowq: LOWQ });
   G.add(level.house.group);
   if (level.house.beam) { level.house.beam.position.copy(flash.position); camera.add(level.house.beam); }
-  wallDecor(G, F, faces, level.house.doorTiles);
+  wallDecor(G, F, faces, level.house.doorTiles, onPuzzleFace);
   const wt = wardrobeMaterials();
   for (const c of closets) G.add(makeWardrobe(c, wt));
   makeExit(G);
-  const fm = fuseParts();
-  fuses.forEach((f, i) => { const o = makeFuse(fm); o.position.set(f.x * S, 0.95, f.y * S); o.userData.k = i * 1.7; f.obj = o; G.add(o); });
+  buildPuzzles3D(G);                                     // the labyrinth boxes on the walls (js/puzzles.js)
   notes.forEach(n => { const o = makeNote(n); n.obj = o; G.add(o); });
   level.prints = makePrints(); G.add(level.prints);
   scene.add(G);
@@ -281,7 +281,7 @@ function wallGeometry(faces) {
   return geo;
 }
 // doll portraits (some with glowing eyes) and words written on the walls
-function wallDecor(G, F, faces, doorTiles) {
+function wallDecor(G, F, faces, doorTiles, skip) {
   const plain = portraitTexture(false), eyed = portraitTexture(true), eyeGlow = portraitEyes();
   const pGeo = new THREE.PlaneGeometry(0.44, 0.56), wGeo = new THREE.PlaneGeometry(1.2, 0.6);
   const pMat = new THREE.MeshLambertMaterial({ map: plain });
@@ -289,7 +289,7 @@ function wallDecor(G, F, faces, doorTiles) {
   const words = {};
   const exitFace = f => f.x === exit.tx && f.y === exit.ty;
   faces.forEach((f, i) => {
-    if (exitFace(f) || (doorTiles && doorTiles.has(f.x + ',' + f.y))) return;
+    if (exitFace(f) || (doorTiles && doorTiles.has(f.x + ',' + f.y)) || (skip && skip(f))) return;
     const r = hash(f.x * 7 + f.nx, f.y * 7 + f.nz, 91), cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2, rot = Math.atan2(f.nx, f.nz);
     if (r < F.frames) {
       const m = new THREE.Mesh(pGeo, hash(f.x, f.y, 98) > 0.55 ? eMat : pMat);
@@ -415,22 +415,6 @@ function doorTexture(open) {
     g.fillStyle = '#9a8540'; g.fillRect(112, 250, 32, 28); g.strokeStyle = '#9a8540'; g.lineWidth = 5; g.beginPath(); g.arc(128, 250, 11, Math.PI, 0); g.stroke();
   }
   return toTex(c);
-}
-function fuseParts() {
-  return {
-    glass: new THREE.CylinderGeometry(0.045, 0.045, 0.13, 12), cap: new THREE.CylinderGeometry(0.052, 0.052, 0.05, 12),
-    glassMat: new THREE.MeshLambertMaterial({ color: 0xffe0a0, emissive: 0xffa030, emissiveIntensity: 1.2, transparent: true, opacity: 0.9 }),
-    capMat: new THREE.MeshStandardMaterial({ color: 0xb8bcc4, metalness: 0.8, roughness: 0.35 }),
-  };
-}
-function makeFuse(fm) {
-  const g = new THREE.Group(), body = new THREE.Group();
-  const c1 = new THREE.Mesh(fm.cap, fm.capMat), c2 = new THREE.Mesh(fm.cap, fm.capMat); c1.position.y = 0.088; c2.position.y = -0.088;
-  body.add(new THREE.Mesh(fm.glass, fm.glassMat), c1, c2); body.rotation.z = 0.35;
-  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color(0xffc060).multiplyScalar(2), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0.7 }));
-  glow.scale.setScalar(0.75);
-  g.add(body, glow); g.userData.body = body;
-  return g;
 }
 function makeNote(n) {
   const c = mkCanvas(128, 168), g = c.getContext('2d');

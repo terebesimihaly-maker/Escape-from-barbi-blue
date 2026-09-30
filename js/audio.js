@@ -104,7 +104,18 @@ const sfx = {
     else if (style === 'tile') { burst('bandpass', 2600, 2.5, 0.09, 0.035); burst('highpass', 5000, 0.7, 0.03, 0.02); knock(220, 0.06, 0.05); }
     else { burst('bandpass', 900, 0.9, 0.12, 0.09); burst('highpass', 3200, 0.5, 0.05, 0.16); knock(90, 0.07, 0.08); }   // (a wet slap)
   },
-  // a fuse: a faint electric hum (from where it is)
+  // someone breathing, slow and wet, right behind you
+  breath(at) { if (!ac) return; const t = ac.currentTime;
+    [[0, 0.9, 500], [1.0, 0.7, 380]].forEach(([o, len, f]) => { const n = noise(), bp = ac.createBiquadFilter(), g = ac.createGain();
+      bp.type = 'bandpass'; bp.frequency.setValueAtTime(f, t + o); bp.frequency.linearRampToValueAtTime(f * 1.4, t + o + len); bp.Q.value = 1.5;
+      g.gain.setValueAtTime(0.0001, t + o); g.gain.exponentialRampToValueAtTime(0.18, t + o + len * 0.4); g.gain.exponentialRampToValueAtTime(0.0001, t + o + len);
+      n.connect(bp); bp.connect(g); out3d(g, at.x, at.y, at.h, 0.8); n.start(t + o); n.stop(t + o + len + 0.05); }); },
+  // a ball falling into a labyrinth hole: a loud metallic clang (she hears it)
+  clang() { if (!ac) return; const t = ac.currentTime, g = ac.createGain(); env(g, t, 0.003, 0.35, 0.9); out(g);
+    [220, 331, 467, 612].forEach((f, i) => { const o = ac.createOscillator(); o.type = 'square'; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.97, t + 0.8);
+      const og = ac.createGain(); og.gain.value = 0.25 / (i + 1); o.connect(og); og.connect(g); o.start(t); o.stop(t + 1); });
+    const n = noise(), bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2500; n.connect(bp); bp.connect(g); n.start(t); n.stop(t + 0.15); },
+  // a puzzle station: a faint electric hum (from where it is)
   hum(at) { if (!ac) return; const t = ac.currentTime, g = ac.createGain(); env(g, t, 0.15, 0.05, 0.8); out3d(g, at.x, at.y, at.h, 1.3);
     [120, 240, 361].forEach((f, i) => { const o = ac.createOscillator(); o.type = i ? 'sine' : 'sawtooth'; o.frequency.value = f; const og = ac.createGain(); og.gain.value = [0.5, 0.3, 0.12][i]; o.connect(og); og.connect(g); o.start(t); o.stop(t + 1); }); },
   // her footsteps: heavy and bare, from where she is (the dragging foot scrapes when she walks)

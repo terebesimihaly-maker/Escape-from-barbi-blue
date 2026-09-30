@@ -84,34 +84,34 @@ const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.r
 
 /* ---------- content ---------- */
 const FLOORS = [
-  { name: 'The Nursery', cw: 7, ch: 11, fuses: 3,
-    text: "You wake up in a nursery that isn't yours. The door is locked. The fuses are missing.",
+  { name: 'The Nursery', cw: 7, ch: 11,
+    text: "You wake up in a nursery that isn't yours. The door is locked. Someone has left wooden labyrinth boxes on the walls.",
     style: 'wood', floorA: '#3b2722', wallTop: '#1c1118', face: '#6a3d54', pattern: '#7f4b66', dot: '#d3a9bd', base: '#2a1820', frames: 0.12 },
-  { name: 'The Doll Hallway', cw: 8, ch: 13, fuses: 4,
+  { name: 'The Doll Hallway', cw: 8, ch: 13,
     text: 'The stairs only go down. Porcelain faces line the walls. Some of them turn to watch you.',
     style: 'tile', floorA: '#22333a', floorB: '#0f181b', grout: '#070b0c', wallTop: '#0d171b', face: '#244650', pattern: '#2f5a67', base: '#0e1e23', frames: 0.4 },
-  { name: 'The Basement', cw: 9, ch: 15, fuses: 5,
+  { name: 'The Basement', cw: 9, ch: 15,
     text: "It's wet down here. The humming is louder. This is where she was left.",
     style: 'concrete', floorA: '#2c2a25', wallTop: '#151410', face: '#4d3b2e', mortar: '#241d17', base: '#1b1611', frames: 0.05 },
   // (floor: which floor painting, and which footsteps; walls: which wall painting; style: how js/house.js dresses it)
-  { name: 'The Attic', cw: 9, ch: 15, fuses: 5,
+  { name: 'The Attic', cw: 9, ch: 15,
     text: "The basement door didn't lead outside. It led up. Everything up here is covered in sheets, and something under them is breathing.",
     style: 'attic', floor: 'wood', walls: 'attic', floorA: '#3a2c20', wallTop: '#140f0b', face: '#4a3726', pattern: '#3a2a1c', base: '#1f160f', frames: 0.06 },
-  { name: 'The Workshop', cw: 10, ch: 16, fuses: 6,
+  { name: 'The Workshop', cw: 10, ch: 16,
     text: 'This is where she was made. Shelves of glass eyes watch you work. The front door is on the other side.',
     style: 'workshop', floor: 'tile', walls: 'workshop', floorA: '#4a4640', floorB: '#191816', grout: '#0c0b0a', wallTop: '#12140f', face: '#4e5647', pattern: '#3c4236', base: '#15130f', frames: 0.2 },
 ];
 // difficulty: single player picks it with the floor; together, the lobby owner picks it for everyone.
 // speed/hear: her speed and hearing; sight: how far she sees (units); hunt: seconds added to the time between her screams;
 // spawn: seconds before she wakes; check: the chance she opens a wardrobe she stops at; phone: its cooldown;
-// down: seconds to revive a teammate; fuses: more or fewer fuses to find
+// down: seconds to revive a teammate. (How many labyrinth boxes, and how hard they are: js/puzzles.js)
 const DIFFS = {
-  easy:   { name: 'Easy', speed: 0.85, hear: 0.75, sight: 300, hunt: 18, spawn: 5, check: 0.12, phone: 35, down: 65, fuses: -1,
-            text: 'She is slower and hears less, and there is a fuse less to find. The phone recharges faster.' },
-  medium: { name: 'Medium', speed: 1, hear: 1, sight: 360, hunt: 0, spawn: 0, check: 0.3, phone: 45, down: 50, fuses: 0,
+  easy:   { name: 'Easy', speed: 0.85, hear: 0.75, sight: 300, hunt: 18, spawn: 5, check: 0.12, phone: 35, down: 65,
+            text: 'She is slower and hears less. One labyrinth box less, smaller mazes, fewer holes and a slower ball. The phone recharges faster.' },
+  medium: { name: 'Medium', speed: 1, hear: 1, sight: 360, hunt: 0, spawn: 0, check: 0.3, phone: 45, down: 50,
             text: 'The house as it was meant to be played.' },
-  hard:   { name: 'Hard', speed: 1.1, hear: 1.3, sight: 430, hunt: -10, spawn: -1, check: 0.5, phone: 60, down: 40, fuses: 1,
-            text: 'She is faster (you can still outrun her), hears and sees further, and opens wardrobes more often. One more fuse.' },
+  hard:   { name: 'Hard', speed: 1.1, hear: 1.3, sight: 430, hunt: -10, spawn: -1, check: 0.5, phone: 60, down: 40,
+            text: 'She is faster (you can still outrun her), hears and sees further, and opens wardrobes more often. Bigger mazes with more holes, and a faster ball.' },
 };
 let curDiff = 'medium';                                   // (the difficulty of the floor being played)
 const DF = () => DIFFS[curDiff] || DIFFS.medium;
@@ -132,7 +132,7 @@ const NOTES = [
   "Don't run unless you have to.\nShe hears running.\nShe hears EVERYTHING.",
   "If the melody gets close, get in a wardrobe.\nShe doesn't look inside...\nunless she SAW you go in.",
   "Her eyes glow in the dark.\nIf you can see them,\nshe can see you.",
-  "Put all the fuses back and the door unlocks.\nBut the lights coming on wakes her up.\nBe ready to move.",
+  "Finish every labyrinth box and the door unlocks.\nBut the lock is loud. It wakes her up.\nBe ready to move.",
   "I can see the door.\nI can hear her humming right behind m",
   "The attic ladder was already down.\nSomeone wanted me up here.\nThe sheets move when I'm not looking.",
   "Wardrobes won't save you forever.\nIf she lost you close by,\nshe checks every one of them.",

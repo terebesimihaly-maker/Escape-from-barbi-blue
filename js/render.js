@@ -36,8 +36,8 @@ function render3D(t) {
   if (!level || level.grid !== grid) buildLevel();
   placeCamera(t); setListener(camera);
   // (the flashlight is dimmed to 0 rather than switched off: switching lights on and off makes every material recompile, a stutter)
-  flash.intensity = p.hidden || p.dead ? 0 : FLASH_I * (calm() ? 0.8 + 0.2 * flicker : flicker) * (p.down ? 0.5 : 1);
-  aura.intensity = p.hidden ? (closetScene && closetScene.t > 0 ? 3.5 : 3.2) : 1.2; aura.distance = p.hidden ? 8 : 4.5;
+  flash.intensity = p.hidden || p.dead ? 0 : FLASH_I * (calm() ? 0.8 + 0.2 * flicker : flicker) * (p.down ? 0.5 : 1) * scares.dim;
+  aura.intensity = p.hidden ? (closetScene && closetScene.t > 0 ? 3.5 : 3.2) : 1.2 * (p.hidden ? 1 : scares.dim); aura.distance = p.hidden ? 8 : 4.5;
 
   // her
   if (barbi) {
@@ -79,7 +79,7 @@ function render3D(t) {
   }
   // wardrobe doors: only the one you're in ever opens (in the scene). From inside, closed doors are drawn as the slats overlay.
   for (const c of closets) if (c.doors) for (const d of c.doors) {
-    const mine = p.hidden && p.closet === c, k = mine && closetScene && d.side < 0 ? sceneDoor(closetScene.t) : 0;
+    const mine = p.hidden && p.closet === c, k = mine && closetScene && d.side < 0 ? sceneDoor(closetScene.t) : d.side < 0 ? scareDoorOpen(c) : 0;
     d.pivot.rotation.y = d.side * k * 1.9; d.leaf.visible = !mine || k > 0.12;
   }
   // teammates
@@ -88,9 +88,7 @@ function render3D(t) {
     o.av.update(lastDt, { speed: o.spd * S, sprinting: o.sprinting, down: o.down, dead: o.dead, hidden: o.hidden, away: o.away, pitch: o.pitch, lightOn: settings.quality !== 'low' });
     o.av.setName(o.dead ? o.name + ' ✝' : o.down ? o.name + ' · ' + Math.ceil(o.downLeft) + 's' : o.name, o.down || o.dead); }
   // things on the floor
-  for (const f of fuses) if (f.obj) { f.obj.visible = !f.got;
-    if (!f.got) { const k = f.obj.userData.k; f.obj.userData.body.rotation.y = t * 1.3 + k; f.obj.position.y = 0.95 + Math.sin(t * 2 + k) * 0.04;
-      f.obj.children[1].material.opacity = 0.5 + Math.sin(t * 4 + k) * 0.2; } }
+  animatePuzzles(t);
   for (const n of notes) if (n.obj) n.obj.visible = !n.read;
   const D = level.door;
   if (D) { if (powerOn && !D.open) { D.open = true; D.door.material = D.openMat; }
@@ -110,7 +108,7 @@ function render3D(t) {
     col.setXYZ(i, b, b * 0.92, b * 0.8);
   });
   pos.needsUpdate = col.needsUpdate = true;
-  if (level.house) level.house.calm = calm();
+  if (level.house) { level.house.calm = calm(); level.house.dark = scares.dim < 0.5; }
   if (level.house) level.house.update(lastDt, t, camera, p, flash);
   draw(scene, camera);
 }
@@ -171,10 +169,10 @@ function drawScreenFx(t) {
 }
 // Multiplayer overlay: in the top right corner an arrow for every downed teammate (up = straight ahead),
 // with their name, how far away they are and how long they have left; and the revive progress ring.
-// can't find the last fuse? When only one is left, or none has been found for a minute, an amber arrow points to the nearest one
+// stuck? When one labyrinth box is left, or none has been solved for a minute, an amber arrow points to the nearest one
 function fuseHintOn() {
-  const left = fuses.filter(f => !f.got);
-  return state === 'play' && !powerOn && left.length > 0 && !player.hidden && !player.down && (left.length === 1 || levelTime - lastFuseAt > 60) ? left : null;
+  const left = hintTargets();
+  return state === 'play' && !powerOn && left.length > 0 && !player.hidden && !player.down && !pzOpen && (fuses.length - fusesGot === 1 || levelTime - lastFuseAt > 60) ? left : null;
 }
 function drawFuseHint(t) {
   const left = fuseHintOn(); if (!left) return;
@@ -186,7 +184,7 @@ function drawFuseHint(t) {
   ctx.translate(cx, cy + 24 * D); ctx.rotate(a); ctx.fillStyle = 'rgba(255,200,100,' + pulse + ')';
   ctx.beginPath(); ctx.moveTo(13 * D, 0); ctx.lineTo(-7 * D, -8 * D); ctx.lineTo(-3 * D, 0); ctx.lineTo(-7 * D, 8 * D); ctx.fill(); ctx.restore();
   ctx.save(); ctx.fillStyle = 'rgba(255,210,140,.85)'; ctx.font = (11 * D) + 'px system-ui,sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText('⚡ ' + Math.round(bd / T) + ' tiles', cx, cy + 58 * D); ctx.restore();
+  ctx.fillText('🧩 ' + Math.round(bd / T) + ' tiles', cx + 20 * D, cy + 58 * D); ctx.restore();
 }
 function drawTeamFx(t) {
   const p = player, cw = cvs.width, ch = cvs.height, D = DPR;

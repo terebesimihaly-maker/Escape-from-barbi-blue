@@ -27,19 +27,11 @@ function generateFloor(i, n, diff) {
   const closetsD = dead.slice(0, 4 + i * 2 + (n - 1)).map(c => { used.add(c.join(','));
     const [ox, oy] = DIRS.find(([dx, dy]) => !isWall(c[0] + dx, c[1] + dy)); return [c[0], c[1], ox, oy]; });
 
-  const cand = CELLS.filter(c => !used.has(c.join(',')) && dist[idx(c[0], c[1])] > maxD * 0.2);
-  const fusesD = [];
-  const nFuses = Math.max(2, F.fuses + (n - 1) + D.fuses);
-  for (let k = 0; k < nFuses; k++) {                    // together: one more fuse per extra player (and by difficulty)
-    let best = null, bs = -1;
-    for (let j = 0; j < 50; j++) {
-      const c = cand[Math.random() * cand.length | 0]; if (!c || used.has(c.join(','))) continue;
-      let sc = Math.hypot(c[0] - 1, c[1] - 1) * 0.7;
-      for (const f of fusesD) sc = Math.min(sc, Math.hypot(c[0] - f[0], c[1] - f[1]));
-      sc += Math.random(); if (sc > bs) { bs = sc; best = c; }
-    }
-    if (best) { used.add(best.join(',')); fusesD.push([best[0], best[1]]); }
-  }
+  // the puzzles: labyrinth boxes on the walls, each in its own cell away from the start (js/puzzles.js)
+  const cand = shuffle(CELLS.filter(c => !used.has(c.join(',')) && dist[idx(c[0], c[1])] > Math.max(2, maxD * 0.12)));
+  const puzzlesD = makePuzzles(puzzleCount(i, diff), cand, i, diff);
+  for (const p of puzzlesD) used.add(p.cell.join(','));
+  const fusesD = puzzlesD.map(p => p.cell.slice());       // (the stations: solving one counts as a "fuse")
   const nc = shuffle(CELLS.filter(c => !used.has(c.join(',')) && dist[idx(c[0], c[1])] > 2));
   const notesD = nc.slice(0, 2).map(c => { used.add(c.join(',')); return [c[0], c[1], +rnd(-0.6, 0.6).toFixed(2)]; });
 
@@ -56,7 +48,7 @@ function generateFloor(i, n, diff) {
   const spawns = n > 1 ? [[-13, -13], [13, 13], [13, -13], [-13, 13]].map(([ox, oy]) => [T * 2.5 + ox, T * 2.5 + oy]) : [[T * 1.5, T * 1.5]];
   const mc = CELLS.filter(c => dist[idx(c[0], c[1])] > maxD * 0.55 && !(c[0] === far[0] && c[1] === far[1]));
   const m0 = mc.length ? mc[Math.random() * mc.length | 0] : far;
-  return { i, n, rows: grid.map(r => Array.from(r).join('')), exit: far, closets: closetsD, fuses: fusesD, notes: notesD, decals: decalsD,
+  return { i, n, rows: grid.map(r => Array.from(r).join('')), exit: far, closets: closetsD, fuses: fusesD, puzzles: puzzlesD, notes: notesD, decals: decalsD,
     spawns, a0, m0, hunt: huntTime(i, n, D), diff: DIFFS[diff] ? diff : 'medium' };
 }
 function applyFloor(d, slot) {
@@ -66,6 +58,7 @@ function applyFloor(d, slot) {
   exit = { tx: d.exit[0], ty: d.exit[1], ...center(d.exit) };
   closets = d.closets.map(([tx, ty, ox, oy]) => ({ ...center([tx, ty]), ox, oy }));
   fuses = d.fuses.map(([tx, ty]) => ({ tx, ty, ...center([tx, ty]), got: false }));
+  applyPuzzles(d.puzzles);
   notes = d.notes.map(([tx, ty, rot], k) => ({ ...center([tx, ty]), read: false, text: NOTES[d.i * 2 + k], rot }));
   decals = d.decals;
   const sp = d.spawns[Math.min(slot, d.spawns.length - 1)];
@@ -82,12 +75,12 @@ function applyFloor(d, slot) {
   updateFuseHud();
   setHud(true); show('downMsg', false); show('revive', false);
   state = 'play'; startSong();
-  const nf = fuses.length;
-  showMsg(d.n > 1 ? (d.i === 0 ? d.n + ' players: she is faster and hears more. Find ' + nf + ' fuses, together.' : F.name + '. Find ' + nf + ' fuses.')
-    : d.i === 0 ? 'Find ' + nf + ' fuses to unlock the front door.' : F.name + '. Find ' + nf + ' fuses.', 4);
+  const nf = fuses.length, what = nf === 1 ? 'the puzzle' : 'the ' + nf + ' puzzles';
+  showMsg(d.n > 1 ? (d.i === 0 ? d.n + ' players: she is faster and hears more. Solve ' + what + ' together.' : F.name + '. Solve ' + what + '.')
+    : d.i === 0 ? 'Solve ' + what + ' to unlock the front door: the wooden labyrinth boxes on the walls.' : F.name + '. Solve ' + what + '.', 4);
 }
 function startFloor(i) { applyFloor(generateFloor(i, 1, settings.difficulty), 0); }
-function updateFuseHud() { $('hFuse').textContent = (powerOn ? '🔓 ' : '⚡ ') + fusesGot + '/' + fuses.length; }
+function updateFuseHud() { $('hFuse').textContent = (powerOn ? '🔓 ' : '🧩 ') + fusesGot + '/' + fuses.length; }
 function setHud(on) { ['hud', 'stam', 'run', 'phone'].forEach(id => show(id, on)); if (!on) show('hide', false); }
 
 let msgTimer = 0;

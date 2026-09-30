@@ -155,3 +155,22 @@ h2{font-weight:400;letter-spacing:5px;color:#86a8ff;text-transform:uppercase;mar
 .lv.locked{opacity:.5;cursor:not-allowed}
 #lbLevel{flex:1;min-width:0;background:rgba(20,26,54,.8);color:#e6ebff;border:1px solid rgba(134,168,255,.4);border-radius:4px;padding:8px;font:14px system-ui,sans-serif}
 .seg button:disabled{opacity:.55;cursor:default}
+/* the puzzle screen */
+#puzzle{position:fixed;inset:0;z-index:25;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:12px;box-sizing:border-box}
+#puzzle .pcard{width:min(460px,100%);max-height:100%;overflow:auto;box-sizing:border-box;padding:14px 16px;background:rgba(14,12,20,.95);border:1px solid rgba(255,190,110,.35);border-radius:6px;color:#eee4d8;font:15px Georgia,serif;text-align:center}
+#pzTitle{margin:0 0 6px;letter-spacing:3px;color:#ffcf8a;font-weight:normal;text-transform:uppercase;font-size:16px}
+.pzcl{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:6px 0}
+.pzclue{width:140px;height:auto;border-radius:3px;background:#1a1612}
+.pzdisp{font:bold 28px monospace;letter-spacing:4px;color:#9cff9c;background:#10140f;border-radius:4px;padding:6px;margin:8px auto;width:max-content;min-width:60%}
+.pzpad{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:240px;margin:0 auto}
+.pzrow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:8px 0}
+.pzb{background:rgba(60,48,40,.8);border:1px solid rgba(255,200,140,.35);color:#f2e6d8;border-radius:4px;padding:10px 12px;font:16px system-ui,sans-serif;cursor:pointer;min-width:52px}
+.pzb:hover{background:rgba(110,80,50,.8)}
+.pzb.dial{font:34px serif;width:72px;height:72px;border-radius:50%;padding:0}
+.pzb.bar{width:44px;height:110px;border:2px solid rgba(0,0,0,.4)}
+.pzb.go{display:block;margin:10px auto 0;background:rgba(140,90,30,.8)}
+.pzclock{width:150px;height:150px;display:block;margin:6px auto}
+#pzMsg{min-height:1.2em;color:#ff9a8a;margin:8px 0}
+#puzzle canvas{position:static;inset:auto;display:inline-block;pointer-events:none}
+#puzzle .pzclock{display:block}
+#pzBoard{position:static;inset:auto;display:block;width:min(100%,440px);height:auto;aspect-ratio:440/340;margin:8px auto;border-radius:6px;box-shadow:0 10px 30px rgba(0,0,0,.6);touch-action:none;transition:transform .08s linear}

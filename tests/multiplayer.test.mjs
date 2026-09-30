@@ -1,5 +1,5 @@
 // (positions are in world units; a tile is 50 units, the start room is tiles 1..3)
-// Multiplayer: lobby (code, full, kick, nametags, ready), then the shared game (spawn, fuses, blocking, down/revive, wardrobes, floors, game over, leaving).
+// Multiplayer: lobby (code, full, kick, nametags, ready), then the shared game (spawn, labyrinth boxes, blocking, down/revive, wardrobes, floors, game over, leaving).
 import { launch, player, check, summary, visible, text, until, openMp, OUT, click, fill } from './lib.mjs';
 const b = await launch();
 console.log('== lobby');
@@ -47,7 +47,7 @@ check(pos.every(([x, y]) => x > 50 && x < 200 && y > 50 && y < 200), 'everyone s
 const dmin = Math.min(...[[0, 1], [0, 2], [1, 2]].map(([i, j]) => Math.hypot(pos[i][0] - pos[j][0], pos[i][1] - pos[j][1])));
 check(dmin >= 22, 'nobody spawned inside someone else', dmin);
 const fz = await A.evaluate(() => bb.fuses.length), fzB = await B.evaluate(() => bb.fuses.length);
-check(fz === 5 && fzB === 5, '3 players: 5 fuses on floor 1 (3 + 2 extra)', [fz, fzB]);
+check(fz === 2 && fzB === 2, 'floor 1: the same 2 labyrinth boxes for everyone', [fz, fzB]);
 
 // ---------------- in the game ----------------
 const ids = await A.evaluate(() => ({ A: bb.MP.myId, others: [...bb.MP.others.values()].map(o => [o.name, o.id]) }));
@@ -138,13 +138,11 @@ await A.evaluate(() => { const o = [...bb.MP.others.values()].find(q => q.name.s
 check(await until(C, () => bb.player.dead, null, 15000), 'after the clock runs out Cara is out');
 check(await until(C, () => /make it/.test(document.getElementById('downMsg').textContent), null, 30000), 'Cara sees "You didn\'t make it" and watches a teammate', await text(C, 'downMsg'));
 await C.waitForTimeout(1000); await C.screenshot({ timeout: 120000, path: OUT + '/game_spectate.png' });
-console.log('== fuses are shared');
-const f0 = await A.evaluate(() => { const f = bb.fuses[0]; return { x: f.x, y: f.y, ang: 0 }; });
-await goTo(B, f0);
-check((await Promise.all([A, B, C].map(P => until(P, () => bb.fusesGot === 1 && bb.fuses[0].got, null, 10000)))).every(Boolean), 'Bobby picks up a fuse: everyone has 1 fuse');
-console.log('== the next floor, together');
+console.log('== labyrinths are shared');
+await B.evaluate(() => { openPuzzle(0); pzOpen.won = 0.001; });
+check((await Promise.all([A, B, C].map(P => until(P, () => bb.fusesGot === 1 && bb.fuses[0].got, null, 10000)))).every(Boolean), 'Bobby solves a labyrinth box: solved for everyone');
 await A.evaluate(() => bb.fuses.forEach((f, k) => { if (!f.got) bb.hostEmit({ t: 'fuseGot', k, by: bb.MP.myId }); }));
-check((await Promise.all([A, B, C].map(P => until(P, () => bb.powerOn, null, 10000)))).every(Boolean), 'all fuses in: the door unlocks for everyone');
+check((await Promise.all([A, B, C].map(P => until(P, () => bb.powerOn, null, 10000)))).every(Boolean), 'all solved: the door unlocks for everyone');
 await freeze();
 const ex = await A.evaluate(() => ({ x: bb.exit.x, y: bb.exit.y, ang: 0 }));
 await goTo(B, ex);

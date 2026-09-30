@@ -14,7 +14,7 @@
 <canvas id="gl"></canvas>
 <canvas id="c"></canvas>
 
-<div id="hud" class="hidden"><span id="hFloor">Floor 1</span><button id="pause">II</button><span id="hFuse">⚡ 0/3</span></div>
+<div id="hud" class="hidden"><span id="hFloor">Floor 1</span><button id="pause">II</button><span id="hFuse">🧩 0/3</span></div>
 <div id="stam" class="hidden"><i></i></div>
 <button id="phone" class="btn hidden" data-key="1">PHONE</button>
 <button id="hide" class="btn hidden" data-key="E">HIDE</button>
@@ -48,7 +48,7 @@
   <div class="card">
     <section data-panel="how">
       <h2>How to play</h2>
-      <p>Find every fuse on the floor. When the last one goes in, the lights come back and the front door unlocks, and she hears it. Get to the door.</p>
+      <p>Every floor has wooden labyrinth boxes on its walls. Tilt the board to roll the ball into the gold hole without dropping it into the other holes. Solve them all and the front door unlocks, and she hears it. Get to the door. A ball falling into a hole is loud: she hears that too, and she doesn't wait while you play.</p>
       <ul class="keys pc-only">
         <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>walk</span></li>
         <li><kbd>Mouse</kbd><span>look around (click to lock the cursor, <kbd>Esc</kbd> frees it and pauses)</span></li>
@@ -81,7 +81,7 @@
       <button class="big wide" id="mpCreate">Create lobby</button>
       <div class="row"><span>Join with a code</span><input id="mpCode" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="123456" autocomplete="off"><button class="sbtn" id="mpJoin">Join</button></div>
       <p id="mpStatus" class="hint"></p>
-      <p class="hint">Together it's a bit harder: she hears a little more, she's a little faster (you can still outrun her) and there's an extra fuse per extra player. If she catches someone, the others have 50 seconds to revive them.</p>
+      <p class="hint">Together it's a bit harder: she hears a little more, she's a little faster (you can still outrun her) and there are more of you to find the labyrinth boxes.</p>
     </section>
     <section data-panel="settings">
       <h2>Settings</h2>
@@ -146,6 +146,9 @@
   <button class="small" id="menu2">Main menu</button>
 </div>
 
+<div id="puzzle" class="hidden"><div class="pcard"><h3 id="pzTitle"></h3><p class="hint" id="pzHelp"></p>
+  <canvas id="pzBoard" width="440" height="340"></canvas><p id="pzMsg"></p>
+  <button class="sbtn hidden" id="pzGyro">Tilt your phone</button> <button class="sbtn" id="pzClose">Close <span class="pc-only">(E)</span></button></div></div>
 <div id="note" class="screen hidden"><div id="paper"></div><p class="tip"><span class="touch-only">tap</span><span class="pc-only">click or press E</span> to keep going</p></div>
 
 <script src="lib/three.min.js"></script>
@@ -165,6 +168,7 @@
 <script src="js/level.js"></script>
 <script src="js/render.js"></script>
 <script src="js/scares.js"></script>
+<script src="js/puzzles.js"></script>
 <script src="js/cinematics.js"></script>
 <script src="js/main.js"></script>
 </body>

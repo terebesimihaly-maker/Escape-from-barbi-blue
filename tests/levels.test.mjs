@@ -16,10 +16,11 @@ const report = await p.evaluate(() => {
     const tag = `floor ${i + 1}, ${n}p, ${diff}`, reach = c => seen.has(c[0] + ',' + c[1]);
     const closetCells = new Set(d.closets.map(c => c[0] + ',' + c[1]));
     if (!reach(d.exit)) bad.push(tag + ': exit unreachable');
-    d.fuses.forEach(f => { if (!reach(f)) bad.push(tag + ': a fuse is unreachable'); if (closetCells.has(f.join())) bad.push(tag + ': a fuse is inside a wardrobe'); if (f.join() === d.exit.join()) bad.push(tag + ': a fuse is on the exit'); });
-    const want = Math.max(2, FLOORS[i].fuses + (n - 1) + DIFFS[diff].fuses);
-    if (d.fuses.length < 2) bad.push(tag + ': fewer than 2 fuses');
-    counts[d.fuses.length < want ? 'short' : 'full'] = (counts[d.fuses.length < want ? 'short' : 'full'] || 0) + 1;
+    d.puzzles.forEach(z => { const f = z.cell; if (!reach(f)) bad.push(tag + ': a labyrinth box is unreachable'); if (closetCells.has(f.join())) bad.push(tag + ': a box is in a wardrobe cell');
+      if (f.join() === d.exit.join()) bad.push(tag + ': a box is on the exit'); if (!wall(f[0] + z.dir[0], f[1] + z.dir[1])) bad.push(tag + ': a box hangs on no wall'); });
+    const want = puzzleCount(i, diff);
+    if (d.puzzles.length < 1) bad.push(tag + ': no labyrinth box');
+    counts[d.puzzles.length < want ? 'short' : 'full'] = (counts[d.puzzles.length < want ? 'short' : 'full'] || 0) + 1;
     d.spawns.slice(0, n).forEach(sp => { const t = tile(sp); if (wall(t[0], t[1]) || !reach(t)) bad.push(tag + ': a spawn is in a wall');
       // room to stand: the player (radius 11) must not touch a wall at the spawn
       for (const [ox, oy] of [[-11, -11], [11, -11], [-11, 11], [11, 11]]) if (wall(Math.floor((sp[0] + ox) / T), Math.floor((sp[1] + oy) / T))) bad.push(tag + ': a spawn touches a wall'); });
@@ -29,8 +30,8 @@ const report = await p.evaluate(() => {
   }
   return { bad: [...new Set(bad)].slice(0, 20), counts, total: FLOORS.length * 4 * 3 * 25 };
 });
-check(report.bad.length === 0, `${report.total} random houses (5 floors x 1-4 players x 3 difficulties): every fuse, the exit, every spawn and wardrobe reachable`, report.bad);
-console.log('  (fuses placed: all of them in', report.counts.full || 0, 'houses; fewer than planned in', report.counts.short || 0, '- still at least 2)');
+check(report.bad.length === 0, `${report.total} random houses (5 floors x 1-4 players x 3 difficulties): every labyrinth box, the exit, every spawn and wardrobe reachable`, report.bad);
+console.log('  (labyrinth boxes placed: all of them in', report.counts.full || 0, 'houses; fewer than planned in', report.counts.short || 0, ')');
 check(await p.evaluate(() => T - 2 * 11 >= 22), 'hallways are wide enough for two players side by side (tile ' + await p.evaluate(() => T) + ' units)');
 
 console.log('== the floor list and unlocking');
@@ -43,7 +44,7 @@ await p.screenshot({ path: OUT + '/menu_levels.png' });
 await click(p, '#diffSeg button[data-d="hard"]');
 await click(p, '#lvList button[data-lv="0"]');
 check(await until(p, () => bb.state === 'play'), 'floor 1 starts');
-check(await p.evaluate(() => curDiff === 'hard' && bb.fuses.length === 4), 'on Hard: her difficulty, and one more fuse (4)', await p.evaluate(() => [curDiff, bb.fuses.length]));
+check(await p.evaluate(() => curDiff === 'hard' && bb.fuses.length === puzzleCount(0, 'hard') && puzzles[0].spec.holes === mazeSpec(0, 'hard').holes), 'on Hard: her difficulty, and harder mazes', await p.evaluate(() => [curDiff, bb.fuses.length, puzzles[0].spec]));
 // the phone: use it, then finish the floor: on the next floor the button must be ready again
 await p.evaluate(() => { const m = bb.monster; m.active = false; m.spawnT = 1e9; usePhone(); });
 check(await p.evaluate(() => document.getElementById('phone').disabled && /s$/.test(document.getElementById('phone').textContent)), 'the phone counts down after a text');
@@ -83,7 +84,7 @@ console.log('== floors 4 and 5, to the end');
 await p.evaluate(() => { progress.done = [true, true, true]; saveProgress(); });
 await startSolo(p, 3, 'easy');
 check(await until(p, () => bb.state === 'play' && bb.floorIdx === 3), 'floor 4 (The Attic) starts');
-check(await p.evaluate(() => curDiff === 'easy' && bb.fuses.length === 4), 'on Easy: one fuse less (4)', await p.evaluate(() => [curDiff, bb.fuses.length]));
+check(await p.evaluate(() => curDiff === 'easy' && bb.fuses.length === puzzleCount(3, 'easy')), 'on Easy: one labyrinth box less', await p.evaluate(() => [curDiff, bb.fuses.length]));
 await p.evaluate(() => { const m = bb.monster; m.active = false; m.spawnT = 1e9; });
 await p.evaluate(() => { let best = null; for (const q of bb.CELLS()) { let n = 0; while (!bb.isWall(q[0] + n + 1, q[1])) n++; if (!best || n > best[2]) best = [q[0], q[1], n]; }
   bb.player.x = (best[0] + 0.5) * bb.T; bb.player.y = (best[1] + 0.5) * bb.T; bb.player.ang = 0; bb.player.pitch = 0; });
@@ -101,24 +102,51 @@ await p.evaluate(() => { bb.fuses.forEach((f, k) => bb.applyFuse(k)); const m = 
 check(await until(p, () => bb.state === 'win' && !document.getElementById('win').classList.contains('hidden')), 'escaping floor 5 wins the game');
 check(await p.evaluate(() => progress.done[4] === true), 'floor 5 saved as escaped');
 
-console.log('== every fuse can be picked up, on every floor (Hard: the most fuses)');
-for (let fl = 0; fl < 5; fl++) {
-  const r = await p.evaluate(async fl => {
-    progress.done = [true, true, true, true, true]; settings.difficulty = 'hard'; startFloor(fl); state = 'play';
-    const m = bb.monster; m.active = false; m.spawnT = 1e9; notes.forEach(n => n.read = true);
-    const want = Math.max(2, FLOORS[fl].fuses + DIFFS.hard.fuses), wait = ms => new Promise(r => setTimeout(r, ms));
-    for (let k = 0; k < 100 && !(bb.level && bb.level.grid === bb.grid); k++) await wait(100);   // (the 3D floor is built on the next frame)
-    const objs = bb.fuses.filter(f => f.obj && f.obj.parent).length;
-    for (const f of bb.fuses) { bb.player.x = f.x; bb.player.y = f.y;                       // (standing on it: the game's own pickup)
-      for (let k = 0; k < 60 && !f.got; k++) await wait(100); }
-    return { want, have: bb.fuses.length, objs, got: bb.fusesGot, power: bb.powerOn };
-  }, fl);
-  check(r.have === r.want && r.objs === r.want && r.got === r.want && r.power, `floor ${fl + 1}: all ${r.want} fuses are in the house and can be picked up`, r);
-}
+console.log('== every labyrinth can be solved (the real ball physics, fast-forwarded, with an autopilot)');
+const sim = await p.evaluate(() => {
+  const keep = drawBoard, fx = fuses, res = []; drawBoard = () => {};                 // (no drawing: just the physics)
+  for (let fl = 0; fl < 5; fl++) for (const diff of ['easy', 'medium', 'hard']) for (let s = 0; s < 5; s++) {
+    const pz = { cell: [0, 0], dir: [0, -1], seed: (fl * 1000 + s * 7919 + diff.length * 31) | 0, spec: mazeSpec(fl, diff) };
+    pz.maze = buildMaze(pz); pz.solved = false; puzzles = [pz]; fuses = [];
+    pzOpen = { k: 0, ball: { x: 0.5, y: 0.5, vx: 0, vy: 0 }, fall: 0, won: 0 };
+    const mz = pz.maze; let i = 0, t = 0, falls = 0, was = 0;
+    while (t < 180 && !pzOpen.won) {
+      const o = pzOpen, b = o.ball; if (o.fall && !was) { falls++; i = 0; } was = o.fall;
+      while (i < mz.route.length - 1 && Math.hypot(b.x - (mz.route[i][0] + 0.5), b.y - (mz.route[i][1] + 0.5)) < 0.3) i++;
+      const g = mz.route[i], dx = g[0] + 0.5 - b.x, dy = g[1] + 0.5 - b.y, d = Math.hypot(dx, dy) || 1;
+      tilt.mx = clamp(dx / d * 0.9 - b.vx * 0.35, -1, 1); tilt.my = clamp(dy / d * 0.9 - b.vy * 0.35, -1, 1);
+      updateBall(1 / 60); t += 1 / 60;
+    }
+    res.push({ fl, diff, ok: !!pzOpen.won, t: Math.round(t), falls, holes: mz.holes.length, size: mz.C + 'x' + mz.R });
+  }
+  pzOpen = null; puzzles = []; fuses = fx; drawBoard = keep; tilt.mx = tilt.my = 0;
+  return res;
+});
+const failed = sim.filter(r => !r.ok);
+check(failed.length === 0, `all ${sim.length} labyrinths (5 floors x 3 difficulties x 5 mazes) reach the gold hole`, failed.slice(0, 5));
+console.log('  (sizes', [...new Set(sim.map(r => r.size))].join(' '), '· holes up to', Math.max(...sim.map(r => r.holes)), '· autopilot fell in', sim.reduce((a, r) => a + r.falls, 0), 'times over all of them · slowest', Math.max(...sim.map(r => r.t)), 's)');
+// and one for real: walk up, USE, tilt the ball in, the door unlocks
+const real = await p.evaluate(async () => {
+  settings.difficulty = 'medium'; startFloor(0); state = 'play'; const m = bb.monster; m.active = false; m.spawnT = 1e9; notes.forEach(n => n.read = true);
+  const wait = ms => new Promise(r => setTimeout(r, ms)); for (let k = 0; k < 100 && !(bb.level && bb.level.grid === bb.grid); k++) await wait(100);
+  for (let k = 0; k < puzzles.length; k++) {
+    const z = puzzles[k], w = wallPoint(z.cell, z.dir, 22); bb.player.x = w.x; bb.player.y = w.y;
+    for (let j = 0; j < 50 && puzzleTarget !== k; j++) await wait(100);
+    bb.toggleHide(); if (!pzOpen) return { k, opened: false };
+    const mz = z.maze, t0 = performance.now(); let i = 0;
+    while (pzOpen && performance.now() - t0 < 120000) { const o = pzOpen, b = o.ball; if (o.fall) i = 0;
+      while (i < mz.route.length - 1 && Math.hypot(b.x - (mz.route[i][0] + 0.5), b.y - (mz.route[i][1] + 0.5)) < 0.3) i++;
+      const g = mz.route[i], dx = g[0] + 0.5 - b.x, dy = g[1] + 0.5 - b.y, d = Math.hypot(dx, dy) || 1;
+      tilt.mx = clamp(dx / d * 0.9 - b.vx * 0.35, -1, 1); tilt.my = clamp(dy / d * 0.9 - b.vy * 0.35, -1, 1); await wait(25); }
+    if (!z.solved) return { k, solved: false };
+  }
+  tilt.mx = tilt.my = 0; return { all: bb.fusesGot === puzzles.length, power: bb.powerOn };
+});
+check(real.all && real.power, 'for real on floor 1: walk up, USE, tilt the ball into the gold hole (every box), the door unlocks', real);
 await p.evaluate(() => { settings.difficulty = 'medium'; state = 'win'; });
 const hint = await p.evaluate(() => { startFloor(2); state = 'play'; const m = bb.monster; m.active = false; m.spawnT = 1e9;
-  const a = !!fuseHintOn(); levelTime = 61; const b = !!fuseHintOn(); levelTime = 0; bb.fuses.slice(1).forEach(f => { f.got = true; }); const c = !!fuseHintOn(); state = 'win'; return [a, b, c]; });
-check(!hint[0] && hint[1] && hint[2], 'the arrow to the nearest fuse shows after a minute without finding one, or when only one is left', hint);
+  const a = !!fuseHintOn(); levelTime = 61; const b = !!fuseHintOn(); levelTime = 0; bb.fuses.slice(1).forEach((f, k) => { f.got = true; puzzles[k + 1].solved = true; }); fusesGot = bb.fuses.length - 1; const c = !!fuseHintOn(); state = 'win'; return [a, b, c]; });
+check(!hint[0] && hint[1] && hint[2], 'the arrow to the nearest labyrinth box shows after a minute without solving one, or when only one is left', hint);
 
 console.log('== mouse look: no jumps');
 const look = await p.evaluate(() => {
@@ -136,7 +164,7 @@ check(look.small, 'normal mouse moves turn the view', look);
 check(look.big, 'an impossible jump (900 px in one move) is ignored', look);
 
 console.log('== dynamic resolution');
-const res = await p.evaluate(() => { state = 'play'; const r0 = resScale; for (let i = 0; i < 100; i++) adaptResolution(45, 0.05); const r1 = resScale;
+const res = await p.evaluate(() => { state = 'play'; resScale = 1; frameAvg = 16; slowT = fastT = 0; const r0 = resScale; for (let i = 0; i < 100; i++) adaptResolution(45, 0.05); const r1 = resScale;
   for (let i = 0; i < 400; i++) adaptResolution(10, 0.05); const r2 = resScale; state = 'win'; return [r0, r1, r2]; });
 check(res[1] < res[0] && res[2] > res[1], 'slow frames lower the resolution, fast frames bring it back', res);
 

@@ -145,7 +145,8 @@ function hostHandle(id, m) {
     case 'ready': if (pl && !MP.lobby.started) { pl.ready = !!m.ready; hostLobbyChanged(); } break;
     case 'leave': hostDrop(id, true); break;
     case 'st': hostPlayerState(id, m); break;
-    case 'fuse': hostFuse(id, m.k | 0); break;
+    case 'solve': hostSolve(id, m.k | 0); break;
+    case 'noise': { const o = MP.others.get(id); if (o && MP.inGame) puzzleNoise(o.x, o.y, id); break; }
     case 'exit': hostExit(); break;
     case 'phone': hostPhone(id); break;
     case 'revive': hostRevive(id, String(m.id)); break;
@@ -341,7 +342,7 @@ function clientHandle(m) {
       const same = MP.inGame && grid && floorIdx === m.d.i && grid.map(r => r.join('')).join('') === m.d.rows.join('') && (state === 'play' || state === 'trans');
       if (same) { m.got.forEach((g, k) => { if (g) applyFuse(k); }); if (m.power && !powerOn) { powerOn = true; updateFuseHud(); } break; }
       clientHandle({ t: 'floor', d: m.d });
-      m.got.forEach((g, k) => { if (g && fuses[k]) { fuses[k].got = true; fusesGot++; } });
+      m.got.forEach((g, k) => { if (g && fuses[k]) { fuses[k].got = true; fusesGot++; puzzleSolved(k); } });
       powerOn = !!m.power; updateFuseHud(); runTime = m.rt || 0;
       const y = m.you, p = player;
       if (y) { p.x = y.x; p.y = y.y; p.ang = y.a;
@@ -474,19 +475,20 @@ function onPlayerHid(id, x, y) {
   const mo = monster;
   if (mo.active && mo.state === 'chase' && mo.ti === id && mo.seenT < 0.8 && Math.hypot(mo.x - x, mo.y - y) < 230) mo.kc = id;
 }
-function hostFuse(id, k) {
-  const f = fuses[k]; if (!f || f.got || !MP.inGame) return;
+// a player got the ball to the goal: solved for everyone
+function hostSolve(id, k) {
+  const f = fuses[k], pz = puzzles[k]; if (!f || f.got || !pz || !MP.inGame) return;
   hostEmit({ t: 'fuseGot', k, by: id });
 }
 function applyFuse(k, by) {
   const f = fuses[k]; if (!f || f.got) return;
-  f.got = true; fusesGot++; lastFuseAt = levelTime; sfx.pickup(); updateFuseHud();
+  f.got = true; fusesGot++; lastFuseAt = levelTime; sfx.pickup(); updateFuseHud(); puzzleSolved(k);
   if (fusesGot === fuses.length) {
     powerOn = true; updateFuseHud(); shake = 8; sfx.scream(0.5);
     if (!MP.on || MP.host) { monster.huntT = 7; if (!monster.active) monster.active = true; }
     if (monster.active) startScream();
-    showMsg('The lights buzz. The door unlocks... and she heard it. RUN.', 4);
-  } else showMsg(by && by !== MP.myId ? nameOf(by) + ' found a fuse (' + fusesGot + ' of ' + fuses.length + ').' : 'Fuse ' + fusesGot + ' of ' + fuses.length + '.', 2);
+    showMsg('Something clicks deep in the house. The door unlocks... and she heard it. RUN.', 4);
+  } else showMsg((by && by !== MP.myId ? nameOf(by) + ' solved a puzzle (' : 'Solved (') + fusesGot + ' of ' + fuses.length + ').', 2.5);
 }
 function hostExit() {
   if (!powerOn || MP.floorDone || !MP.inGame) return;
@@ -526,7 +528,7 @@ function downPlayer(q, reason) {
 }
 // you're down: the jumpscare plays over the game (the game keeps running for everyone), then you wait for a revive
 function goDown(reason) {
-  const p = player;
+  const p = player; closePuzzle();
   if (p.hidden) { p.hidden = false; p.closet = null; $('hide').textContent = 'HIDE'; }
   prepDeath(); deadT = 0; MP.scareT = 1.8; deathReason = reason;
   setHud(false); show('hud', true); setSprint(false); show('revive', false); show('hide', false);

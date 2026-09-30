@@ -1,6 +1,6 @@
 # Escape from Barbi Blue
 
-A first-person 3D horror maze for phones and desktop. Find the fuses, unlock the door, and don't let her catch you.
+A first-person 3D horror maze for phones and desktop. Solve the labyrinth boxes, unlock the door, and don't let her catch you.
 
 - `index.html`: the page (menus, HUD); `css/style.css`: its styles
 - The game, in plain scripts that share one scope (loaded in this order by `index.html`, no build step):
@@ -13,6 +13,7 @@ A first-person 3D horror maze for phones and desktop. Find the fuses, unlock the
   - `js/monster.js`: her AI (see "Her" below)
   - `js/world3d.js`, `js/level.js`, `js/render.js`: the 3D world, building a floor, drawing a frame
   - `js/scares.js`: the jump scares
+  - `js/puzzles.js`: the labyrinth boxes (the puzzles)
   - `js/cinematics.js`: the death screen and the title screen; `js/main.js`: the main loop and start-up
 - `js/house.js`: dresses each floor: skirting, rails and crown molding, framed doorways, lamps that really light the rooms (a few flicker or are dead), rugs and a runner carpet, porcelain dolls whose heads turn when you look away, teddy bears, side tables, grandfather clocks, basement pipes, crates, barrels and puddles, the attic's sheet-covered furniture, trunks and cobwebs, the workshop's workbenches, shelves of doll heads, dress forms and dolls hanging on strings, and a flashlight beam you can see in the air
 - `models/barbi.glb`: her rigged model (made in Blender)
@@ -32,9 +33,9 @@ A first-person 3D horror maze for phones and desktop. Find the fuses, unlock the
 
 **Enter the house** shows the five floors: The Nursery, The Doll Hallway, The Basement, The Attic and The Workshop. A floor opens once you've escaped the one before it (your progress and best time per floor are kept on this device). Pick **Easy**, **Medium** or **Hard** above the list:
 
-- Easy: she's slower, hears and sees less, rarely opens wardrobes; one fuse less; the phone recharges in 35 s; 65 s to revive a teammate
+- Easy: she's slower, hears and sees less, rarely opens wardrobes; one labyrinth box less, smaller mazes; the phone recharges in 35 s; 65 s to revive a teammate
 - Medium: the house as it was meant to be played (45 s phone, 50 s to revive)
-- Hard: she's faster (a sprint still gets away from her), hears and sees further, opens wardrobes more often, screams more; one fuse more; 60 s phone; 40 s to revive
+- Hard: she's faster (a sprint still gets away from her), hears and sees further, opens wardrobes more often, screams more; bigger mazes with more holes; 60 s phone; 40 s to revive
 
 Playing together, the lobby owner picks the floor (from the ones they've opened) and the difficulty for everyone; escaping a floor together opens the next one for all of you.
 
@@ -42,6 +43,10 @@ The game loads its files over HTTP, so open it from a web server (e.g. GitHub Pa
 
 Controls: left side of the screen, drag to walk. Right side, drag to look. RUN, HIDE, and PHONE buttons.
 Computer: click to lock the cursor, then WASD to move and the mouse to look. Shift runs, E hides, 1 uses the phone, Esc frees the cursor and pauses.
+
+## The labyrinth boxes
+
+Instead of fuses, every floor has wooden labyrinth boxes on its walls (1 to 4, more on later floors), like the tilting ball maze game. Walk up and press **USE** (or E): tilt the board to roll the steel ball into the gold hole. Point the mouse where the ball should roll (or use the arrow keys / WASD); on a phone drag your finger, or tap "Tilt your phone". A ball falling into a hole is loud, and she hears it, and the game doesn't stop while you play. Later floors and Hard have bigger mazes with more holes and a faster ball; Easy has one box less, smaller mazes and a slower ball. Playing together, a box one of you solves is solved for everyone. Stuck? When one box is left, or none has been solved for a minute, an arrow points to the nearest.
 
 ## Her
 
@@ -59,7 +64,7 @@ Look sensitivity, volume, field of view, invert looking up and down, graphics qu
 
 ## Jump scares
 
-Rare (one every minute or so at most), never while she's after you: a doll that isn't where it was, her face at the end of a corridor, footsteps on the ceiling.
+Every 35 to 60 seconds or so, never while she's after you: a doll that isn't where it was, her face at the end of a corridor, footsteps on the ceiling, every light dying (and her standing right in front of you when they come back), her sprinting across a junction ahead, breathing right behind you, a wardrobe door opening by itself.
 
 ## Playing together (up to 4)
 

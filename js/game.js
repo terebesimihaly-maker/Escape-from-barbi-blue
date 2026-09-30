@@ -4,7 +4,7 @@
 
 /* ---------- update ---------- */
 // the phone button shows its cooldown (only touch the page when the text changes)
-let phoneTxt = '', fuseHum = 0;
+let phoneTxt = '', hideTxt = '';
 function updatePhoneBtn() {
   const b = $('phone'), t = phoneCool > 0 ? Math.ceil(phoneCool) + 's' : 'PHONE';
   if (t !== phoneTxt) { phoneTxt = t; b.textContent = t; b.disabled = phoneCool > 0; }
@@ -95,7 +95,7 @@ function updateCloset(dt) {
 
 function updatePlayer(dt) {
   const p = player; readInput();
-  if (MP.menu || MP.reconnecting) { input.x = input.y = 0; input.sprint = input.sprintKey = false; input.turn = 0; }
+  if (MP.menu || MP.reconnecting || pzOpen) { input.x = input.y = 0; input.sprint = input.sprintKey = false; input.turn = 0; }
   if (p.down || p.dead) {                          // down (or out): you can look around, nothing else
     p.moving = p.sprinting = false; if (input.turn) lookBy(input.turn * 2.4 * dt, 0);
     hideTarget = null; reviveTarget = null; revP = 0; show('hide', false); show('revive', false); show('run', false); show('phone', false);
@@ -125,14 +125,7 @@ function updatePlayer(dt) {
     if (stepTimer <= 0) { stepTimer = 1; sfx.step(p.sprinting); }
   }
 
-  // in multiplayer the host hands out fuses (so two players can't both take the same one)
-  // (in multiplayer: ask again every 1.5 s while standing on it. Asking only once lost the fuse for you if that message got lost)
-  fuses.forEach((f, k) => { if (!f.got && Math.hypot(f.x - p.x, f.y - p.y) < 22) {
-    if (MP.on) { const now = performance.now(); if (!f.askedAt || now - f.askedAt > 1500) { f.askedAt = now; toHost({ t: 'fuse', k }); } } else applyFuse(k); } });
-  // every fuse still out there hums (3D sound: you can hear where it is when you're close)
-  fuseHum -= dt;
-  if (fuseHum <= 0) { fuseHum = 1.1;
-    for (const f of fuses) if (!f.got && Math.hypot(f.x - p.x, f.y - p.y) < T * 6) sfx.hum({ x: f.x, y: f.y, h: 0.95 }); }
+  updatePuzzles(dt);                                   // the labyrinth box you're next to, and the ball while one is open (js/puzzles.js)
   for (const n of notes) if (!n.read && Math.hypot(n.x - p.x, n.y - p.y) < 20) {
     n.read = true; setSprint(false); joy.id = null; joy.x = joy.y = 0;
     openNote(n.text); return;
@@ -140,7 +133,7 @@ function updatePlayer(dt) {
   const de = Math.hypot(exit.x - p.x, exit.y - p.y);
   if (de < 18) {
     if (powerOn) { if (!MP.on) { nextFloor(); return; } if (!MP.exitAsked) { MP.exitAsked = true; toHost({ t: 'exit' }); } }
-    else if (msgTimer <= 0) showMsg('The door is locked. The fuse box is dead.', 2);
+    else if (msgTimer <= 0) showMsg('The door is locked. Solve ' + (fuses.length - fusesGot === 1 ? 'the last puzzle' : 'the puzzles') + ' first.', 2);
   }
   // a downed teammate close by: hold E (or the REVIVE button) for a few seconds to get them up
   reviveTarget = null;
@@ -154,7 +147,10 @@ function updatePlayer(dt) {
   show('revive', !!reviveTarget);
   hideTarget = null;
   if (!reviveTarget) for (const c of closets) if (Math.hypot(c.x - p.x, c.y - p.y) < 28) hideTarget = c;
-  show('hide', (!!hideTarget || p.hidden) && !reviveTarget);
+  // next to a puzzle (and not a wardrobe): the same button says USE
+  show('hide', (!!hideTarget || p.hidden || puzzleTarget !== null) && !reviveTarget);
+  const lbl = p.hidden ? 'LEAVE' : puzzleTarget !== null && !hideTarget ? 'USE' : 'HIDE';
+  if (lbl !== hideTxt) { hideTxt = lbl; $('hide').textContent = lbl; }
   // teammates overlapping you (it can happen after a revive): ease apart
   if (MP.on) for (const o of MP.others.values()) { if (o.hidden || o.down || o.dead) continue;
     const dx = p.x - o.x, dy = p.y - o.y, d = Math.hypot(dx, dy);

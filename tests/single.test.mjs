@@ -5,14 +5,17 @@ const p = await solo(b);
 console.log('== single player still works');
 await startSolo(p);
 check(await until(p, () => bb.state === 'play'), 'the game starts');
-check(await p.evaluate(() => bb.fuses.length === 3 && !bb.MP.on && Math.abs(bb.player.x - bb.T * 1.5) < 1), '3 fuses, start tile, no multiplayer');
-await p.evaluate(() => { bb.monster.active = false; bb.monster.spawnT = 1e9; });
-const f = await p.evaluate(() => [bb.fuses[0].x, bb.fuses[0].y]);
-await p.evaluate(f => { bb.player.x = f[0]; bb.player.y = f[1]; }, f);
-check(await until(p, () => bb.fusesGot === 1), 'picking up a fuse');
-await p.evaluate(() => { for (const f of bb.fuses) { bb.player.x = f.x; bb.player.y = f.y; } });
+check(await p.evaluate(() => bb.fuses.length === puzzleCount(0, 'medium') && !bb.MP.on && Math.abs(bb.player.x - bb.T * 1.5) < 1), 'the labyrinth boxes are there, start tile, no multiplayer');
+await p.evaluate(() => { bb.monster.active = false; bb.monster.spawnT = 1e9; notes.forEach(n => n.read = true); });
+// walk up to the first box: the button says USE, and it opens the labyrinth
+await p.evaluate(() => { const z = puzzles[0], w = wallPoint(z.cell, z.dir, 22); bb.player.x = w.x; bb.player.y = w.y; });
+check(await until(p, () => puzzleTarget === 0 && document.getElementById('hide').textContent === 'USE'), 'next to a labyrinth box the button says USE');
+await p.evaluate(() => bb.toggleHide());
+check(await until(p, () => !!pzOpen && !document.getElementById('puzzle').classList.contains('hidden')), 'USE opens the labyrinth');
+await p.evaluate(() => { pzOpen.won = 0.001; });          // (the ball in the gold hole: the maze itself is tested in levels.test.mjs)
+check(await until(p, () => bb.fusesGot === 1 && !pzOpen), 'the ball in the gold hole: 1 solved');
 await p.evaluate(() => bb.fuses.forEach((f, k) => bb.applyFuse(k)));
-check(await until(p, () => bb.powerOn), 'all fuses: power on');
+check(await until(p, () => bb.powerOn), 'all solved: the door unlocks');
 await p.evaluate(() => { bb.monster.active = false; bb.monster.spawnT = 1e9; bb.player.x = bb.exit.x; bb.player.y = bb.exit.y; });
 check(await until(p, () => bb.state === 'trans'), 'reaching the door: next floor screen');
 await click(p, '#tGo');

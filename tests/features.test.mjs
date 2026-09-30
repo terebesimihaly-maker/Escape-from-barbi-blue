@@ -93,6 +93,24 @@ else {
 check(await p.evaluate(() => bb.scares.force('ceiling')), 'footsteps on the ceiling start');
 check(await until(p, () => bb.scares.dust && bb.scares.dust.visible, null, 24000), 'dust comes down from the ceiling when they pass over you');
 check(await until(p, () => !bb.scares.active, null, 48000), 'they end (something is dragged away)');
+// the new ones: the lights die (and she's there), she dashes past, breathing behind you, a wardrobe door
+check(await p.evaluate(() => bb.scares.force('breath')), 'breathing behind you starts');
+check(await until(p, () => !bb.scares.active, null, 40000), '...and ends');
+await p.evaluate(s => { const P = bb.player; P.x = (s[0] + 0.5) * bb.T; P.y = (s[1] + 0.5) * bb.T; P.ang = Math.atan2(s[3], s[2]); }, spot);
+await p.waitForTimeout(500);
+if (await p.evaluate(() => bb.scares.force('dark'))) {
+  check(await until(p, () => bb.scares.dim < 0.2, null, 8000), 'the lights die');
+  check(await until(p, () => bb.scares.app && bb.scares.app.show && bb.barbi.obj.visible, null, 20000), 'the lights come back: she is right in front of you');
+  await p.screenshot({ path: OUT + '/scare_dark.png' });
+  check(await until(p, () => !bb.scares.active && bb.scares.dim === 1 && !bb.barbi.obj.visible, null, 20000), 'dark again, then light, and she is gone');
+} else console.log('  (no room in front for the lights-out scare here)');
+const door = await p.evaluate(() => { const c = bb.closets.find(c => c.doors); if (!c) return false; const P = bb.player;
+  P.x = c.x + c.ox * bb.T * 1.5; P.y = c.y + c.oy * bb.T * 1.5; P.ang = Math.atan2(-c.oy, -c.ox); P.pitch = 0; return true; });
+if (door) { await p.waitForTimeout(800);
+  if (await p.evaluate(() => bb.scares.force('door'))) {
+    check(await until(p, () => bb.closets.some(c => c.doors && Math.abs(c.doors.find(d => d.side < 0).pivot.rotation.y) > 0.3), null, 20000), 'a wardrobe door creaks open by itself');
+    check(await until(p, () => !bb.scares.active, null, 30000), '...and slams shut');
+  } else console.log('  (no wardrobe in view for the door scare)'); }
 // the director: scares only when she isn't after you
 await p.evaluate(() => { const m = bb.monster, P = bb.player, far = bb.CELLS().map(bb.center).sort((a, c) => Math.hypot(c.x - P.x, c.y - P.y) - Math.hypot(a.x - P.x, a.y - P.y))[0];
   bb.scares.next = 0; Object.assign(m, { active: true, spawnT: 0, state: 'hunt', x: far.x, y: far.y, huntT: 30, screamT: 0, path: [], repath: 0 }); });

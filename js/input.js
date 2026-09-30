@@ -20,7 +20,7 @@ function lockMouse() {
 // Pointer lock sometimes reports one huge, fake mouse movement: right after the lock starts (or comes back), and now and
 // then at random in some browsers. That's the view "jumping" by itself. Skip the first moves after locking, and impossible jumps.
 let lockSkip = 0;
-document.addEventListener('pointerlockchange', () => { lockSkip = 3; if (!locked() && state === 'play') pause(); });
+document.addEventListener('pointerlockchange', () => { lockSkip = 3; if (!locked() && state === 'play' && !pzOpen) pause(); });
 // turn the view. Inside a wardrobe you can still look around, but only through the doors
 function lookBy(dx, dy) {
   const p = player; if (state !== 'play') return;
@@ -69,7 +69,7 @@ $('revive').addEventListener('pointerdown', e => { e.preventDefault(); reviveHel
 
 // the phone: one text a minute. If she's chasing you, she drops everything and leaves for 15 seconds.
 function usePhone() {
-  if (state !== 'play' || phoneCool > 0 || player.down || player.dead || MP.menu) return;
+  if (state !== 'play' || phoneCool > 0 || player.down || player.dead || MP.menu || pzOpen) return;
   if (MP.on) {                                      // together: the host decides if she leaves; the phone recharges slower
     phoneCool = DF().phone + 5; updatePhoneBtn(); sfx.buzz(); $('popRes').textContent = ''; $('pop').classList.add('on'); popT = 3.5; toHost({ t: 'phone' }); return;
   }
@@ -120,6 +120,7 @@ function toggleHide() {
   if (state !== 'play' || player.down || player.dead || MP.menu) return;
   const p = player;
   if (p.hidden) { if (!(closetScene && closetScene.t > 0)) exitHide(); return; }
+  if (puzzleTarget !== null && !hideTarget) { openPuzzle(puzzleTarget); return; }   // (the button says USE next to a puzzle)
   if (!hideTarget) return;
   if (closetTaken(hideTarget)) { lockedOut(); return; }
   p.hidden = true; p.closet = hideTarget; p.x = hideTarget.x; p.y = hideTarget.y; hideCool = 0.5; p.hideYaw = p.hidePitch = 0;
@@ -201,6 +202,7 @@ function pause() {
 document.addEventListener('visibilitychange', () => { if (document.hidden && !MP.on) pause(); });
 
 function die(reason) {
+  closePuzzle();
   if (songOn && songBuf && ac) { playSongNode(); setSongLevel(1, true); } else stopSong();   // she caught you: her song, full volume
   closetScene = null;
   $('pop').classList.remove('on');
