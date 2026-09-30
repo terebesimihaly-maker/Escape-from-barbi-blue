@@ -75,6 +75,8 @@ await p.screenshot({ path: OUT + '/board.png' });
 
 console.log('== holding your breath');
 await calmHer();
+// (the board test teleports the player around: it may have landed on a note. Read them all, close any that's open)
+await p.evaluate(() => { notes.forEach(n => { n.read = true; }); if (bb.state === 'note') { noteAt = 0; closeNote(); } });
 await p.evaluate(() => { const c = bb.closets[0]; bb.player.x = c.x + c.ox * 30; bb.player.y = c.y + c.oy * 30; });
 await p.evaluate(() => { const c = bb.closets[0]; hideTarget = c; bb.toggleHide(); });
 check(await until(p, () => bb.player.hidden && !document.getElementById('breath').classList.contains('hidden') && !document.getElementById('breathBar').classList.contains('hidden') && document.getElementById('run').classList.contains('hidden'), null, 10000),

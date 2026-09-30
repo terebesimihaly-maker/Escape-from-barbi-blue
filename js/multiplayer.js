@@ -31,9 +31,11 @@ function saveName(n) { myName = cleanName(n) || myName; try { localStorage.setIt
 // home networks. Some can't be reached directly at all (internet providers that share one address between many
 // customers, strict routers and firewalls): for those the connection has to go through a relay (a TURN server).
 // TURN_API: a free Metered account's credentials link (https://<app>.metered.live/api/v1/turn/credentials?apiKey=...).
-// Without it there's no relay, and players on such networks can't join.
+// Without it there's no relay, and players on such networks can't join. (The key only gives out relay logins; it's public by design.)
 // (?turn=<that link> in the page address works too, for trying one out)
-const TURN_API = new URLSearchParams(location.search).get('turn') || '';
+const TURN_URL = 'https://efbb.metered.live/api/v1/turn/credentials?apiKey=7f632c56901f1fca8aab3cc2b3dde6767912';
+// (the tests use their own matchmaking server on this computer, ?peer=..., and need no relay)
+const TURN_API = new URLSearchParams(location.search).get('turn') || (new URLSearchParams(location.search).get('peer') ? '' : TURN_URL);
 const STUN = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }];
 let iceList = null;
 async function iceReady() {
