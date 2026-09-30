@@ -67,7 +67,7 @@ function leaveMP(quiet) {
 // ---- the host side
 function createLobby() {
   if (!window.peerjs) { mpStatus('Playing together could not load.'); return; }
-  leaveMP(true); saveName($('mpName').value); loadPlayerTemplate();
+  leaveMP(true); saveName($('mpName').value);
   const code = String(100000 + Math.floor(Math.random() * 900000));
   mpStatus('Creating a lobby…');
   const peer = new peerjs.Peer(PEER_PREFIX + code, peerOptions()); MP.peer = peer;
@@ -178,7 +178,7 @@ function joinLobby(r) {
   if (!window.peerjs) { mpStatus('Playing together could not load.'); return; }
   const code = r ? r.code : $('mpCode').value.replace(/\D/g, '');
   if (code.length !== 6) { mpStatus('The code has 6 digits.'); return; }
-  leaveMP(true); saveName($('mpName').value); loadPlayerTemplate();
+  leaveMP(true); saveName($('mpName').value);
   mpStatus(r ? 'Rejoining…' : 'Connecting…'); MP.kicked = false; MP.rejected = ''; MP.hostLeft = false;
   // your player id in this lobby (the same one when you rejoin, so the owner knows it's you)
   const pid = r ? r.pid : newPid(), t0 = performance.now(), wait = r ? RECONNECT_FOR * 1000 : 15000;
@@ -192,7 +192,7 @@ function joinLobby(r) {
       openHostConn(peer, code, () => {                    // (first message from the owner: we're in)
         if (joined) return; joined = true; clearTimeout(timer);
         Object.assign(MP, { on: true, host: false, code }); mpStatus(''); saveRejoin(); updateRejoinBtn();
-        if (!MP.lobby || !MP.lobby.started) showLobby();  // (rejoining a game in progress: the owner sends the floor)
+        loadPlayerTemplate(); if (!MP.lobby || !MP.lobby.started) showLobby();  // (rejoining a game in progress: the owner sends the floor)
       }, why => fail(why));
     });
     peer.on('error', err => {
@@ -243,6 +243,7 @@ function endClient(why) { stopReconnect(); leaveMP(true); clearRejoin(); toTitle
 function showLobby() {
   ['title', 'panel', 'dead', 'win', 'trans', 'paused', 'note'].forEach(id => show(id, false)); setHud(false);
   show('lobby', true); stopSong(); state = 'lobby'; MP.inGame = false; MP.menu = false;
+  loadPlayerTemplate();                                // (the teammates' model: once you're in, not while connecting)
   if (document.activeElement !== $('lbName')) $('lbName').value = myName;
   renderLobby();
 }
