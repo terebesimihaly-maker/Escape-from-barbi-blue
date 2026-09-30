@@ -1,0 +1,220 @@
+/* Escape from Barbi Blue: Drawing a frame: the camera, her, teammates, props, and the 2D effects on top (wardrobe slats, team arrows, grain).
+   (The game is split over several plain scripts that share one scope; index.html loads them in order.) */
+'use strict';
+
+/* ---------- drawing a frame ---------- */
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _sc = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
+function draw(sc, cam) {
+  if (useBloom) { renderPass.scene = sc; renderPass.camera = cam; composer.render(); }
+  else renderer.render(sc, cam);
+}
+function relPan(x, y) {   // -1 = to your left, 1 = to your right
+  const dx = x - player.x, dy = y - player.y, d = Math.hypot(dx, dy) || 1;
+  return (-Math.sin(player.ang) * dx + Math.cos(player.ang) * dy) / d;
+}
+function placeCamera(t) {
+  const p = player;
+  let cx = p.x, cy = p.y, yaw = p.ang, pitch = p.pitch, h = EYE;
+  if (p.hidden && p.closet) {                    // inside the wardrobe, looking out through the slats
+    const c = p.closet; cx = c.x - c.ox * (CLOSET_FRONT + 5); cy = c.y - c.oy * (CLOSET_FRONT + 5);
+    const cs = closetScene;
+    yaw = Math.atan2(c.oy, c.ox) + (cs ? 0 : p.hideYaw) + Math.sin(t * 0.7) * 0.03;
+    pitch = cs ? (cs.t > SC.lean ? 0.02 : 0.1) : -0.03 + p.hidePitch; h = 1.55 + Math.sin(t * 1.7) * 0.006;
+  } else if (p.dead && MP.on) {                   // out: watch a teammate who's still standing (tap to switch)
+    const al = [...MP.others.values()].filter(o => !o.down && !o.dead), w = al.length ? al[MP.spec % al.length] : null;
+    if (w) { cx = w.x - Math.cos(w.ang) * 30; cy = w.y - Math.sin(w.ang) * 30; yaw = w.ang; pitch = -0.25; h = 2.3;
+      if (blocked(cx, cy, 2)) { cx = w.x; cy = w.y; h = EYE; pitch = w.pitch; } }
+    else { h = 0.35; }
+  } else if (p.down) { h = 0.32 + Math.sin(t * 1.2) * 0.01; pitch = clamp(pitch, -0.3, 1.1); }   // lying on the floor
+  else if (p.moving) { h += Math.sin(stepPhase) * (p.sprinting ? 0.045 : 0.025); yaw += Math.sin(stepPhase * 0.5) * 0.006; }
+  const sh = shake * 0.01;
+  camera.position.set(cx * S + rnd(-sh, sh), h + rnd(-sh, sh) * 0.6, cy * S + rnd(-sh, sh));
+  camera.rotation.set(pitch, -Math.PI / 2 - yaw, 0);
+}
+function render3D(t) {
+  const p = player, m = monster;
+  if (!level || level.grid !== grid) buildLevel();
+  placeCamera(t);
+  flash.visible = !p.hidden && !p.dead; flash.intensity = FLASH_I * flicker * (p.down ? 0.5 : 1);
+  aura.intensity = p.hidden ? (closetScene && closetScene.t > 0 ? 3.5 : 3.2) : 1.2; aura.distance = p.hidden ? 8 : 4.5;
+
+  // her
+  if (barbi) {
+    putBarbi(scene);
+    const sc = closetScene && p.closet ? closetScene : null;
+    let mx = m.x, my = m.y, ma = m.ang, show = m.active;
+    if (sc) { const c = p.closet, al = sceneAlong(sc.t, c), sd = sceneSide(sc.t);
+      // (-oy, ox) is to your right as you look out of the wardrobe: that's the door that opens, so she leans in there
+      mx = c.x + c.ox * al - c.oy * sd; my = c.y + c.oy * al + c.ox * sd; ma = Math.atan2(-c.oy, -c.ox); show = sc.t < SC.gone;
+      if (sc.t > SC.vanish && sc.t < SC.gone) { show = Math.random() < 0.55; mx += rnd(-3, 3); my += rnd(-3, 3); } }   // glitching away
+    barbi.obj.visible = show;
+    barbi.obj.position.set(mx * S, 0, my * S); barbi.obj.rotation.y = Math.PI / 2 - ma;
+    let eye = 0;
+    if (show) { const d = Math.hypot(mx - p.x, my - p.y), toP = Math.atan2(p.y - my, p.x - mx);
+      if (sc) eye = 0.95;
+      else if (d < 420 && los(p.x, p.y, mx, my)) eye = clamp(1 - d / 420, 0, 1) * (0.75 + Math.random() * 0.25) * clamp((Math.cos(angDiff(toP, ma)) + 0.3) * 1.6, 0, 1); }
+    setEyes(eye);
+    // her face is right in front of yours when she leans in: the eye glow shrinks to fit
+    const near = sc ? clamp((sc.t - SC.lean) / (SC.leanEnd - SC.lean), 0, 1) : 0;
+    for (const e of barbi.eyes) if (e.userData.base) e.scale.setScalar(e.userData.base * (1 - 0.65 * near));
+  }
+  drawPhantom();
+  // in the wardrobe scene the camera turns to look her in the eyes as she leans in
+  if (barbi && closetScene && p.closet && barbi.eyes.length) {
+    const k = clamp((closetScene.t - SC.lean) / (SC.leanEnd - SC.lean), 0, 1) * (closetScene.t < SC.vanish ? 1 : 0);
+    if (k > 0) {
+      barbi.obj.updateMatrixWorld(true);
+      const e = new THREE.Vector3(); barbi.eyes.forEach(s => e.add(s.parent.getWorldPosition(_v))); e.divideScalar(barbi.eyes.length);
+      const dx = e.x - camera.position.x, dy = e.y - camera.position.y, dz = e.z - camera.position.z;
+      const yaw = Math.atan2(-dx, -dz), pitch = clamp(Math.atan2(dy, Math.hypot(dx, dz)), -0.9, 0.9), kk = k * k * (3 - 2 * k);
+      // mostly tilt, only turn a little: turning fully would slide her face behind the door that stays shut
+      camera.rotation.y += angDiff(yaw, camera.rotation.y) * kk * 0.4; camera.rotation.x += (pitch - camera.rotation.x) * kk;
+    }
+  }
+  // wardrobe doors: only the one you're in ever opens (in the scene). From inside, closed doors are drawn as the slats overlay.
+  for (const c of closets) if (c.doors) for (const d of c.doors) {
+    const mine = p.hidden && p.closet === c, k = mine && closetScene && d.side < 0 ? sceneDoor(closetScene.t) : 0;
+    d.pivot.rotation.y = d.side * k * 1.9; d.leaf.visible = !mine || k > 0.12;
+  }
+  // teammates
+  if (MP.on) for (const o of MP.others.values()) { if (!o.av) continue;
+    o.av.obj.position.set(o.x * S, 0, o.y * S); o.av.obj.rotation.y = Math.PI / 2 - o.ang;
+    o.av.update(lastDt, { speed: o.spd * S, sprinting: o.sprinting, down: o.down, dead: o.dead, hidden: o.hidden, pitch: o.pitch, lightOn: settings.quality !== 'low' });
+    o.av.setName(o.dead ? o.name + ' ✝' : o.down ? o.name + ' · ' + Math.ceil(o.downLeft) + 's' : o.name, o.down || o.dead); }
+  // things on the floor
+  for (const f of fuses) if (f.obj) { f.obj.visible = !f.got;
+    if (!f.got) { const k = f.obj.userData.k; f.obj.userData.body.rotation.y = t * 1.3 + k; f.obj.position.y = 0.95 + Math.sin(t * 2 + k) * 0.04;
+      f.obj.children[1].material.opacity = 0.5 + Math.sin(t * 4 + k) * 0.2; } }
+  for (const n of notes) if (n.obj) n.obj.visible = !n.read;
+  const D = level.door;
+  if (D) { if (powerOn && !D.open) { D.open = true; D.door.material = D.openMat; }
+    D.lamp.material.color.setHex(powerOn ? 0x4dff88 : (Math.sin(t * 6) > 0 ? 0xff3030 : 0x401010)).multiplyScalar(4);
+    exitLight.intensity = powerOn ? 2.5 + Math.sin(t * 5) * 0.5 : 0; }
+  const P = level.prints;
+  prints.forEach((f, i) => { const k = Math.min(1, f.t / 4);
+    _m4.compose(_v.set(f.x * S, 0.004, f.y * S), _q.setFromAxisAngle(_up, -f.a), _sc.set(k, 1, k)); P.setMatrixAt(i, _m4); });
+  P.count = prints.length; P.instanceMatrix.needsUpdate = true;
+  // dust floating in the flashlight beam
+  const pos = dustPts.geometry.attributes.position, col = dustPts.geometry.attributes.color;
+  dust.forEach((d, i) => {
+    pos.setXYZ(i, d.x * S, d.h, d.y * S);
+    const dx = d.x - p.x, dy = d.y - p.y, dd = Math.hypot(dx, dy);
+    let b = 0;
+    if (!p.hidden && dd > 14 && dd < 280 && Math.abs(angDiff(Math.atan2(dy, dx), p.ang)) < 0.55) b = (1 - dd / 280) * 0.8 * flicker * (0.6 + 0.4 * Math.sin(d.ph * 2));
+    col.setXYZ(i, b, b * 0.92, b * 0.8);
+  });
+  pos.needsUpdate = col.needsUpdate = true;
+  if (level.house) level.house.update(lastDt, t, camera, p, flash);
+  draw(scene, camera);
+}
+
+function updateDust(dt) {
+  const p = player;
+  while (dust.length < 50) dust.push({ x: p.x + rnd(-260, 260), y: p.y + rnd(-260, 260), h: rnd(0.2, 2.7), vx: rnd(-5, 5), vy: rnd(-5, 5), ph: rnd(0, 6.28) });
+  for (const d of dust) { d.x += d.vx * dt; d.y += d.vy * dt; d.ph += dt; d.h += Math.sin(d.ph) * dt * 0.03;
+    if (Math.abs(d.x - p.x) > 280 || Math.abs(d.y - p.y) > 280) { d.x = p.x + rnd(-260, 260); d.y = p.y + rnd(-260, 260); } }
+  for (const f of prints) f.t -= dt;
+  while (prints.length && prints[0].t <= 0) prints.shift();
+}
+
+function drawScreenFx(t) {
+  const p = player, m = monster, cw = cvs.width, ch = cvs.height;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const sc = closetScene && closetScene.t > 0 ? closetScene : null;
+  if (p.hidden) { // looking out between the louvres of the wardrobe doors
+    const per = 34 * DPR, slat = 14 * DPR, off = (ch / 2) % per;
+    const open = closetScene ? sceneDoor(closetScene.t) : 0, rx = cw / 2 + open * cw * 0.6;   // the right door swings away
+    for (let y = off - per; y < ch; y += per) {
+      const g = ctx.createLinearGradient(0, y, 0, y + slat);
+      g.addColorStop(0, 'rgba(40,24,14,.96)'); g.addColorStop(0.35, 'rgba(22,13,7,.97)'); g.addColorStop(1, 'rgba(6,3,2,.98)');
+      ctx.fillStyle = g; ctx.fillRect(0, y, cw / 2, slat); if (rx < cw) ctx.fillRect(rx, y, cw - rx + 1, slat);
+      ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, y + slat, cw / 2, 2 * DPR); if (rx < cw) ctx.fillRect(rx, y + slat, cw - rx + 1, 2 * DPR);
+    }
+    ctx.fillStyle = 'rgba(8,4,2,.97)'; ctx.fillRect(cw / 2 - 5 * DPR, 0, 10 * DPR, ch);   // the edge of the door that stays shut
+    if (open > 0 && rx < cw) ctx.fillRect(rx - 5 * DPR, 0, 10 * DPR, ch);
+    const fr = ctx.createRadialGradient(cw / 2, ch / 2, Math.min(cw, ch) * 0.35, cw / 2, ch / 2, Math.max(cw, ch) * 0.75);
+    fr.addColorStop(0, 'rgba(8,4,2,0)'); fr.addColorStop(1, 'rgba(8,4,2,.7)'); ctx.fillStyle = fr; ctx.fillRect(0, 0, cw, ch);
+    ctx.fillStyle = 'rgba(160,130,100,.5)'; ctx.font = (12 * DPR) + 'px Georgia'; ctx.textAlign = 'center';
+    if (!closetScene) ctx.fillText('hiding · move to leave', cw / 2, ch - 110 * DPR);
+  }
+  const d = m.active ? Math.hypot(m.x - p.x, m.y - p.y) : 9999, c = clamp(1 - d / 380, 0, 1);
+  const vg = ctx.createRadialGradient(cw / 2, ch / 2, Math.min(cw, ch) * 0.3, cw / 2, ch / 2, Math.max(cw, ch) * 0.72);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(' + Math.round(110 * c) + ',0,0,' + (0.45 + 0.4 * c * (0.7 + 0.3 * Math.sin(t * 10))) + ')');
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, cw, ch);
+  // once the power is back: an arrow towards the door (up = straight ahead)
+  if (powerOn && !p.hidden) { const ex = exit.x - p.x, ey = exit.y - p.y, de = Math.hypot(ex, ey);
+    if (de > 150) { const a = angDiff(Math.atan2(ey, ex), p.ang) - Math.PI / 2, r = Math.min(cw, ch) * 0.36;
+      ctx.save(); ctx.translate(cw / 2 + Math.cos(a) * r, ch / 2 + Math.sin(a) * r); ctx.rotate(a);
+      ctx.fillStyle = 'rgba(80,255,140,' + (0.35 + 0.2 * Math.sin(t * 5)) + ')';
+      ctx.beginPath(); ctx.moveTo(12 * DPR, 0); ctx.lineTo(-6 * DPR, -8 * DPR); ctx.lineTo(-6 * DPR, 8 * DPR); ctx.fill(); ctx.restore(); } }
+  if (p.hidden && sc) drawClosetLine(sc.t);
+  if (MP.on) drawTeamFx(t);
+  drawGrain(0.06);
+  if (canLock && !locked() && state === 'play') {
+    ctx.fillStyle = 'rgba(200,210,255,.75)'; ctx.font = (15 * DPR) + 'px Georgia'; ctx.textAlign = 'center';
+    ctx.fillText('click to look around', cw / 2, ch / 2 + 60 * DPR);
+  }
+  if (joy.id !== null) {
+    ctx.strokeStyle = 'rgba(160,180,255,.25)'; ctx.lineWidth = 2 * DPR;
+    ctx.beginPath(); ctx.arc(joy.ox * DPR, joy.oy * DPR, 55 * DPR, 0, 7); ctx.stroke();
+    ctx.fillStyle = 'rgba(160,180,255,.3)'; ctx.beginPath(); ctx.arc((joy.ox + joy.x * 55) * DPR, (joy.oy + joy.y * 55) * DPR, 22 * DPR, 0, 7); ctx.fill();
+  }
+}
+// Multiplayer overlay: in the top right corner an arrow for every downed teammate (up = straight ahead),
+// with their name, how far away they are and how long they have left; and the revive progress ring.
+function drawTeamFx(t) {
+  const p = player, cw = cvs.width, ch = cvs.height, D = DPR;
+  let row = 0;
+  for (const o of MP.others.values()) {
+    if (!o.down || o.dead) continue;
+    const cx = cw - 44 * D, cy = 86 * D + row * 64 * D, r = 20 * D; row++;
+    const a = angDiff(Math.atan2(o.y - p.y, o.x - p.x), p.ang) - Math.PI / 2, pulse = 0.65 + 0.35 * Math.sin(t * 6);
+    ctx.save();
+    ctx.fillStyle = 'rgba(40,0,0,.55)'; ctx.strokeStyle = 'rgba(255,90,90,' + pulse + ')'; ctx.lineWidth = 2 * D;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.translate(cx, cy); ctx.rotate(a); ctx.fillStyle = 'rgba(255,120,120,' + pulse + ')';
+    ctx.beginPath(); ctx.moveTo(13 * D, 0); ctx.lineTo(-7 * D, -8 * D); ctx.lineTo(-3 * D, 0); ctx.lineTo(-7 * D, 8 * D); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#ffd0cc'; ctx.font = '600 ' + (12 * D) + 'px system-ui, sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillText(o.name, cx - r - 8 * D, cy - 7 * D);
+    ctx.fillStyle = 'rgba(255,208,204,.75)'; ctx.font = (11 * D) + 'px system-ui, sans-serif';
+    ctx.fillText(Math.round(Math.hypot(o.x - p.x, o.y - p.y) * S) + ' m · ' + Math.ceil(o.downLeft) + 's', cx - r - 8 * D, cy + 8 * D);
+  }
+  if (reviveTarget && revP > 0) {
+    const cx = cw / 2, cy = ch / 2 + 40 * D, r = 30 * D;
+    ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.lineWidth = 6 * D; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.stroke();
+    ctx.strokeStyle = '#8ff0b5'; ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + revP * Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#e6fff0'; ctx.font = '600 ' + (13 * D) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('Reviving ' + reviveTarget.name + '…', cx, cy + r + 18 * D);
+  } else if (reviveTarget) {
+    ctx.fillStyle = 'rgba(255,220,215,.85)'; ctx.font = '600 ' + (13 * D) + 'px system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText((canLock ? 'Hold E' : 'Hold REVIVE') + ' to get ' + reviveTarget.name + ' up', cw / 2, ch / 2 + 60 * D);
+  }
+}
+function drawClosetLine(t) {
+  const cw = cvs.width, ch = cvs.height, shown = Math.floor(clamp((t - SC.speak) / 1.6, 0, 1) * CLOSET_LINE.length);
+  if (!shown) return;
+  const fs = 22 * DPR, alpha = clamp((SC.vanish + 0.3 - t) / 0.5, 0, 1);
+  ctx.save(); ctx.font = 'italic ' + fs + 'px Georgia, serif'; ctx.textBaseline = 'middle';
+  const txt = CLOSET_LINE.slice(0, shown), full = ctx.measureText(CLOSET_LINE).width;
+  let x = cw / 2 - full / 2; const y = ch - 150 * DPR;
+  for (const chr of txt) {
+    ctx.fillStyle = 'rgba(255,' + (40 + Math.random() * 40 | 0) + ',50,' + alpha + ')';
+    ctx.shadowColor = '#f00'; ctx.shadowBlur = 12 * DPR;
+    ctx.fillText(chr, x + rnd(-2, 2) * DPR, y + rnd(-2, 2) * DPR); x += ctx.measureText(chr).width;
+  }
+  ctx.restore();
+}
+function drawGrain(a) {
+  ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = grainPat;
+  const ox = Math.random() * 128 | 0, oy = Math.random() * 128 | 0;
+  ctx.setTransform(1, 0, 0, 1, -ox, -oy); ctx.fillRect(0, 0, cvs.width + 128, cvs.height + 128); ctx.restore();
+}
+
+function renderGame(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cvs.width, cvs.height);
+  if (MP.on && MP.scareT > 0) { MP.scareT -= lastDt; renderDead(lastDt, true); return; }
+  if (renderer) render3D(t);
+  drawScreenFx(t);
+}

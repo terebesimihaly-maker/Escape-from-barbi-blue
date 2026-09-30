@@ -4,9 +4,9 @@
    Pose angles are in degrees, in the model's own space at rest (she faces +Z, +X is her left, +Y is up):
      x > 0 bends the spine/head forward, and swings a hanging arm or leg backwards (x < 0 = forwards)
      y turns (twist), z tilts sideways (for the left side z > 0 lifts an arm out; the right side is mirrored).
-   Most walking and running comes from motion capture (models/mocap.json, retargeted from the CMU Graphics Lab
-   Motion Capture Database by tools/retarget-mocap.mjs); the creepy parts (head tilt, twitches, reaching arms,
-   curled fingers, the scream, the lunge) are layered on top in code. Without the mocap file the clips fall back
+   Her standing, wandering and searching come from motion capture (models/mocap.json, retargeted from the CMU Graphics Lab
+   Motion Capture Database by tools/retarget-mocap.mjs); the creepy parts (head tilt, twitches,
+   curled fingers) are layered on top in code. Her sprint, the scream, the lunge and the wardrobe scene are hand-made. Without the mocap file the clips fall back
    to the hand-made versions below.
    Usage: const anim = BarbiAnim.build(THREE, gltf.scene, { mocap, scale }); anim.play('walk'); anim.update(dt); */
 (function () {
@@ -125,19 +125,11 @@ const CLIPS = {
     P.sym('lowerarm01', -18, 0, 0).hand(1, 0.3, 6).hand(-1, 0.3, 6);
   } },
 
-  // chasing: sprinting at you, bent forward, both arms reaching for your face, fingers spread
-  chase: { dur: 0.62, loop: true, speed: 6, mocap: 'p_run', over(t, P, k) {           // (mocap: a real run, arms replaced)
-    const ph = k * TAU;
-    P.spine(12, 0, 0).neck(-12, 0, 0).rot('head', -4 + wob(t, 23, 0) * 4, wob(t, 17, 1) * 5, 12 + wob(t, 13, 2) * 5);
-    P.symSet('upperarm01', -78, 0, -14).symSet('lowerarm01', -14, 0, 0).symSet('wrist', -10, 0, 0);
-    P.rot('upperarm01.L', 10 * sin(ph), 0, 0).rot('upperarm01.R', -10 * sin(ph), 0, 0);
-    P.hand(1, -0.15, 14).hand(-1, -0.15, 14); oLegsRun(P, 1.2);
-  }, fn(t, P) { run(t, P, 0.62, 1); } },
-  // hunting (running to where she heard you): the same run, arms flailing instead of reaching
-  run: { dur: 0.62, loop: true, speed: 5, mocap: 'p_jog', over(t, P, k) {
-    P.spine(10, 0, 0).rot('head', wob(t, 19, 0) * 5, wob(t, 15, 1) * 6, 14 + wob(t, 11, 2) * 5);
-    P.hand(1, 0.5, 4).hand(-1, 0.5, 4); oLegsRun(P, 1.2);
-  }, fn(t, P) { run(t, P, 0.62, 0); } },
+  // chasing: hand-made, so she doesn't run like a person: a lurching, uneven sprint (a long stride, then a stumbling one),
+  // bent low with her head held dead level and tilted, jaw hanging; head and arms move in stop-motion jerks
+  chase: { dur: 0.9, loop: true, speed: 6.2, fn(t, P) { sprint(t, P, 0.9, 1); } },
+  // hunting (running to where she heard you): the same sprint, her arms hanging and flopping behind her
+  run: { dur: 0.9, loop: true, speed: 5.4, fn(t, P) { sprint(t, P, 0.9, 0); } },
 
   // the scream: she stops, bends, then throws her head back with her arms spread, shaking
   scream: { dur: 2.0, loop: false, fn(t, P) {
@@ -228,19 +220,34 @@ CLIPS.lean = { dur: 3.0, loop: true, fn(t, P) {
   P.move(0, -0.12, 0.08);
 } };
 
-function run(t, P, dur, reach) {
-  const ph = t / dur * TAU, flail = 1 - reach;
-  legs(P, ph, 40, 85, 0.2);
-  P.move(sin(ph) * 0.03, -0.05 + 0.05 * Math.abs(cos(ph)), 0);
-  P.rot('root', 0, sin(ph) * 8, 0);
-  P.spine(30 + cos(ph * 2) * 3, -sin(ph) * 10, 0).neck(-10 - 10 * reach, sin(ph) * 3, 0);
-  P.rot('head', -4 * reach + wob(t, 23, 0) * 4, wob(t, 17, 1) * 5, 14 + wob(t, 13, 2) * 5);
-  P.rot('jaw', 6 + 10 * reach, 0, 0);
-  // reaching: both arms forward, alternating a little; flailing: big uneven swings
-  P.sym('upperarm01', -78 * reach, 0, -14 * reach - 6 * flail);
-  P.rot('upperarm01.L', 12 * sin(ph) * (reach + flail * 3), 0, 0).rot('upperarm01.R', -12 * sin(ph) * (reach + flail * 3.4), 0, 0);
-  P.sym('lowerarm01', -14 * reach - 40 * flail, 0, 0);
-  P.hand(1, reach ? -0.15 : 0.5, 14 * reach).hand(-1, reach ? -0.15 : 0.5, 14 * reach);
+// Her sprint. One loop = a long stride with the right leg, then a quick stumbling step with the left.
+// reach 1: arms out for your face, clawing; reach 0: arms hanging loose, flopping behind her.
+function sprint(t, P, dur, reach) {
+  const k = t / dur, ph = k * TAU, w = ph + 0.45 * sin(ph);    // (warped time: the uneven stride)
+  const q = Math.floor(k * 9) / 9, qt = q * dur;                // stop-motion time for the head and arms: 9 held poses per loop
+  const stumble = spike(k, 0.62, 0.07), snap = spike(k, 0.34, 0.035), snap2 = spike(k, 0.83, 0.03);
+  legs(P, w, 46, 92, 0.25); oLegsRun(P, 1.35);
+  P.move(sin(w) * 0.06, -0.09 + 0.06 * Math.abs(cos(w)) - 0.07 * stumble, 0);
+  P.rot('root', 16 + stumble * 6, sin(w) * 11, sin(w) * 7 + stumble * 6);             // pitched forward from the hips
+  P.spine(52 + cos(w * 2) * 5 + stumble * 10, -sin(w) * 13, -stumble * 4);
+  // the head stays level and locked on you whatever the body does, tilted over; it snaps sideways now and then
+  P.neck(-36 - stumble * 8, sin(w) * 9, 0);
+  P.rot('head', -22 + wob(qt, 21, 0) * 3, -sin(w) * 10 + wob(qt, 13, 1) * 6 + snap * 32 - snap2 * 26, 30 + wob(qt, 9, 2) * 6 - snap * 40 + snap2 * 20);
+  P.rot('jaw', 16 + 8 * reach + wob(qt, 17, 3) * 5, 0, 0);
+  P.sym('clavicle', 0, 0, 6 * snap + 8 * stumble);
+  if (reach) {
+    // one arm high at your face, the other lower and further out; the hands claw open and shut
+    const j = wob(qt, 11, 4) * 5;
+    P.side('upperarm01', 1, -122 + j + sin(w) * 8, 0, -4).side('lowerarm01', 1, -6, 0, 0).side('wrist', 1, -22, 0, 0);
+    P.side('upperarm01', -1, -40 - j - sin(w) * 12, 0, 34).side('lowerarm01', -1, -38, 0, 0).side('wrist', -1, -8, 0, 0);
+    const claw = Math.max(0, sin(q * TAU * 3));
+    P.hand(1, -0.2 + 0.85 * claw, 14).hand(-1, -0.2 + 0.85 * Math.max(0, sin(q * TAU * 3 + 2)), 14);
+  } else {
+    // dead weight: the arms swing late, far behind the legs
+    P.sym('upperarm01', 22, 0, -4).rot('upperarm01.L', 34 * sin(w - 1.3), 0, 0).rot('upperarm01.R', -38 * sin(w - 1.1), 0, 0);
+    P.sym('lowerarm01', -12, 0, 0).rot('lowerarm01.L', -20 * Math.max(0, sin(w - 2)), 0, 0).rot('lowerarm01.R', -24 * Math.max(0, -sin(w - 2)), 0, 0);
+    P.hand(1, 0.25, 3).hand(-1, 0.3, 3);
+  }
 }
 
 /* ---------- model prep ---------- */

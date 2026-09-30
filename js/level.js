@@ -1,0 +1,423 @@
+/* Escape from Barbi Blue: Building a floor in 3D: floor, walls, ceiling, wardrobes, the exit door, fuses, notes and footprints.
+   (The game is split over several plain scripts that share one scope; index.html loads them in order.) */
+'use strict';
+
+/* ---------- building a floor ---------- */
+function disposeLevel() {
+  if (!level) return;
+  if (level.house) level.house.dispose();
+  scene.remove(level.group);
+  const seen = new Set();
+  level.group.traverse(o => {
+    if (o.geometry && !seen.has(o.geometry)) { seen.add(o.geometry); o.geometry.dispose(); }
+    const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+    for (const m of ms) { if (seen.has(m)) continue; seen.add(m);
+      for (const k of ['map', 'emissiveMap', 'bumpMap']) if (m[k] && m[k] !== glowTex && !seen.has(m[k])) { seen.add(m[k]); m[k].dispose(); }
+      m.dispose(); }
+  });
+  if (level.door) { level.door.openMat.map.dispose(); level.door.openMat.dispose(); level.door.lockedMat.map.dispose(); level.door.lockedMat.dispose(); }
+  level = null;
+}
+function buildLevel() {
+  disposeLevel();
+  const F = FLOORS[floorIdx], G = new THREE.Group(), L = TILE_M;
+  level = { grid, group: G, door: null, prints: null };
+  const ftx = floorTexture(F);   // the floor's own picture doubles as its relief: dark seams and grout sit lower
+  // (a physically based floor: varnished boards and polished tiles throw the flashlight and the lamps back at you)
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(GW * L, GH * L), new THREE.MeshStandardMaterial({ map: ftx, bumpMap: ftx, bumpScale: 2.5,
+    roughness: { wood: 0.5, tile: 0.28, concrete: 0.85 }[F.style], metalness: 0, color: new THREE.Color().setScalar(F.style === 'tile' ? 2.6 : 1.8) }));
+  floor.rotation.x = -Math.PI / 2; floor.position.set(GW * L / 2, 0, GH * L / 2); floor.receiveShadow = true; G.add(floor);
+  const ct = ceilingTexture(F); ct.repeat.set(GW, GH);
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(GW * L, GH * L), new THREE.MeshLambertMaterial({ map: ct, bumpMap: ct, bumpScale: 2 }));
+  ceil.rotation.x = Math.PI / 2; ceil.position.set(GW * L / 2, WALL_H, GH * L / 2); G.add(ceil);
+  const faces = [];
+  const wallTx = wallTexture(F);
+  const walls = new THREE.Mesh(wallGeometry(faces), new THREE.MeshLambertMaterial({ map: wallTx, bumpMap: wallTx.userData.bump, bumpScale: 3,
+    vertexColors: true, color: new THREE.Color().setScalar(F.style === 'tile' ? 2.2 : 1) }));
+  walls.castShadow = walls.receiveShadow = true; G.add(walls);
+  // the house around the maze: woodwork, doorways, lamps, furniture and props (js/house.js)
+  const keep = new Set([...closets.map(c => Math.floor(c.x / T) + ',' + Math.floor(c.y / T)), exit.tx + ',' + exit.ty]);
+  level.house = House.build(THREE, { style: F.style, L, H: WALL_H, GW, GH, isWall, faces, keep, wallMat: walls.material, hash, toTex, glowTex,
+    decorFace: f => hash(f.x * 7 + f.nx, f.y * 7 + f.nz, 91) < F.frames + 0.045, quality: settings.quality, lowq: LOWQ });
+  G.add(level.house.group);
+  if (level.house.beam) { level.house.beam.position.copy(flash.position); camera.add(level.house.beam); }
+  wallDecor(G, F, faces, level.house.doorTiles);
+  const wt = wardrobeMaterials();
+  for (const c of closets) G.add(makeWardrobe(c, wt));
+  makeExit(G);
+  const fm = fuseParts();
+  fuses.forEach((f, i) => { const o = makeFuse(fm); o.position.set(f.x * S, 0.95, f.y * S); o.userData.k = i * 1.7; f.obj = o; G.add(o); });
+  notes.forEach(n => { const o = makeNote(n); n.obj = o; G.add(o); });
+  level.prints = makePrints(); G.add(level.prints);
+  scene.add(G);
+}
+
+// the floor is painted once per floor, tile by tile, into one big texture
+function floorTexture(F) {
+  const res = Math.min(2, (LOWQ ? 1536 : 2048) / (Math.max(GW, GH) * T));
+  const c = mkCanvas(Math.ceil(GW * T * res), Math.ceil(GH * T * res)), g = c.getContext('2d');
+  g.setTransform(res, 0, 0, res, 0, 0);
+  g.fillStyle = '#000'; g.fillRect(0, 0, GW * T, GH * T);
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (!grid[y][x]) paintFloor(g, F, x, y);
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (!grid[y][x]) paintShade(g, x, y);
+  for (const d of decals) paintDecal(g, d);
+  return toTex(c);
+}
+function paintFloor(g, F, x, y) {
+  const X = x * T, Y = y * T;
+  if (F.style === 'wood') {
+    for (let k = 0; k < 4; k++) {
+      const row = y * 4 + k, py = Y + k * 10, seam = X + 4 + hash(row, x, 1) * (T - 8);
+      for (const [a, b] of [[X, seam], [seam, X + T]]) {
+        const v = hash(row, Math.round(a), 2);
+        g.fillStyle = F.floorA; g.fillRect(a, py, b - a + 0.3, 10.3);
+        g.fillStyle = v < 0.5 ? 'rgba(0,0,0,' + (0.5 - v) * 0.5 + ')' : 'rgba(255,215,190,' + (v - 0.5) * 0.14 + ')';
+        g.fillRect(a, py, b - a + 0.3, 10.3);
+        g.strokeStyle = 'rgba(0,0,0,.2)'; g.lineWidth = 0.4;
+        for (let q = 0; q < 2; q++) { const gy = py + 2.5 + q * 4 + hash(row, q + a, 3) * 2;
+          g.beginPath(); g.moveTo(a, gy); g.bezierCurveTo(a + (b - a) * 0.3, gy - 1, a + (b - a) * 0.6, gy + 1, b, gy); g.stroke(); }
+        if (hash(row, a, 5) > 0.6) { g.fillStyle = 'rgba(0,0,0,.5)'; g.beginPath(); g.arc(a + 1.6, py + 5, 0.55, 0, 7); g.fill(); }
+      }
+      g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(X, py + 9.4, T, 0.6); g.fillRect(seam, py, 0.6, 10);
+      g.fillStyle = 'rgba(255,225,205,.07)'; g.fillRect(X, py, T, 0.5);
+    }
+  } else if (F.style === 'tile') {
+    for (let k = 0; k < 4; k++) {
+      const ix = x * 2 + (k % 2), iy = y * 2 + (k >> 1), tx = ix * 20, ty = iy * 20, v = hash(ix, iy, 4);
+      g.fillStyle = (ix + iy) % 2 ? F.floorB : F.floorA; g.fillRect(tx, ty, 20.3, 20.3);
+      g.fillStyle = 'rgba(255,255,255,' + (0.03 + 0.04 * v) + ')'; g.fillRect(tx + 1.5, ty + 1.5, 17, 5);
+      if (v > 0.84) { g.strokeStyle = 'rgba(0,0,0,.65)'; g.lineWidth = 0.6; g.beginPath();
+        g.moveTo(tx + 2, ty + 3 + v * 10); g.lineTo(tx + 9, ty + 10); g.lineTo(tx + 12, ty + 17); g.moveTo(tx + 9, ty + 10); g.lineTo(tx + 18, ty + 6 + v * 8); g.stroke(); }
+    }
+    g.fillStyle = F.grout; g.fillRect(X, Y, T, 0.9); g.fillRect(X, Y + 20, T, 0.9); g.fillRect(X, Y, 0.9, T); g.fillRect(X + 20, Y, 0.9, T);
+  } else {
+    g.fillStyle = F.floorA; g.fillRect(X, Y, T + 0.3, T + 0.3);
+    for (let k = 0; k < 8; k++) { const v = hash(x, y, 10 + k);
+      g.fillStyle = v < 0.55 ? 'rgba(0,0,0,.13)' : 'rgba(255,240,220,.045)';
+      g.beginPath(); g.arc(X + hash(x, y, 20 + k) * T, Y + hash(x, y, 30 + k) * T, 2 + v * 8, 0, 7); g.fill(); }
+    if (hash(x, y, 40) > 0.72) { g.strokeStyle = 'rgba(0,0,0,.55)'; g.lineWidth = 0.6; g.beginPath();
+      let cx = X + hash(x, y, 41) * T, cy = Y; g.moveTo(cx, cy);
+      for (let q = 1; q <= 5; q++) { cx += (hash(x, y, 42 + q) - 0.5) * 12; cy += T / 5; g.lineTo(cx, cy); } g.stroke(); }
+    if (hash(x, y, 50) > 0.78) { const px = X + 10 + hash(x, y, 51) * 20, py = Y + 10 + hash(x, y, 52) * 20;
+      const pg = g.createRadialGradient(px - 3, py - 3, 1, px, py, 13);
+      pg.addColorStop(0, 'rgba(140,170,210,.4)'); pg.addColorStop(0.5, 'rgba(25,35,60,.55)'); pg.addColorStop(1, 'rgba(10,15,25,0)');
+      g.fillStyle = pg; g.beginPath(); g.ellipse(px, py, 13, 8, hash(x, y, 53) * 3, 0, 7); g.fill(); }
+  }
+}
+function paintShade(g, x, y) { // corners and wall bases are darker
+  const X = x * T, Y = y * T;
+  const band = (x0, y0, x1, y1, a, rx, ry, rw, rh) => { const gr = g.createLinearGradient(x0, y0, x1, y1);
+    gr.addColorStop(0, 'rgba(0,0,0,' + a + ')'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(rx, ry, rw, rh); };
+  if (isWall(x, y - 1)) band(0, Y, 0, Y + 9, 0.55, X, Y, T, 9);
+  if (isWall(x - 1, y)) band(X, 0, X + 9, 0, 0.55, X, Y, 9, T);
+  if (isWall(x + 1, y)) band(X + T, 0, X + T - 9, 0, 0.55, X + T - 9, Y, 9, T);
+  if (isWall(x, y + 1)) band(0, Y + T, 0, Y + T - 9, 0.55, X, Y + T - 9, T, 9);
+}
+function paintDecal(g, d) {
+  g.save(); g.translate(d.x, d.y); g.rotate(d.rot);
+  if (d.type === 'stain') {
+    const sg = g.createRadialGradient(0, 0, 0, 0, 0, d.s);
+    sg.addColorStop(0, 'rgba(70,4,10,.6)'); sg.addColorStop(1, 'rgba(70,4,10,0)');
+    g.fillStyle = sg; g.beginPath(); g.ellipse(0, 0, d.s, d.s * 0.65, 0, 0, 7); g.fill();
+    g.fillStyle = 'rgba(70,4,10,.55)'; g.beginPath(); g.arc(d.s * 1.2, 2, 1.6, 0, 7); g.arc(d.s * 1.6, -1, 1, 0, 7); g.fill();
+  } else if (d.type === 'petal') {
+    for (let k = 0; k < 4; k++) { g.fillStyle = k % 2 ? 'rgba(90,130,255,.55)' : 'rgba(150,180,255,.45)';
+      g.beginPath(); g.ellipse(k * 4 - 6, (k % 2) * 4 - 2, 3.2, 1.6, k * 1.3, 0, 7); g.fill(); }
+  } else {
+    g.fillStyle = 'rgba(120,10,18,.6)'; g.font = 'bold 9px Georgia, serif'; g.textAlign = 'center'; g.fillText(d.text, 0, 3);
+    g.fillRect(-2, 4, 0.7, 4 + d.s * 0.3);   // a drip
+  }
+  g.restore();
+}
+function ceilingTexture(F) {
+  const c = mkCanvas(128, 128), g = c.getContext('2d');
+  g.fillStyle = F.style === 'concrete' ? '#2a2724' : '#2b2528'; g.fillRect(0, 0, 128, 128);
+  for (let k = 0; k < 40; k++) { g.fillStyle = Math.random() < 0.6 ? 'rgba(0,0,0,.12)' : 'rgba(255,240,220,.03)';
+    g.beginPath(); g.arc(Math.random() * 128, Math.random() * 128, 3 + Math.random() * 14, 0, 7); g.fill(); }
+  g.strokeStyle = 'rgba(0,0,0,.5)'; g.lineWidth = 1; g.beginPath(); let x = 20, y = 0; g.moveTo(x, y);
+  while (y < 128) { x += rnd(-10, 10); y += rnd(8, 18); g.lineTo(x, y); } g.stroke();
+  return toTex(c, true);
+}
+// one texture covers one tile of wall (1.8 m wide, 3 m high) and repeats sideways
+function wallTexture(F) {
+  const w = 384, h = 640, c = mkCanvas(w, h), g = c.getContext('2d'), pm = h / WALL_H;
+  const rail = h - 0.95 * pm, base = h - 0.14 * pm;
+  // the relief (bump map): mid grey is flat, lighter sticks out, darker is sunk in
+  const hc = mkCanvas(w, h), hg = hc.getContext('2d');
+  hg.fillStyle = '#808080'; hg.fillRect(0, 0, w, h);
+  for (let k = 0; k < 900; k++) { hg.fillStyle = 'rgba(' + (Math.random() < 0.5 ? '0,0,0' : '255,255,255') + ',.05)'; hg.fillRect(Math.random() * w, Math.random() * h, 2 + Math.random() * 4, 2 + Math.random() * 4); }
+  if (F.style === 'wood') {
+    hg.fillStyle = '#9a9a9a'; hg.fillRect(0, rail, w, base - rail);
+    for (let x = 0; x < w; x += 96) { hg.strokeStyle = '#303030'; hg.lineWidth = 5; hg.strokeRect(x + 12, rail + 26, 72, base - rail - 46);
+      hg.fillStyle = '#b0b0b0'; hg.fillRect(x + 16, rail + 30, 64, base - rail - 54); }
+    hg.fillStyle = '#e0e0e0'; hg.fillRect(0, rail - 7, w, 14); hg.fillStyle = '#404040'; hg.fillRect(0, rail + 7, w, 3);
+  } else if (F.style === 'tile') {
+    hg.fillStyle = '#a8a8a8'; hg.fillRect(0, rail, w, h - rail);
+    hg.fillStyle = '#303030'; for (let y = rail; y < h; y += 32) { hg.fillRect(0, y, w, 3); for (let x = 0; x < w; x += 48) hg.fillRect(x, y, 3, 32); }
+    hg.fillStyle = '#e0e0e0'; hg.fillRect(0, rail - 6, w, 12);
+  } else {
+    for (let y = 0, r = 0; y < h; y += 18, r++) for (let x = -(r % 2) * 32; x < w; x += 64) {
+      hg.fillStyle = 'rgb(' + Array(3).fill(150 + (Math.random() * 40 | 0)).join(',') + ')'; hg.fillRect(x + 3, y + 3, 61, 15);
+      hg.fillStyle = '#2a2a2a'; hg.fillRect(x, y, 64, 3); hg.fillRect(x, y, 3, 18);
+    }
+  }
+  hg.fillStyle = '#d0d0d0'; hg.fillRect(0, base, w, h - base); hg.fillStyle = '#404040'; hg.fillRect(0, base, w, 3);
+  g.fillStyle = F.face; g.fillRect(0, 0, w, h);
+  if (F.style === 'wood') {            // nursery: striped wallpaper with little flowers, wooden panels below
+    g.fillStyle = F.pattern; for (let x = 0; x < w; x += 48) g.fillRect(x + 8, 0, 14, rail);
+    g.fillStyle = F.dot;
+    for (let x = 0; x < w; x += 48) for (let y = 24, r = 0; y < rail - 14; y += 44, r++) {
+      const fx = x + 35, fy = y + (r % 2) * 18;
+      for (let p = 0; p < 5; p++) { const a = p / 5 * 6.283; g.beginPath(); g.arc(fx + Math.cos(a) * 3.2, fy + Math.sin(a) * 3.2, 2.2, 0, 7); g.fill(); }
+    }
+    g.fillStyle = '#3a2418'; g.fillRect(0, rail, w, h - rail);
+    for (let x = 0; x < w; x += 96) { g.strokeStyle = 'rgba(0,0,0,.5)'; g.lineWidth = 4; g.strokeRect(x + 12, rail + 26, 72, base - rail - 46);
+      g.strokeStyle = 'rgba(255,220,190,.08)'; g.lineWidth = 2; g.strokeRect(x + 15, rail + 29, 72, base - rail - 46); }
+    g.fillStyle = '#5a3a28'; g.fillRect(0, rail - 7, w, 14); g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(0, rail + 7, w, 3);
+  } else if (F.style === 'tile') {     // hallway: damask wallpaper over old tiles
+    g.fillStyle = F.pattern;
+    for (let x = 0; x < w; x += 64) for (let y = 0, r = 0; y < rail; y += 80, r++) {
+      const cx = x + 32 + (r % 2) * 32, cy = y + 40;
+      for (const ox of [cx, cx - w]) { g.beginPath(); g.moveTo(ox, cy - 26); g.lineTo(ox + 14, cy); g.lineTo(ox, cy + 26); g.lineTo(ox - 14, cy); g.fill();
+        g.beginPath(); g.arc(ox, cy - 34, 4, 0, 7); g.arc(ox, cy + 34, 4, 0, 7); g.fill(); }
+    }
+    g.fillStyle = '#1f353b'; g.fillRect(0, rail, w, h - rail);
+    for (let y = rail; y < h; y += 32) for (let x = 0; x < w; x += 48) {
+      g.fillStyle = 'rgba(255,255,255,' + (0.02 + Math.random() * 0.05) + ')'; g.fillRect(x + 2, y + 2, 44, 28);
+      g.fillStyle = F.grout; g.fillRect(x, y, 48, 2); g.fillRect(x, y, 2, 32); }
+    g.fillStyle = '#10262c'; g.fillRect(0, rail - 6, w, 12);
+  } else {                             // basement: damp brick
+    for (let y = 0, r = 0; y < h; y += 18, r++) for (let x = -(r % 2) * 32; x < w; x += 64) {
+      const v = Math.random();
+      g.fillStyle = F.face; g.fillRect(x, y, 64, 18);
+      g.fillStyle = v < 0.5 ? 'rgba(0,0,0,' + (0.3 * (0.5 - v)) + ')' : 'rgba(255,220,190,' + (0.1 * (v - 0.5)) + ')'; g.fillRect(x, y, 64, 18);
+      g.fillStyle = F.mortar; g.fillRect(x, y, 64, 3); g.fillRect(x, y, 3, 18);
+    }
+    const dg = g.createLinearGradient(0, h, 0, h - 1.3 * pm); dg.addColorStop(0, 'rgba(12,24,16,.75)'); dg.addColorStop(1, 'rgba(12,24,16,0)');
+    g.fillStyle = dg; g.fillRect(0, 0, w, h);
+  }
+  // grime: dark top, water streaks, stains, dirty skirting
+  const tg = g.createLinearGradient(0, 0, 0, 0.9 * pm); tg.addColorStop(0, 'rgba(0,0,0,.6)'); tg.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = tg; g.fillRect(0, 0, w, h);
+  for (let k = 0; k < 7; k++) { const x = Math.random() * w, sw = 3 + Math.random() * 12, len = (0.4 + Math.random() * 1.6) * pm;
+    const sg = g.createLinearGradient(0, 0, 0, len); sg.addColorStop(0, 'rgba(10,6,4,.35)'); sg.addColorStop(1, 'rgba(10,6,4,0)');
+    g.fillStyle = sg; g.fillRect(x, 0, sw, len); }
+  for (let k = 0; k < 4; k++) { const x = Math.random() * w, y = Math.random() * h, r = 20 + Math.random() * 50;
+    const sg = g.createRadialGradient(x, y, 0, x, y, r); sg.addColorStop(0, 'rgba(40,25,10,.22)'); sg.addColorStop(1, 'rgba(40,25,10,0)');
+    g.fillStyle = sg; g.fillRect(x - r, y - r, r * 2, r * 2); }
+  const bg = g.createLinearGradient(0, h, 0, h - 0.5 * pm); bg.addColorStop(0, 'rgba(0,0,0,.55)'); bg.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = bg; g.fillRect(0, 0, w, h);
+  g.fillStyle = F.base; g.fillRect(0, base, w, h - base); g.fillStyle = 'rgba(255,255,255,.06)'; g.fillRect(0, base, w, 3);
+  const t = toTex(c, true), bump = new THREE.CanvasTexture(hc); bump.wrapS = bump.wrapT = THREE.RepeatWrapping;
+  t.userData.bump = bump;
+  return t;
+}
+// one wall piece for every wall side that faces an open tile. Each piece is a small grid so that
+// inside corners, the ceiling line and the floor line can be shaded darker (fake ambient occlusion)
+function wallGeometry(faces) {
+  const P = [], N = [], U = [], C = [], I = [], L = TILE_M, h = WALL_H;
+  const us = [0, 0.14, 0.86, 1], vs = [0, 0.12, 0.8, 1];
+  const quad = (x0, z0, x1, z1, nx, nz, x, y) => {
+    const tx = Math.sign(x1 - x0), tz = Math.sign(z1 - z0);
+    // a wall at the next tile along means an inside corner at that end
+    const dark0 = isWall(x - tx, y - tz) ? 0.42 : 1, dark1 = isWall(x + tx, y + tz) ? 0.42 : 1;
+    const b = P.length / 3;
+    for (const v of vs) for (const u of us) {
+      P.push(x0 + (x1 - x0) * u, h * v, z0 + (z1 - z0) * u); N.push(nx, 0, nz); U.push(u, v);
+      let k = u === 0 ? dark0 : u === 1 ? dark1 : 1;
+      if (v === 0) k *= 0.62; else if (v === 1) k *= 0.5;
+      C.push(k, k, k);
+    }
+    for (let r = 0; r < 3; r++) for (let q = 0; q < 3; q++) {
+      const i = b + r * 4 + q; I.push(i, i + 1, i + 5, i, i + 5, i + 4);
+    }
+    faces.push({ x0, z0, x1, z1, nx, nz, x, y });
+  };
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    if (grid[y][x]) continue;
+    const X0 = x * L, X1 = X0 + L, Z0 = y * L, Z1 = Z0 + L;
+    if (isWall(x, y - 1)) quad(X0, Z0, X1, Z0, 0, 1, x, y);
+    if (isWall(x, y + 1)) quad(X1, Z1, X0, Z1, 0, -1, x, y);
+    if (isWall(x - 1, y)) quad(X0, Z1, X0, Z0, 1, 0, x, y);
+    if (isWall(x + 1, y)) quad(X1, Z0, X1, Z1, -1, 0, x, y);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+  geo.setIndex(I);
+  return geo;
+}
+// doll portraits (some with glowing eyes) and words written on the walls
+function wallDecor(G, F, faces, doorTiles) {
+  const plain = portraitTexture(false), eyed = portraitTexture(true), eyeGlow = portraitEyes();
+  const pGeo = new THREE.PlaneGeometry(0.44, 0.56), wGeo = new THREE.PlaneGeometry(1.2, 0.6);
+  const pMat = new THREE.MeshLambertMaterial({ map: plain });
+  const eMat = new THREE.MeshLambertMaterial({ map: eyed, emissiveMap: eyeGlow, emissive: 0xffffff, emissiveIntensity: 2.5 });
+  const words = {};
+  const exitFace = f => f.x === exit.tx && f.y === exit.ty;
+  faces.forEach((f, i) => {
+    if (exitFace(f) || (doorTiles && doorTiles.has(f.x + ',' + f.y))) return;
+    const r = hash(f.x * 7 + f.nx, f.y * 7 + f.nz, 91), cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2, rot = Math.atan2(f.nx, f.nz);
+    if (r < F.frames) {
+      const m = new THREE.Mesh(pGeo, hash(f.x, f.y, 98) > 0.55 ? eMat : pMat);
+      m.position.set(cx + f.nx * 0.015, 1.72, cz + f.nz * 0.015); m.rotation.y = rot; G.add(m);
+    } else if (r < F.frames + 0.045) {
+      const txt = DECAL_WORDS[(hash(f.x, f.y, 92) * DECAL_WORDS.length) | 0];
+      const mat = words[txt] || (words[txt] = new THREE.MeshLambertMaterial({ map: wordTexture(txt), transparent: true, depthWrite: false,
+        polygonOffset: true, polygonOffsetFactor: -1 }));
+      const m = new THREE.Mesh(wGeo, mat);
+      m.position.set(cx + f.nx * 0.01, 1.2 + hash(f.x, f.y, 93) * 0.6, cz + f.nz * 0.01); m.rotation.y = rot; m.rotation.z = (hash(f.x, f.y, 94) - 0.5) * 0.25;
+      G.add(m);
+    }
+  });
+}
+function portraitTexture(glowing) {
+  const c = mkCanvas(128, 164), g = c.getContext('2d');
+  g.fillStyle = '#7a602a'; g.fillRect(0, 0, 128, 164);
+  g.strokeStyle = '#4a3a18'; g.lineWidth = 3; g.strokeRect(6, 6, 116, 152);
+  g.fillStyle = '#1b1410'; g.fillRect(14, 14, 100, 136);
+  g.fillStyle = '#0b0d18'; g.beginPath(); g.ellipse(64, 70, 36, 44, 0, 0, 7); g.fill();          // hair
+  g.fillStyle = '#b9c6e4'; g.beginPath(); g.ellipse(64, 76, 22, 28, 0, 0, 7); g.fill();          // porcelain face
+  g.fillStyle = '#0b0d18'; g.beginPath(); g.moveTo(40, 66); g.quadraticCurveTo(64, 40, 88, 66); g.lineTo(88, 56); g.quadraticCurveTo(64, 30, 40, 56); g.fill();
+  g.fillStyle = '#2a4390'; g.beginPath(); g.moveTo(26, 150); g.quadraticCurveTo(64, 96, 102, 150); g.fill();   // blue dress
+  g.fillStyle = glowing ? '#9fe6ff' : '#05060c'; g.beginPath(); g.arc(55, 76, 3.2, 0, 7); g.arc(73, 76, 3.2, 0, 7); g.fill();
+  g.strokeStyle = 'rgba(30,40,80,.8)'; g.lineWidth = 1; g.beginPath(); g.moveTo(70, 56); g.lineTo(74, 66); g.lineTo(71, 74); g.stroke();
+  g.fillStyle = '#6a1c24'; g.fillRect(60, 92, 8, 2);
+  return toTex(c);
+}
+function portraitEyes() {
+  const c = mkCanvas(128, 164), g = c.getContext('2d');
+  g.fillStyle = '#000'; g.fillRect(0, 0, 128, 164);
+  g.fillStyle = '#7fd4ff'; g.beginPath(); g.arc(55, 76, 3.4, 0, 7); g.arc(73, 76, 3.4, 0, 7); g.fill();
+  return toTex(c);
+}
+function wordTexture(txt) {
+  const c = mkCanvas(256, 128), g = c.getContext('2d');
+  g.font = 'bold ' + (txt.length > 6 ? 38 : 58) + 'px Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillStyle = 'rgba(125,8,16,.85)'; g.fillText(txt, 128, 56);
+  for (let k = 0; k < 6; k++) { const x = 40 + Math.random() * 176, len = 10 + Math.random() * 40; g.fillRect(x, 70, 2.5, len); g.beginPath(); g.arc(x + 1.2, 70 + len, 2.5, 0, 7); g.fill(); }
+  return toTex(c);
+}
+function wardrobeMaterials() {
+  const side = mkCanvas(128, 256), s = side.getContext('2d');
+  s.fillStyle = '#3b2819'; s.fillRect(0, 0, 128, 256);
+  s.strokeStyle = 'rgba(0,0,0,.35)'; s.lineWidth = 1;
+  for (let x = 4; x < 128; x += 6 + Math.random() * 6) { s.beginPath(); s.moveTo(x, 0); s.bezierCurveTo(x + 4, 80, x - 4, 170, x + 2, 256); s.stroke(); }
+  const door = mkCanvas(256, 512), d = door.getContext('2d');
+  d.drawImage(side, 0, 0, 128, 512); d.drawImage(side, 128, 0, 128, 512);
+  for (const x0 of [8, 132]) {
+    d.strokeStyle = 'rgba(0,0,0,.55)'; d.lineWidth = 4; d.strokeRect(x0, 10, 116, 492);
+    for (let y = 40; y < 290; y += 14) {           // louvres you can peek through
+      d.fillStyle = '#080503'; d.fillRect(x0 + 12, y, 92, 6);
+      d.fillStyle = 'rgba(255,220,180,.1)'; d.fillRect(x0 + 12, y + 6, 92, 2);
+    }
+    d.strokeStyle = 'rgba(0,0,0,.45)'; d.lineWidth = 3; d.strokeRect(x0 + 14, 318, 88, 160);
+  }
+  d.fillStyle = '#120b06'; d.fillRect(126, 0, 4, 512);
+  d.fillStyle = '#c9a25a'; d.beginPath(); d.arc(118, 300, 5, 0, 7); d.arc(138, 300, 5, 0, 7); d.fill();
+  const st = toTex(side), dt = toTex(door);
+  const sideMat = new THREE.MeshLambertMaterial({ map: st, bumpMap: st, bumpScale: 2 });
+  // each door leaf shows its half of the door picture, from both sides
+  const half = off => { const t = dt.clone(); t.repeat.set(0.5, 1); t.offset.set(off, 0); t.needsUpdate = true;
+    return new THREE.MeshLambertMaterial({ map: t, bumpMap: t, bumpScale: 3, side: THREE.DoubleSide }); };
+  return { sideMat, innerMat: new THREE.MeshLambertMaterial({ color: 0x0a0604 }), leafR: half(0), leafL: half(0.5),
+    leafGeo: new THREE.PlaneGeometry(0.575, 2.2), geo: new THREE.BoxGeometry(1.15, 2.25, 0.6), crown: new THREE.BoxGeometry(1.25, 0.1, 0.68) };
+}
+function makeWardrobe(c, wt) {
+  const g = new THREE.Group(), body = new THREE.Mesh(wt.geo, [wt.sideMat, wt.sideMat, wt.sideMat, wt.sideMat, wt.innerMat, wt.sideMat]);
+  body.position.y = 1.125; const crown = new THREE.Mesh(wt.crown, wt.sideMat); crown.position.y = 2.3;
+  body.castShadow = body.receiveShadow = crown.castShadow = true;
+  g.add(body, crown);
+  // two doors on hinges at the outer edges. Seen from inside, the door on your right is at local -x.
+  c.doors = [];
+  for (const side of [-1, 1]) {
+    const pivot = new THREE.Group(); pivot.position.set(side * 0.575, 1.125, 0.305);
+    const leaf = new THREE.Mesh(wt.leafGeo, side < 0 ? wt.leafR : wt.leafL); leaf.position.x = -side * 0.2875; leaf.castShadow = true;
+    pivot.add(leaf); g.add(pivot); c.doors.push({ pivot, leaf, side, open: 0 });
+  }
+  const back = TILE_M / 2 - 0.3 - 0.01;          // its back against the wall of the dead end, doors facing the way out
+  g.position.set(c.x * S - c.ox * back, 0, c.y * S - c.oy * back); g.rotation.y = Math.atan2(c.ox, c.oy);
+  return g;
+}
+// wardrobes are solid: you can't walk into one (only hide in it)
+const CLOSET_FRONT = T / 2 - 0.6 / S;
+function closetBlocked(x, y, r) {
+  for (const c of closets) {
+    const dx = x - c.x, dy = y - c.y, along = dx * c.ox + dy * c.oy, side = Math.abs(dx * c.oy - dy * c.ox);
+    if (side < T / 2 && along > -T && along - r < -CLOSET_FRONT) return true;
+  }
+  return false;
+}
+function makeExit(G) {
+  const cx = exit.tx, cy = exit.ty;
+  // the door goes on the back wall of the dead end (or any wall of that tile)
+  const open = DIRS.filter(([dx, dy]) => !isWall(cx + dx, cy + dy));
+  const cand = DIRS.filter(([dx, dy]) => isWall(cx + dx, cy + dy));
+  const dir = cand.find(([dx, dy]) => open.some(([ox, oy]) => ox === -dx && oy === -dy)) || cand[0] || [0, -1];
+  const ld = doorTexture(false), lockedMat = new THREE.MeshLambertMaterial({ map: ld, bumpMap: ld, bumpScale: 3 }), openMat = new THREE.MeshBasicMaterial({ map: doorTexture(true) });
+  const door = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 2.3), lockedMat);
+  const px = exit.x * S + dir[0] * (TILE_M / 2 - 0.015), pz = exit.y * S + dir[1] * (TILE_M / 2 - 0.015);
+  door.position.set(px, 1.15, pz); door.rotation.y = Math.atan2(-dir[0], -dir[1]); G.add(door);
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff3030 }));
+  lamp.position.set(px - dir[0] * 0.05, 2.5, pz - dir[1] * 0.05); G.add(lamp);
+  exitLight.position.set(px - dir[0] * 0.8, 1.7, pz - dir[1] * 0.8);
+  level.door = { door, lamp, lockedMat, openMat, open: false };
+}
+function doorTexture(open) {
+  const c = mkCanvas(256, 512), g = c.getContext('2d');
+  g.fillStyle = '#2d1e13'; g.fillRect(0, 0, 256, 512);
+  if (open) {
+    g.fillStyle = '#020604'; g.fillRect(18, 18, 220, 494);
+    const gl = g.createRadialGradient(128, 300, 0, 128, 300, 240); gl.addColorStop(0, 'rgba(120,255,170,.45)'); gl.addColorStop(1, 'rgba(0,40,20,0)');
+    g.fillStyle = gl; g.fillRect(18, 18, 220, 494);
+    g.fillStyle = '#4d3523'; g.beginPath(); g.moveTo(18, 18); g.lineTo(70, 40); g.lineTo(70, 490); g.lineTo(18, 512); g.fill();   // the door, swung open
+    g.fillStyle = 'rgba(200,255,220,.9)'; g.font = 'bold 28px Georgia, serif'; g.textAlign = 'center'; g.fillText('EXIT', 150, 70);
+  } else {
+    g.fillStyle = '#4d3523'; g.fillRect(18, 18, 220, 494);
+    g.strokeStyle = 'rgba(0,0,0,.45)'; g.lineWidth = 4; g.strokeRect(40, 40, 76, 190); g.strokeRect(140, 40, 76, 190); g.strokeRect(40, 270, 76, 200); g.strokeRect(140, 270, 76, 200);
+    for (const [a, b] of [[[20, 90], [236, 420]], [[236, 90], [20, 420]]]) {       // boards nailed across
+      g.save(); g.translate((a[0] + b[0]) / 2, (a[1] + b[1]) / 2); g.rotate(Math.atan2(b[1] - a[1], b[0] - a[0]));
+      g.fillStyle = '#34231a'; g.fillRect(-200, -16, 400, 32); g.fillStyle = '#888'; g.fillRect(-150, -3, 6, 6); g.fillRect(144, -3, 6, 6); g.restore();
+    }
+    g.fillStyle = '#9a8540'; g.fillRect(112, 250, 32, 28); g.strokeStyle = '#9a8540'; g.lineWidth = 5; g.beginPath(); g.arc(128, 250, 11, Math.PI, 0); g.stroke();
+  }
+  return toTex(c);
+}
+function fuseParts() {
+  return {
+    glass: new THREE.CylinderGeometry(0.045, 0.045, 0.13, 12), cap: new THREE.CylinderGeometry(0.052, 0.052, 0.05, 12),
+    glassMat: new THREE.MeshLambertMaterial({ color: 0xffe0a0, emissive: 0xffa030, emissiveIntensity: 1.2, transparent: true, opacity: 0.9 }),
+    capMat: new THREE.MeshStandardMaterial({ color: 0xb8bcc4, metalness: 0.8, roughness: 0.35 }),
+  };
+}
+function makeFuse(fm) {
+  const g = new THREE.Group(), body = new THREE.Group();
+  const c1 = new THREE.Mesh(fm.cap, fm.capMat), c2 = new THREE.Mesh(fm.cap, fm.capMat); c1.position.y = 0.088; c2.position.y = -0.088;
+  body.add(new THREE.Mesh(fm.glass, fm.glassMat), c1, c2); body.rotation.z = 0.35;
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color(0xffc060).multiplyScalar(2), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0.7 }));
+  glow.scale.setScalar(0.75);
+  g.add(body, glow); g.userData.body = body;
+  return g;
+}
+function makeNote(n) {
+  const c = mkCanvas(128, 168), g = c.getContext('2d');
+  g.fillStyle = '#ddd2b8'; g.fillRect(0, 0, 128, 168);
+  g.fillStyle = '#b9ad92'; g.beginPath(); g.moveTo(128, 120); g.lineTo(128, 168); g.lineTo(84, 168); g.fill();
+  g.fillStyle = '#5e3e30'; for (let k = 0; k < 7; k++) g.fillRect(14, 22 + k * 16, 96 - (k % 3) * 18, 3);
+  g.fillStyle = 'rgba(120,10,18,.8)'; g.fillRect(14, 140, 40, 4);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.32), new THREE.MeshLambertMaterial({ map: toTex(c), emissive: 0x2a2418 }));
+  m.rotation.set(-Math.PI / 2, 0, n.rot); m.position.set(n.x * S, 0.006, n.y * S); m.receiveShadow = true;
+  return m;
+}
+// her wet footprints: one instanced mesh, a slot per print
+function makePrints() {
+  const c = mkCanvas(64, 32), g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.beginPath(); g.ellipse(38, 16, 20, 10, 0, 0, 7); g.fill(); g.beginPath(); g.ellipse(10, 16, 8, 7, 0, 0, 7); g.fill();
+  const geo = new THREE.PlaneGeometry(0.26, 0.12); geo.rotateX(-Math.PI / 2);
+  const m = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: 0x1c3478, alphaMap: toTex(c), transparent: true, opacity: 0.7,
+    depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }), 90);
+  m.frustumCulled = false; m.count = 0;
+  return m;
+}

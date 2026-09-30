@@ -1,0 +1,8 @@
+{
+  "name": "escape-from-barbi-blue-tests",
+  "private": true,
+  "description": "Browser tests for the game (Playwright + a local PeerJS server). The game itself needs no build step.",
+  "type": "module",
+  "scripts": { "test": "node run.mjs" },
+  "devDependencies": { "express": "^4.21.2", "peer": "^1.0.2", "playwright-core": "1.56" }
+}
