@@ -57,7 +57,7 @@ function updateMyFigure() {
   const slot = MP.mySlot || 0;
   if (!MP.meAv || MP.meAvSlot !== slot) {
     if (MP.meAv) { scene.remove(MP.meAv.obj); MP.meAv.dispose(); }
-    MP.meAv = PlayerModel.createHuman(THREE, { slot, name: myName, template: playerTemplate, mocap: mocapData }); MP.meAvSlot = slot; scene.add(MP.meAv.obj);
+    MP.meAv = PlayerModel.createHuman(THREE, { slot, name: myName, template: playerTemplate, mocap: mocapData, face: MP.myId }); MP.meAvSlot = slot; scene.add(MP.meAv.obj);
   }
   const p = player, av = MP.meAv, on = danceCam.k > 0.05 && !p.hidden && !p.down && !p.dead;
   av.obj.position.set(p.x * S, 0, p.y * S); av.obj.rotation.y = Math.PI / 2 - p.ang;

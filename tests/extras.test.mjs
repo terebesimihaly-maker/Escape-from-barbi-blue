@@ -253,6 +253,47 @@ await p.mouse.move(...geo.from); await p.mouse.down(); await p.mouse.move(...geo
 check(await p.evaluate(g => pzOpen.empty === g.j && pzOpen.tiles[g.e] === g.v, geo), 'dragged into the gap: the piece moves there', geo);
 await p.evaluate(() => closePuzzle());
 
+console.log('== a puzzle you leave stays as you left it');
+await p.evaluate(() => { openPuzzle(0); });
+const before = await p.evaluate(() => JSON.stringify(pzOpen.tiles));
+await p.evaluate(() => closePuzzle());
+check(await p.evaluate(() => !!puzzles[0].saved && JSON.stringify(puzzles[0].saved.tiles) !== JSON.stringify(puzzles[0].data.tiles)), 'closing the portrait half done keeps how far you got');
+await p.evaluate(() => { openPuzzle(0); });
+check(await p.evaluate(b => JSON.stringify(pzOpen.tiles) === b && /Carrying on/.test(document.getElementById('pzMsg').textContent), before), 'opening it again: every piece where you left it ("Carrying on where you left off")');
+await p.evaluate(() => closePuzzle());
+check(await p.evaluate(() => { const pz = puzzles[0], g = pz.cv.getContext('2d'); const a = g.getImageData(0, 0, pz.cv.width, pz.cv.height).data;
+  const c = document.createElement('canvas'); c.width = pz.cv.width; c.height = pz.cv.height; KINDS.slide.draw(KINDS.slide.start(pz), pz, c);
+  const b = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let diff = 0; for (let i = 0; i < a.length; i += 4) if (a[i] !== b[i]) diff++; return diff > 100; }),
+  'the box on the wall shows your progress too');
+// the labyrinth (floor 1): the ball stays where it was; the music box (floor 4): you're back at the round you'd reached
+await p.evaluate(() => { bb.startFloor(0); bb.state = 'play'; const m = bb.monster; m.active = false; m.spawnT = 1e9; openPuzzle(0); pzOpen.ball.x = 0.31; pzOpen.ball.y = 0.72; pzOpen.ball.vx = 0.5; closePuzzle(); openPuzzle(0); });
+check(await p.evaluate(() => Math.abs(pzOpen.ball.x - 0.31) < 1e-9 && Math.abs(pzOpen.ball.y - 0.72) < 1e-9 && pzOpen.ball.vx === 0), 'the labyrinth ball is where you left it (and still)');
+await p.evaluate(() => { closePuzzle(); progress.done = [true, true, true]; bb.startFloor(3); bb.state = 'play'; const m = bb.monster; m.active = false; m.spawnT = 1e9;
+  openPuzzle(0); pzOpen.round = 3; pzOpen.phase = 'play'; pzOpen.i = 1; closePuzzle(); openPuzzle(0); });
+check(await p.evaluate(() => puzzles[0].kind === 'simon' && pzOpen.round === 3 && pzOpen.phase === 'listen' && pzOpen.i === 0), 'the music box: back at round 3, and it plays the melody to you again');
+await p.evaluate(() => { pzOpen.won = 0.001; closePuzzle(); });
+check(await p.evaluate(() => puzzles[0].saved.round === 3), '(a solved one isn\'t saved over)');
+await p.evaluate(() => closePuzzle());
+
+console.log('== faces: every player their own');
+await p.evaluate(() => loadPlayerTemplate());
+check(await until(p, () => !!playerTemplate, null, 60000), '(the teammates\' model loaded)');
+const faces = await p.evaluate(() => {
+  const mk = id => PlayerModel.createHuman(THREE, { slot: 1, name: 'x', template: playerTemplate, mocap: mocapData, face: id });
+  const ids = ['escape-barbi-blue-111111', 'escape-barbi-blue-111111-abcd1234', 'escape-barbi-blue-111111-zzzz9999', 'escape-barbi-blue-111111-q1w2e3r4'];
+  const figs = ids.map(mk), again = mk(ids[1]), heads = figs.map(f => { let h; f.obj.traverse(o => { if (o.isMesh && o.name === 'Head') h = o; }); return h; });
+  let tplHead; playerTemplate.traverse(o => { if (o.isMesh && o.name === 'Head') tplHead = o; });
+  const key = f => JSON.stringify(f.face), px = h => { const c = h.material.map.image, d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let s = 0; for (let i = 0; i < d.length; i += 97) s = (s * 31 + d[i]) >>> 0; return s; };
+  const out = { distinct: new Set(figs.map(key)).size, same: key(again) === key(figs[1]), samePaint: px(heads[1]) === px((() => { let h; again.obj.traverse(o => { if (o.isMesh && o.name === 'Head') h = o; }); return h; })()),
+    notHers: heads.every(h => h.material.map !== tplHead.material.map && h.geometry !== tplHead.geometry), white: heads.every(h => h.material.color.getHex() === 0xffffff),
+    moved: heads.map(h => { const a = h.geometry.attributes.position.array, b = tplHead.geometry.attributes.position.array; let m = 0; for (let i = 0; i < a.length; i++) m = Math.max(m, Math.abs(a[i] - b[i])); return +m.toFixed(4); }),
+    glasses: figs.map(f => !!f.face.glasses) };
+  figs.concat(again).forEach(f => f.dispose()); return out; });
+check(faces.distinct === 4, 'four players: four different faces', faces);
+check(faces.same && faces.samePaint, 'the same player id always gives the same face (shape and paint): everyone sees the same person');
+check(faces.notHers && faces.white, 'none of them has her face any more (their own painted face and head shape)');
+check(faces.moved.every(m => m > 0.002 && m < 0.03), 'the head shape changes (by a few millimetres to a couple of centimetres)', faces.moved);
+
 console.log('== Settings → Controls: your own keys');
 await p.evaluate(() => { toTitle(); document.querySelector('nav [data-panel=settings]').click(); });
 await click(p, '#openKeys');

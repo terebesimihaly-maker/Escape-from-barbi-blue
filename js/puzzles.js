@@ -59,6 +59,7 @@ KINDS.maze = {
                  : 'Roll the ball into the <b>gold hole</b>. Drag your finger where it should roll, or tilt your phone. Mind the holes: they are loud.',
   build: pz => buildMaze(pz),
   start: () => ({ ball: { x: 0.5, y: 0.5, vx: 0, vy: 0 }, fall: 0 }),
+  resume: s => ({ ball: s.fall ? { x: 0.5, y: 0.5, vx: 0, vy: 0 } : { x: s.ball.x, y: s.ball.y, vx: 0, vy: 0 }, fall: 0 }),   // (the ball where you left it, still)
   draw: (o, pz, cv) => mazeCanvas(pz.data, cv.width, cv.height, { x: o.ball.x, y: o.ball.y, s: o.fall ? Math.max(0, 1 - o.fall * 1.6) : 1 }, cv),
   update: (o, pz, dt) => updateBall(dt),
   tilts: true,
@@ -246,6 +247,7 @@ KINDS.simon = {
   help: pc => 'Listen, then play the melody back. One note longer each time. A wrong note is loud. ' + (pc ? '(Click the keys, or press 1 2 3 4.)' : ''),
   build: pz => { const rnd = seeded(pz.seed); return { seq: Array.from({ length: pz.spec.len }, () => rnd() * 4 | 0) }; },
   start: () => ({ round: 1, phase: 'listen', t: -0.6, i: 0, lit: -1, litT: 0 }),
+  resume: s => ({ round: s.round, phase: 'listen', t: -0.6, i: 0, lit: -1, litT: 0 }),   // (the round you'd reached, played to you again)
   draw: (o, pz, cv) => { const g = cv.getContext('2d'), W = cv.width, H = cv.height, cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.42;
     g.fillStyle = '#1a1210'; g.fillRect(0, 0, W, H); g.fillStyle = '#4a2e18'; g.beginPath(); g.arc(cx, cy, R + 14, 0, 7); g.fill();
     MB_KEYS.forEach((k, i) => { const a0 = i * Math.PI / 2 - Math.PI / 2 + 0.05, a1 = a0 + Math.PI / 2 - 0.1;
@@ -296,7 +298,7 @@ function buildPuzzles3D(G) {
   puzzles.forEach(p => {
     const g = new THREE.Group(), wood = new THREE.MeshStandardMaterial({ color: 0x5a3a20, roughness: 0.6 });
     const box = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.52, 0.1), wood); box.castShadow = true; g.add(box);
-    const cv = mkCanvas(256, 214); KINDS[p.kind].draw(KINDS[p.kind].start(p), p, cv); const tx = toTex(cv);
+    const cv = mkCanvas(256, 214); KINDS[p.kind].draw(p.saved || KINDS[p.kind].start(p), p, cv); const tx = toTex(cv); p.cv = cv; p.tx = tx;
     const face = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.46), new THREE.MeshLambertMaterial({ map: tx, color: 0xb0b0b0, emissive: 0xffffff, emissiveMap: tx, emissiveIntensity: 0.03 }));
     face.position.z = 0.051; g.add(face);
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color(0xffb050).multiplyScalar(1.6), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0.5 }));
@@ -330,19 +332,25 @@ function updatePuzzles(dt) {
 
 /* ---------- the puzzle screen ---------- */
 const tilt = { mx: 0, my: 0, kx: 0, ky: 0, gx: 0, gy: 0, gyro: false, drag: false };
+// A puzzle you leave half done stays as you left it (for you: each player has their own go at it). Coming back, you carry on.
 function openPuzzle(k) {
-  const pz = puzzles[k]; if (!pz || pz.solved) return; const K = KINDS[pz.kind];
-  pzOpen = Object.assign({ k, won: 0 }, K.start(pz));
+  const pz = puzzles[k]; if (!pz || pz.solved) return; const K = KINDS[pz.kind], saved = pz.saved;
+  pzOpen = Object.assign({ k, won: 0 }, saved ? (K.resume ? K.resume(saved, pz) : saved) : K.start(pz));
   Object.assign(tilt, { mx: 0, my: 0, kx: 0, ky: 0 });
   setSprint(false); joy.id = null; joy.x = joy.y = 0;
   if (locked()) document.exitPointerLock();                // (the puzzle needs a cursor; the game keeps going: she can still come)
   const pc = document.body.classList.contains('pc');
   $('pzTitle').textContent = K.title; $('pzHelp').innerHTML = K.help(pc);
   show('pzGyro', !!K.tilts && !pc && 'DeviceOrientationEvent' in window && !tilt.gyro);
-  $('pzMsg').textContent = ''; show('puzzle', true); drawBoard();
+  $('pzMsg').textContent = saved ? 'Carrying on where you left off.' : ''; show('puzzle', true); drawBoard();
 }
 function closePuzzle() {
-  if (!pzOpen) return; pzOpen = null; show('puzzle', false);
+  if (!pzOpen) return; const o = pzOpen, pz = puzzles[o.k]; pzOpen = null; show('puzzle', false);
+  if (pz && !o.won && !pz.solved) {                       // (keep how far you got; the box on the wall shows it too)
+    const st = Object.assign({}, o); delete st.k; delete st.won; delete st.sent; delete st.drag;
+    pz.saved = typeof structuredClone === 'function' ? structuredClone(st) : JSON.parse(JSON.stringify(st));
+    if (pz.cv && pz.tx) { KINDS[pz.kind].draw(pz.saved, pz, pz.cv); pz.tx.needsUpdate = true; }
+  }
   if (state === 'play') lockMouse();
 }
 function drawBoard() {

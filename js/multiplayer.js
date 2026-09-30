@@ -363,7 +363,7 @@ function makeOther(id, slot, name) {
   o.slot = slot; o.name = name;
   if (renderer && (!o.av || o.avSlot !== slot || (playerTemplate && !o.avHuman))) {
     removeAvatar(o);
-    try { o.av = playerTemplate ? PlayerModel.createHuman(THREE, { slot, name, template: playerTemplate, mocap: mocapData }) : PlayerModel.create(THREE, { slot, name }); }
+    try { o.av = playerTemplate ? PlayerModel.createHuman(THREE, { slot, name, template: playerTemplate, mocap: mocapData, face: id }) : PlayerModel.create(THREE, { slot, name }); }   // (face: their own, from their id)
     catch (e) { console.error(e); o.av = PlayerModel.create(THREE, { slot, name }); }
     o.avSlot = slot; o.avHuman = !!playerTemplate; scene.add(o.av.obj); }
   return o;

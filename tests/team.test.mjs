@@ -68,6 +68,10 @@ await A.evaluate(() => { document.querySelectorAll('#emoteRing .seg')[7].dispatc
 check(await until(B, id => bb.MP.others.get(id).dance === 7 && bb.MP.others.get(id).av.anim.current === 'd_hype', annaId, 15000), 'Anna taps "Hype": Ben sees her jumping');
 check(await A.evaluate(() => document.getElementById('emoteRing').classList.contains('hidden')), 'and the wheel closes');
 await A.evaluate(() => stopDance());
+console.log('== faces');
+const fa = await A.evaluate(id => JSON.stringify(bb.MP.others.get(id).av.face), benId), fb = await B.evaluate(() => JSON.stringify(bb.MP.meAv.face));
+check(fa === fb, 'Anna sees Ben with exactly the face Ben sees on his own figure');
+check(await A.evaluate(id => JSON.stringify(bb.MP.others.get(id).av.face) !== JSON.stringify(bb.MP.meAv.face), benId), 'and Anna\'s face is a different one');
 
 
 console.log('== holding breath, gasps and loose boards, for the host\'s her');

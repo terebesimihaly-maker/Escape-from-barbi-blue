@@ -27,7 +27,7 @@ A first-person 3D horror maze for phones and desktop. Solve the puzzles, unlock 
   head held level and tilted, head and arms moving in stop-motion jerks. `scream`, `lunge` (the kill), `peek` and `lean` are hand-made too.
 - `models/mocap.json`: the motion capture, already retargeted onto her rig (made with `tools/retarget-mocap.mjs`)
 - `audio/chase.mp3`: her chase song. It's faint when she's far away, gets louder as she gets closer, and plays at full volume when she catches you (a different song can be picked on the title screen)
-- `js/player-model.js`: teammates in multiplayer: human figures made from the same rig (clothes, hair and skin tone differ per player), animated with motion capture (idle, walk, jog, run), plus a downed pose, a working flashlight in the hand and a nametag
+- `js/player-model.js`: teammates in multiplayer: human figures made from the same rig, animated with motion capture (idle, walk, jog, run) and hand-made dances, plus a downed pose, a working flashlight in the hand and a nametag. Clothes go by lobby slot; everything else is a face of their own, made from their player id (so everyone sees the same person): skin tone, hair colour and length, the head reshaped (jaw, chin, nose, cheeks, eyes, mouth, brow, face length), the face repainted (eyebrows, mouth, eye colour, eyeliner, stubble or a beard, freckles, blush, a mole, age lines) and glasses for some
 - `animations.html`: preview each animation (drag to orbit)
 - `tests/`: browser tests (see "Tests" below)
 - `lib/three.min.js`: three.js r186 + GLTFLoader + post-processing (MIT, see `lib/THREE-LICENSE.txt`)
@@ -62,7 +62,7 @@ Instead of fuses, every floor has wooden puzzle boxes on its walls (3 to 5; one 
 4. **The Attic: the music box.** It plays a melody on four keys; play it back, one note longer each time. A wrong note is loud.
 5. **The Workshop: her face.** Turn the rings until her face lines up; turning a ring also turns the next one out.
 
-The game doesn't stop while you play: she can come. Later floors and Hard have bigger boards, more holes, longer melodies and more rings. Playing together, a box one of you solves is solved for everyone. Stuck? When one box is left, or none has been solved for a minute, an arrow points to the nearest.
+The game doesn't stop while you play: she can come. Close a puzzle half done (to run, or to hide) and it stays exactly as you left it; the box on the wall shows how far you got, and you carry on when you open it again (the music box plays the melody up to your round again). Each player keeps their own progress. Later floors and Hard have bigger boards, more holes, longer melodies and more rings. Playing together, a box one of you solves is solved for everyone. Stuck? When one box is left, or none has been solved for a minute, an arrow points to the nearest.
 
 ## Her
 
