@@ -48,6 +48,12 @@ check(Math.hypot(posAfter[0] - posBefore[0], posAfter[1] - posBefore[1]) < 30, '
 check(await until(A, id => { const o = bb.MP.others.get(id); return o && !o.away; }, benId, 15000), 'Anna sees Ben back again');
 check(await B.evaluate(id => bb.MP.myId === id, benId), 'as the same player');
 
+console.log('== every fuse on the basement (2 players, Hard: 7 fuses)');
+const fz = await A.evaluate(() => bb.fuses.map((f, k) => ({ k, x: f.x, y: f.y, got: f.got })));
+check(fz.length === 7, 'the basement has 7 fuses for 2 players on Hard', fz.length);
+for (const f of fz.filter(f => !f.got)) { await B.evaluate(f => { bb.player.x = f.x; bb.player.y = f.y; }, f); await until(A, k => bb.fuses[k].got, f.k, 20000); }
+check((await Promise.all([A, B].map(P => until(P, () => bb.fusesGot === 7 && bb.powerOn, null, 20000)))).every(Boolean), 'Ben walks over all 7: both have 7 of 7, the door opens');
+
 console.log('== a player who never comes back');
 await B.context().close();
 check(await until(A, id => { const o = bb.MP.others.get(id); return o && o.away; }, benId, 30000), 'Anna sees Ben as away');

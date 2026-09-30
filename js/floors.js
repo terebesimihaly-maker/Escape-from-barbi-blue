@@ -5,7 +5,7 @@
 /* ---------- game state ---------- */
 let state = 'title', floorIdx = 0, fuses = [], notes = [], closets = [], decals = [], exit = null;
 let player, monster, fusesGot = 0, powerOn = false, runTime = 0, huntTimer = 0, creakTimer = 5;
-let phoneCool = 0, popT = 0, closetScene = null, sceneCool = 0, levelTime = 0, runFrom = 0;
+let phoneCool = 0, popT = 0, closetScene = null, sceneCool = 0, levelTime = 0, runFrom = 0, lastFuseAt = 0;
 let shake = 0, deadT = 0, flicker = 1, flickTarget = 1, flickT = 0, hbTimer = 0, stepTimer = 0;
 let musicTimer = 0, musicI = 0, hideTarget = null, hideCool = 0, breathShown = false, deathReason = '';
 let titleEyes = null, titleT = 0, reviveTarget = null, revP = 0, lastDt = 0.016, reviveHeld = false;
@@ -60,7 +60,7 @@ function generateFloor(i, n, diff) {
     spawns, a0, m0, hunt: huntTime(i, n, D), diff: DIFFS[diff] ? diff : 'medium' };
 }
 function applyFloor(d, slot) {
-  floorIdx = d.i; const F = FLOORS[d.i]; curDiff = d.diff || 'medium'; levelTime = 0;
+  floorIdx = d.i; const F = FLOORS[d.i]; curDiff = d.diff || 'medium'; levelTime = 0; lastFuseAt = 0;
   grid = d.rows.map(r => Uint8Array.from(r, ch => ch === '1' ? 1 : 0)); GH = grid.length; GW = grid[0].length;
   CELLS = []; for (let y = 1; y < GH; y += 2) for (let x = 1; x < GW; x += 2) CELLS.push([x, y]);
   exit = { tx: d.exit[0], ty: d.exit[1], ...center(d.exit) };

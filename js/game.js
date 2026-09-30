@@ -4,7 +4,7 @@
 
 /* ---------- update ---------- */
 // the phone button shows its cooldown (only touch the page when the text changes)
-let phoneTxt = '';
+let phoneTxt = '', fuseHum = 0;
 function updatePhoneBtn() {
   const b = $('phone'), t = phoneCool > 0 ? Math.ceil(phoneCool) + 's' : 'PHONE';
   if (t !== phoneTxt) { phoneTxt = t; b.textContent = t; b.disabled = phoneCool > 0; }
@@ -126,8 +126,13 @@ function updatePlayer(dt) {
   }
 
   // in multiplayer the host hands out fuses (so two players can't both take the same one)
+  // (in multiplayer: ask again every 1.5 s while standing on it. Asking only once lost the fuse for you if that message got lost)
   fuses.forEach((f, k) => { if (!f.got && Math.hypot(f.x - p.x, f.y - p.y) < 22) {
-    if (MP.on) { if (!f.asked) { f.asked = true; toHost({ t: 'fuse', k }); } } else applyFuse(k); } });
+    if (MP.on) { const now = performance.now(); if (!f.askedAt || now - f.askedAt > 1500) { f.askedAt = now; toHost({ t: 'fuse', k }); } } else applyFuse(k); } });
+  // every fuse still out there hums (3D sound: you can hear where it is when you're close)
+  fuseHum -= dt;
+  if (fuseHum <= 0) { fuseHum = 1.1;
+    for (const f of fuses) if (!f.got && Math.hypot(f.x - p.x, f.y - p.y) < T * 6) sfx.hum({ x: f.x, y: f.y, h: 0.95 }); }
   for (const n of notes) if (!n.read && Math.hypot(n.x - p.x, n.y - p.y) < 20) {
     n.read = true; setSprint(false); joy.id = null; joy.x = joy.y = 0;
     openNote(n.text); return;

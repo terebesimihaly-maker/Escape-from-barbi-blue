@@ -101,6 +101,25 @@ await p.evaluate(() => { bb.fuses.forEach((f, k) => bb.applyFuse(k)); const m = 
 check(await until(p, () => bb.state === 'win' && !document.getElementById('win').classList.contains('hidden')), 'escaping floor 5 wins the game');
 check(await p.evaluate(() => progress.done[4] === true), 'floor 5 saved as escaped');
 
+console.log('== every fuse can be picked up, on every floor (Hard: the most fuses)');
+for (let fl = 0; fl < 5; fl++) {
+  const r = await p.evaluate(async fl => {
+    progress.done = [true, true, true, true, true]; settings.difficulty = 'hard'; startFloor(fl); state = 'play';
+    const m = bb.monster; m.active = false; m.spawnT = 1e9; notes.forEach(n => n.read = true);
+    const want = Math.max(2, FLOORS[fl].fuses + DIFFS.hard.fuses), wait = ms => new Promise(r => setTimeout(r, ms));
+    for (let k = 0; k < 100 && !(bb.level && bb.level.grid === bb.grid); k++) await wait(100);   // (the 3D floor is built on the next frame)
+    const objs = bb.fuses.filter(f => f.obj && f.obj.parent).length;
+    for (const f of bb.fuses) { bb.player.x = f.x; bb.player.y = f.y;                       // (standing on it: the game's own pickup)
+      for (let k = 0; k < 60 && !f.got; k++) await wait(100); }
+    return { want, have: bb.fuses.length, objs, got: bb.fusesGot, power: bb.powerOn };
+  }, fl);
+  check(r.have === r.want && r.objs === r.want && r.got === r.want && r.power, `floor ${fl + 1}: all ${r.want} fuses are in the house and can be picked up`, r);
+}
+await p.evaluate(() => { settings.difficulty = 'medium'; state = 'win'; });
+const hint = await p.evaluate(() => { startFloor(2); state = 'play'; const m = bb.monster; m.active = false; m.spawnT = 1e9;
+  const a = !!fuseHintOn(); levelTime = 61; const b = !!fuseHintOn(); levelTime = 0; bb.fuses.slice(1).forEach(f => { f.got = true; }); const c = !!fuseHintOn(); state = 'win'; return [a, b, c]; });
+check(!hint[0] && hint[1] && hint[2], 'the arrow to the nearest fuse shows after a minute without finding one, or when only one is left', hint);
+
 console.log('== mouse look: no jumps');
 const look = await p.evaluate(() => {
   state = 'play'; const cv = document.getElementById('c');

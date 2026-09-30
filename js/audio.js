@@ -104,6 +104,9 @@ const sfx = {
     else if (style === 'tile') { burst('bandpass', 2600, 2.5, 0.09, 0.035); burst('highpass', 5000, 0.7, 0.03, 0.02); knock(220, 0.06, 0.05); }
     else { burst('bandpass', 900, 0.9, 0.12, 0.09); burst('highpass', 3200, 0.5, 0.05, 0.16); knock(90, 0.07, 0.08); }   // (a wet slap)
   },
+  // a fuse: a faint electric hum (from where it is)
+  hum(at) { if (!ac) return; const t = ac.currentTime, g = ac.createGain(); env(g, t, 0.15, 0.05, 0.8); out3d(g, at.x, at.y, at.h, 1.3);
+    [120, 240, 361].forEach((f, i) => { const o = ac.createOscillator(); o.type = i ? 'sine' : 'sawtooth'; o.frequency.value = f; const og = ac.createGain(); og.gain.value = [0.5, 0.3, 0.12][i]; o.connect(og); og.connect(g); o.start(t); o.stop(t + 1); }); },
   // her footsteps: heavy and bare, from where she is (the dragging foot scrapes when she walks)
   herStep(x, y, run, drag) { if (!ac) return; const t = ac.currentTime, g = ac.createGain(); out3d(g, x, y, 0.05);
     const o = ac.createOscillator(), og = ac.createGain(); o.frequency.setValueAtTime(95, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.16);

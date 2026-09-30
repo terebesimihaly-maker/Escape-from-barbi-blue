@@ -157,6 +157,7 @@ function drawScreenFx(t) {
       ctx.beginPath(); ctx.moveTo(12 * DPR, 0); ctx.lineTo(-6 * DPR, -8 * DPR); ctx.lineTo(-6 * DPR, 8 * DPR); ctx.fill(); ctx.restore(); } }
   if (p.hidden && sc) drawClosetLine(sc.t);
   if (MP.on) drawTeamFx(t);
+  drawFuseHint(t);
   drawGrain(0.06);
   if (canLock && !locked() && state === 'play') {
     ctx.fillStyle = 'rgba(200,210,255,.75)'; ctx.font = (15 * DPR) + 'px Georgia'; ctx.textAlign = 'center';
@@ -170,6 +171,23 @@ function drawScreenFx(t) {
 }
 // Multiplayer overlay: in the top right corner an arrow for every downed teammate (up = straight ahead),
 // with their name, how far away they are and how long they have left; and the revive progress ring.
+// can't find the last fuse? When only one is left, or none has been found for a minute, an amber arrow points to the nearest one
+function fuseHintOn() {
+  const left = fuses.filter(f => !f.got);
+  return state === 'play' && !powerOn && left.length > 0 && !player.hidden && !player.down && (left.length === 1 || levelTime - lastFuseAt > 60) ? left : null;
+}
+function drawFuseHint(t) {
+  const left = fuseHintOn(); if (!left) return;
+  const p = player, D = DPR, cx = 44 * D, cy = 86 * D, r = 20 * D;
+  let f = left[0], bd = 1e9; for (const q of left) { const d = Math.hypot(q.x - p.x, q.y - p.y); if (d < bd) { bd = d; f = q; } }
+  const a = angDiff(Math.atan2(f.y - p.y, f.x - p.x), p.ang) - Math.PI / 2, pulse = 0.6 + 0.3 * Math.sin(t * 4);
+  ctx.save(); ctx.fillStyle = 'rgba(40,24,0,.5)'; ctx.strokeStyle = 'rgba(255,190,80,' + pulse + ')'; ctx.lineWidth = 2 * D;
+  ctx.beginPath(); ctx.arc(cx, cy + 24 * D, r, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.translate(cx, cy + 24 * D); ctx.rotate(a); ctx.fillStyle = 'rgba(255,200,100,' + pulse + ')';
+  ctx.beginPath(); ctx.moveTo(13 * D, 0); ctx.lineTo(-7 * D, -8 * D); ctx.lineTo(-3 * D, 0); ctx.lineTo(-7 * D, 8 * D); ctx.fill(); ctx.restore();
+  ctx.save(); ctx.fillStyle = 'rgba(255,210,140,.85)'; ctx.font = (11 * D) + 'px system-ui,sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('⚡ ' + Math.round(bd / T) + ' tiles', cx, cy + 58 * D); ctx.restore();
+}
 function drawTeamFx(t) {
   const p = player, cw = cvs.width, ch = cvs.height, D = DPR;
   let row = 0;

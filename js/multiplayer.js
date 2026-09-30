@@ -480,7 +480,7 @@ function hostFuse(id, k) {
 }
 function applyFuse(k, by) {
   const f = fuses[k]; if (!f || f.got) return;
-  f.got = true; fusesGot++; sfx.pickup(); updateFuseHud();
+  f.got = true; fusesGot++; lastFuseAt = levelTime; sfx.pickup(); updateFuseHud();
   if (fusesGot === fuses.length) {
     powerOn = true; updateFuseHud(); shake = 8; sfx.scream(0.5);
     if (!MP.on || MP.host) { monster.huntT = 7; if (!monster.active) monster.active = true; }
