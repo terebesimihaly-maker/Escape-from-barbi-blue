@@ -67,7 +67,7 @@ function leaveMP(quiet) {
 // ---- the host side
 function createLobby() {
   if (!window.peerjs) { mpStatus('Playing together could not load.'); return; }
-  leaveMP(true); saveName($('mpName').value);
+  leaveMP(true); saveName($('mpName').value); loadPlayerTemplate();
   const code = String(100000 + Math.floor(Math.random() * 900000));
   mpStatus('Creating a lobby…');
   const peer = new peerjs.Peer(PEER_PREFIX + code, peerOptions()); MP.peer = peer;
@@ -178,7 +178,7 @@ function joinLobby(r) {
   if (!window.peerjs) { mpStatus('Playing together could not load.'); return; }
   const code = r ? r.code : $('mpCode').value.replace(/\D/g, '');
   if (code.length !== 6) { mpStatus('The code has 6 digits.'); return; }
-  leaveMP(true); saveName($('mpName').value);
+  leaveMP(true); saveName($('mpName').value); loadPlayerTemplate();
   mpStatus(r ? 'Rejoining…' : 'Connecting…'); MP.kicked = false; MP.rejected = ''; MP.hostLeft = false;
   // your player id in this lobby (the same one when you rejoin, so the owner knows it's you)
   const pid = r ? r.pid : newPid(), t0 = performance.now(), wait = r ? RECONNECT_FOR * 1000 : 15000;
@@ -320,13 +320,15 @@ function makeOther(id, slot, name) {
   if (!o) { o = { id, x: 0, y: 0, tx: 0, ty: 0, ang: 0, pitch: 0, hidden: false, closet: -1, moving: false, sprinting: false,
     down: false, dead: false, downLeft: 0, inv: 0, rv: '', spd: 0, px: 0, py: 0, av: null }; MP.others.set(id, o); }
   o.slot = slot; o.name = name;
-  if (renderer && (!o.av || o.avSlot !== slot)) {
+  if (renderer && (!o.av || o.avSlot !== slot || (playerTemplate && !o.avHuman))) {
     removeAvatar(o);
     try { o.av = playerTemplate ? PlayerModel.createHuman(THREE, { slot, name, template: playerTemplate, mocap: mocapData }) : PlayerModel.create(THREE, { slot, name }); }
     catch (e) { console.error(e); o.av = PlayerModel.create(THREE, { slot, name }); }
-    o.avSlot = slot; scene.add(o.av.obj); }
+    o.avSlot = slot; o.avHuman = !!playerTemplate; scene.add(o.av.obj); }
   return o;
 }
+// the teammates' model arrived after they were made (a quick start): swap the stand-ins for the real figures
+function refreshAvatars() { for (const o of MP.others.values()) if (o.av && !o.avHuman) makeOther(o.id, o.slot, o.name); }
 function removeAvatar(o) { if (o.av) { scene.remove(o.av.obj); o.av.dispose(); o.av = null; } }
 const meOrOther = id => id === MP.myId ? player : MP.others.get(id);
 

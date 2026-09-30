@@ -11,7 +11,8 @@ const FLASH_I = 25;
 let renderer = null, scene, camera, flash, aura, exitLight, dustPts, glowTex, level = null;
 let composer = null, renderPass = null, bloomPass = null, useBloom = false, flashCookie = null;
 let titleScene, titleCam, titleLight, titleBulb, titleBulbLight, titleKey, titleAim = null, barbi = null, deathCam = null;
-let mocapData = null, playerTemplate = null;     // (teammates in multiplayer are built from the same rigged model)
+let mocapData = null, playerTemplate = null, playerTemplateLoad = null;   // (teammates in multiplayer: models/barbi.glb, the same skeleton as hers)
+const HER_MODEL = 'models/character_mobile.glb', MATE_MODEL = 'models/barbi.glb';
 let dust = [], prints = [], stepPhase = 0;
 const mkCanvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
 function toTex(c, rep) {
@@ -124,14 +125,24 @@ function loadBarbi() {
   const done = () => { btn.disabled = false; btn.textContent = 'Enter the house'; };
   // the motion capture loads next to the model (if it can't be loaded, the hand-made animations are used)
   const mocapLoad = fetch('models/mocap.json').then(r => r.ok ? r.json() : null).catch(() => null);
-  new THREE.GLTFLoader().load('models/barbi.glb', async gltf => {
+  new THREE.GLTFLoader().load(HER_MODEL, async gltf => {
     mocapData = await mocapLoad;
-    try { setupBarbi(gltf.scene, BarbiAnim.build(THREE, gltf.scene, { mocap: mocapData, scale: M_SCALE })); playerTemplate = gltf.scene; }
+    try { setupBarbi(gltf.scene, BarbiAnim.build(THREE, gltf.scene, { mocap: mocapData, scale: M_SCALE })); }
     catch (e) { console.error(e); setupBarbi(standInDoll(), null); }
     done();
   }, e => { if (e.total) btn.textContent = 'Loading… ' + Math.round(e.loaded / e.total * 100) + '%'; },
   err => { console.error(err); setupBarbi(standInDoll(), null); done();
-    $('loadMsg').textContent = "Couldn't load her model (models/barbi.glb), so a stand-in is chasing you. The game has to be opened from a web server, not as a local file."; });
+    $('loadMsg').textContent = "Couldn't load her model (" + HER_MODEL + "), so a stand-in is chasing you. The game has to be opened from a web server, not as a local file."; });
+}
+// the teammates' model: only downloaded when you go to play together (single player never needs it)
+function loadPlayerTemplate() {
+  if (playerTemplateLoad || !renderer) return playerTemplateLoad;
+  playerTemplateLoad = new Promise(res => new THREE.GLTFLoader().load(MATE_MODEL, g => {
+    // (as dark and matte as they always were: they used to share her materials, which setupBarbi darkens)
+    g.scene.traverse(o => { if (o.isMesh && o.material && o.material.color) { o.material.color.multiplyScalar(0.72); if (o.material.roughness !== undefined) o.material.roughness = Math.max(o.material.roughness, 0.72); } });
+    playerTemplate = g.scene; refreshAvatars(); res(); },
+    undefined, e => { console.error(e); res(); }));
+  return playerTemplateLoad;
 }
 function setupBarbi(model, anim) {
   const obj = new THREE.Group(); obj.add(model);

@@ -35,7 +35,7 @@
   const rim = new THREE.DirectionalLight(0x6f8cff, 2); rim.position.set(-3, 2, -3); scene.add(rim);
   const grid = new THREE.GridHelper(8, 16, 0x334, 0x223); scene.add(grid);
   const camera = new THREE.PerspectiveCamera(35, 1, 0.05, 50);
-  const [gltf, mocap] = await Promise.all([new THREE.GLTFLoader().loadAsync('models/barbi.glb'),
+  const [gltf, mocap] = await Promise.all([new THREE.GLTFLoader().loadAsync('models/character_mobile.glb'),
     fetch('models/mocap.json').then(r => r.ok ? r.json() : null).catch(() => null)]);
   const model = gltf.scene; scene.add(model);
   const anim = BarbiAnim.build(THREE, model, { mocap });

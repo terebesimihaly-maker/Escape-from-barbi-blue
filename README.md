@@ -19,7 +19,8 @@ A first-person 3D horror maze for phones and desktop. Solve the puzzles, unlock 
   - `js/extras.js`: achievements, the torn notes you've collected, the performance overlay
   - `js/cinematics.js`: the death screen and the title screen; `js/main.js`: the main loop and start-up
 - `js/house.js`: dresses each floor: skirting, rails and crown molding, framed doorways, lamps that really light the rooms (a few flicker or are dead), rugs and a runner carpet, porcelain dolls whose heads turn when you look away, teddy bears, side tables, grandfather clocks, basement pipes, crates, barrels and puddles, the attic's sheet-covered furniture, trunks and cobwebs, the workshop's workbenches, shelves of doll heads, dress forms and dolls hanging on strings, and a flashlight beam you can see in the air
-- `models/barbi.glb`: her rigged model (made in Blender)
+- `models/character_mobile.glb`: her rigged model (made in Blender)
+- `models/barbi.glb`: the earlier version of her model, with the same skeleton; teammates in multiplayer are made from it (only downloaded when you play together)
 - `js/barbi-anim.js`: her animations. The model has no animation clips, so they're built in code from the rig's bones.
   Standing, wandering and searching are real human motion capture (see below) with her own touches on top (the O-shaped legs,
   the head snapping sideways). Her sprint is hand-made so she doesn't run like a person: a lurching, uneven stride, bent low,
