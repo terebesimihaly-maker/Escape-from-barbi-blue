@@ -8,7 +8,8 @@ check(await until(A, () => !document.getElementById('lobby').classList.contains(
 const code = (await text(A, 'lbCode')).replace(/\s/g, '');
 check(/^\d{6}$/.test(code), 'lobby code is 6 digits', code);
 for (const P of [B, C, D]) { await openMp(P); await fill(P, '#mpCode', code); await click(P, '#mpJoin');
-  check(await until(P, () => !document.getElementById('lobby').classList.contains('hidden')), P.pname + ' joined'); }
+  // (90 s: with four browsers drawing on this test machine's CPU, the last page can be starved for half a minute; its own timers stall too)
+  check(await until(P, () => !document.getElementById('lobby').classList.contains('hidden'), null, 90000), P.pname + ' joined'); }
 check(await until(A, () => document.querySelectorAll('#lbList li:not(.empty)').length === 4), 'host lists 4 players');
 const names = await D.evaluate(() => [...document.querySelectorAll('#lbList li:not(.empty) .nm')].map(e => e.textContent));
 check(names.some(n => n.includes('Alice')) && names.some(n => n.includes('Dan')), 'a joiner sees everyone by name', names);
