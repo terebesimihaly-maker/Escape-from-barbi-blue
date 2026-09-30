@@ -118,5 +118,7 @@ Browser tests with Playwright: single player, multiplayer (4 browsers and a loca
 
     cd tests && npm install && npm test          # or: node run.mjs features   (only the suites with "features" in the name)
 
-`CHROME=/path/to/chrome` picks the browser. Screenshots go to `tests/out/`. `tests/server.mjs` serves the game with test hooks (`tests/hooks.js`) at `/game.html`; the real game never loads them.
+`CHROME=/path/to/chrome` picks the browser. By default the 3D is drawn in software (slow, but works on any machine, including servers without a graphics card). On your own computer, `GPU=1` uses your installed Chrome (or Edge) and your graphics card, in visible windows; add `HEADLESS=1` to hide them. On Windows (PowerShell):
+
+    cd tests; npm install; $env:GPU=1; npm test Screenshots go to `tests/out/`. `tests/server.mjs` serves the game with test hooks (`tests/hooks.js`) at `/game.html`; the real game never loads them.
 

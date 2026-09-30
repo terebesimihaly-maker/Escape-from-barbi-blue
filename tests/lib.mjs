@@ -15,8 +15,18 @@ let fails = 0, passes = 0;
 // every check prints PASS or FAIL; summary() returns the number of failures (the exit code)
 export function check(cond, label, extra) { if (cond) { passes++; console.log('  PASS', label); } else { fails++; console.log('  FAIL', label, extra !== undefined ? JSON.stringify(extra) : ''); } }
 export const summary = () => { console.log(`\n${passes} passed, ${fails} failed`); return fails; };
+//   GPU=1     draw the 3D on your graphics card (your own Chrome or Edge, in visible windows) instead of in software
+//   HEADLESS=1  with GPU=1: no windows (whether headless Chrome uses the GPU depends on the machine)
 export async function launch() {
   const dev = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', exe = process.env.CHROME || (fs.existsSync(dev) ? dev : undefined);
+  if (process.env.GPU) {
+    const pf = [process.env['PROGRAMFILES'], process.env['PROGRAMFILES(X86)'], process.env.LOCALAPPDATA].filter(Boolean);
+    const found = process.env.CHROME || [...pf.map(d => path.join(d, 'Google', 'Chrome', 'Application', 'chrome.exe')), ...pf.map(d => path.join(d, 'Microsoft', 'Edge', 'Application', 'msedge.exe')),
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome'].find(f => fs.existsSync(f));
+    return chromium.launch({ executablePath: found, channel: found ? undefined : 'chrome', headless: !!process.env.HEADLESS,
+      args: ['--ignore-gpu-blocklist', '--enable-gpu-rasterization', '--autoplay-policy=no-user-gesture-required', '--disable-background-timer-throttling',
+        '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'] });
+  }
   return chromium.launch({ executablePath: exe,
     args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
 }
