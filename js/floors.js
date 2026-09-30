@@ -102,7 +102,7 @@ function applyFloor(d, slot) {
     : d.i === 0 ? 'Solve ' + what + ' to unlock the front door: the wooden boxes on the walls.' : F.name + '. Solve ' + what + '.', 4);
 }
 function startFloor(i) { applyFloor(generateFloor(i, 1, settings.difficulty), 0); }
-function updateFuseHud() { $('hFuse').textContent = (powerOn ? '🔓 ' : '🧩 ') + fusesGot + '/' + fuses.length; }
+function updateFuseHud() { $('hFuse').innerHTML = ico(powerOn ? 'unlock' : 'puzzle') + ' ' + fusesGot + '/' + fuses.length; }
 function setHud(on) { ['hud', 'stam', 'run', 'crouch', 'phone', 'fearBar'].forEach(id => show(id, on));
   if (!on) ['hide', 'breath', 'breathBar', 'pingBtn', 'emoteBtn', 'warnBtn'].forEach(id => show(id, false)); closeWheel(false); lastHid = false; teamBtnState = ''; }
 

@@ -14,7 +14,7 @@
 <canvas id="gl"></canvas>
 <canvas id="c"></canvas>
 
-<div id="hud" class="hidden"><span><span id="hFloor">Floor 1</span> <span id="hNote"></span></span><button id="pause">II</button><span id="hFuse">🧩 0/3</span></div>
+<div id="hud" class="hidden"><span><span id="hFloor">Floor 1</span> <span id="hNote"></span></span><button id="pause">II</button><span id="hFuse">0/3</span></div>
 <div id="fearBar" class="hidden"><i></i></div>
 <div id="stam" class="hidden"><i></i></div>
 <div id="breathBar" class="hidden"><i></i></div>
@@ -27,8 +27,8 @@
 <button id="crouch" class="btn hidden" data-key="Ctrl">CROUCH</button>
 <button id="revive" class="btn hidden" data-key="Hold E">REVIVE</button>
 <button id="breath" class="btn hidden" data-key="Hold Space">BREATH</button>
-<button id="pingBtn" class="sq hidden" data-key="Q" aria-label="Ping">📍</button>
-<button id="emoteBtn" class="sq hidden" data-key="Hold R" aria-label="Dances">💃</button>
+<button id="pingBtn" class="sq hidden" data-key="Q" aria-label="Ping"></button>
+<button id="emoteBtn" class="sq hidden" data-key="Hold R" aria-label="Dances"></button>
 <button id="warnBtn" class="btn hidden" data-key="G">WARN</button>
 <div id="emoteRing" class="hidden"><div id="emoteHub"></div></div>
 <div id="downMsg" class="hidden"></div>
@@ -95,7 +95,7 @@
         <li><kbd>HIDE</kbd><span>get into a wardrobe when you're next to one</span></li>
         <li><kbd>PHONE</kbd><span>text her (it recharges: 35 s on Easy, 45 s on Medium, 60 s on Hard)</span></li>
         <li><kbd>BREATH</kbd><span>in a wardrobe: hold to hold your breath (not for too long)</span></li>
-        <li><kbd>📍</kbd><kbd>💬</kbd><span>playing together: ping what you look at; the dance wheel (tap one; moving stops it)</span></li>
+        <li><kbd data-ico="pin"></kbd><kbd data-ico="dance"></kbd><span>playing together: ping what you look at; the dance wheel (tap one; moving stops it)</span></li>
       </ul>
       <p class="hint">Her song gets louder the closer she is. If you can see her blue eyes, she can see you. If she's chasing you, a text makes her stop and leave for 15 seconds. Don't let her see you climb into a wardrobe.</p>
       <p class="hint">When she stops right outside your wardrobe, hold your breath: she listens. Run out of air and you gasp, and she hears that too. Sometimes her footsteps fade away... and she's still there.</p>
@@ -222,6 +222,7 @@
 <script src="js/house.js"></script>
 <script src="lib/peerjs.min.js"></script>
 <!-- the game, in order (the files share one scope) -->
+<script src="js/icons.js"></script>
 <script src="js/core.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/floors.js"></script>

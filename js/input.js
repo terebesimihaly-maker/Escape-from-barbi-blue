@@ -166,6 +166,8 @@ function applyKeyHints() {
   const set = (id, a, hold) => { const el = $(id); if (el) el.dataset.key = keyLabel(a, hold); };
   set('run', 'run'); set('crouch', 'crouch'); set('hide', 'use'); set('phone', 'phone'); set('revive', 'use', true); set('breath', 'breath', true);
   set('pingBtn', 'ping'); set('emoteBtn', 'emote', true); set('warnBtn', 'warn');
+  if (!$('pingBtn').firstChild) { $('pingBtn').innerHTML = ico('pin'); $('emoteBtn').innerHTML = ico('dance'); }
+  document.querySelectorAll('[data-ico]').forEach(el => { if (!el.firstChild) el.innerHTML = ico(el.dataset.ico); });
   document.querySelectorAll('[data-keyof]').forEach(el => { el.textContent = keyLabel(el.dataset.keyof); });
   document.querySelectorAll('[data-keyname]').forEach(el => { el.textContent = keyName(bound(el.dataset.keyname)[0]); });
 }
@@ -232,9 +234,9 @@ function renderLevels() {
     const sub = document.createElement('small');
     const found = NOTE_POOL[i].filter((_, k) => progress.notes.includes(i + '-' + k)).length;
     sub.textContent = (!open ? 'Locked · escape ' + FLOORS[i - 1].name + ' first' : done ? 'Escaped' + (progress.best[i] ? ' · best ' + fmtTime(progress.best[i]) : '') : i === 0 ? 'Start here' : 'Not escaped yet') +
-      (open ? ' · 📜 ' + found + '/' + NOTE_POOL[i].length : '');
+      (open ? ' · ' + found + '/' + NOTE_POOL[i].length + ' notes' : '');
     t.append(nm, sub);
-    const st = document.createElement('span'); st.className = 's'; st.textContent = !open ? '🔒' : done ? '✓' : '▶';
+    const st = document.createElement('span'); st.className = 's'; st.innerHTML = !open ? ico('lock') : done ? '✓' : '▶';
     b.append(n, t, st); b.onclick = () => playFloor(i);
     li.appendChild(b); ul.appendChild(li);
   });

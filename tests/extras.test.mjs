@@ -27,11 +27,11 @@ await startSolo(p, 0);
 await until(p, () => bb.state === 'play');
 await calmHer();
 check(await p.evaluate(() => ['pingBtn', 'emoteBtn', 'warnBtn'].every(id => document.getElementById(id).classList.contains('hidden'))), 'no ping or emote buttons in single player');
-check(await p.evaluate(() => document.getElementById('hNote').textContent === '📜 0/3'), 'the HUD shows this floor\'s notes: 📜 0/3', await p.evaluate(() => document.getElementById('hNote').textContent));
+check(await p.evaluate(() => document.getElementById('hNote').textContent.trim() === '0/3' && !!document.querySelector('#hNote svg.ico')), 'the HUD shows this floor\'s notes: (note icon) 0/3', await p.evaluate(() => document.getElementById('hNote').textContent));
 await p.evaluate(() => { const n = notes[0]; bb.player.x = n.x; bb.player.y = n.y; });
 check(await until(p, () => bb.state === 'note', null, 20000), 'walking onto a note opens it');
 check(await p.evaluate(() => /Note 1 of 20 found/.test(document.getElementById('paper').textContent) && progress.notes.length === 1 && progress.notes[0] === notes[0].id), 'it says "Note 1 of 20 found" and is saved', await p.evaluate(() => document.getElementById('paper').textContent.slice(-40)));
-check(await p.evaluate(() => document.getElementById('hNote').textContent === '📜 1/3'), 'the HUD counts it: 📜 1/3');
+check(await p.evaluate(() => document.getElementById('hNote').textContent.trim() === '1/3'), 'the HUD counts it: 1/3');
 await p.evaluate(() => { noteAt = 0; closeNote(); });
 check(await p.evaluate(() => JSON.parse(localStorage.getItem('bb_progress')).notes.length === 1), 'kept on the device');
 
@@ -261,7 +261,7 @@ check(list.n === 18 && list.got >= 5 && /of 18/.test(list.count) && /notes found
 await p.screenshot({ path: OUT + '/achievements.png' });
 await p.evaluate(() => closePanel());
 await click(p, '#play');
-check(await p.evaluate(() => /Torn notes found: 1 of 20/.test(document.getElementById('lvNotes').textContent) && /📜 1\/4/.test(document.querySelector('#lvList button[data-lv="0"]').textContent)),
+check(await p.evaluate(() => /Torn notes found: 1 of 20/.test(document.getElementById('lvNotes').textContent) && /1\/4 notes/.test(document.querySelector('#lvList button[data-lv="0"]').textContent)),
   'the floor list shows the notes found: overall and per floor');
 await p.evaluate(() => closePanel());
 await p.evaluate(() => { unlock('phone'); unlock('phone'); });

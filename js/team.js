@@ -9,12 +9,12 @@
 'use strict';
 
 // [name, icon, animation (js/barbi-anim.js)]
-const DANCES = [['Floss', '🕺', 'd_floss'], ['Robot', '🤖', 'd_robot'], ['Disco', '🪩', 'd_disco'], ['Chicken', '🐔', 'd_chicken'],
-  ['Wave', '🌊', 'd_wave'], ['Twist', '🌀', 'd_twist'], ['Air guitar', '🎸', 'd_guitar'], ['Hype', '🙌', 'd_hype']];
+const DANCES = [['Floss', 'floss', 'd_floss'], ['Robot', 'robot', 'd_robot'], ['Disco', 'disco', 'd_disco'], ['Chicken', 'chicken', 'd_chicken'],
+  ['Wave', 'wave', 'd_wave'], ['Twist', 'twist', 'd_twist'], ['Air guitar', 'guitar', 'd_guitar'], ['Hype', 'hype', 'd_hype']];   // (icons: js/icons.js)
 const DANCE_MAX = 30;                                   // (seconds: a dance stops by itself after this)
 const PING_LIFE = 8, WARN_COOL = 30, PING_KINDS = {
   her: { label: "She's here!", col: '255,90,90' }, pz: { label: 'Puzzle', col: '255,190,85' },
-  go: { label: 'Here', col: '232,236,255' }, ghost: { label: "👻 She's here", col: '143,208,255' } };
+  go: { label: 'Here', col: '232,236,255' }, ghost: { label: "She's here", col: '143,208,255', ico: 'ghost' } };
 const team = { pings: [], sentAt: {}, warnCool: 0, sent: 0 };
 
 function resetTeam() { team.pings = []; team.warnCool = 0; closeWheel(false); }
@@ -43,7 +43,7 @@ function teamButtons(ping, emote, warn) {
 // the view while the wheel is open); letting go of the key, or a click, sends it. With a cursor or a finger: point, or tap one
 const wheel = { open: false, byKey: false, vx: 0, vy: 0, sel: -1 };
 DANCES.forEach(([txt, icon], i) => { const b = document.createElement('button'), a = i / DANCES.length * Math.PI * 2;
-  b.className = 'seg'; b.dataset.i = i; b.innerHTML = '<i></i><span></span>'; b.firstChild.textContent = icon; b.lastChild.textContent = txt;
+  b.className = 'seg'; b.dataset.i = i; b.innerHTML = '<i></i><span></span>'; b.firstChild.innerHTML = ico(icon); b.lastChild.textContent = txt;
   b.style.left = (50 + Math.sin(a) * 38) + '%'; b.style.top = (50 - Math.cos(a) * 38) + '%';
   b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); wheel.sel = i; closeWheel(true); });
   b.addEventListener('pointerenter', () => { if (wheel.open) { wheel.sel = i; wheelShow(); } });
@@ -147,6 +147,7 @@ function drawTeamMarks(t) {   // (pings)
     ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.fillStyle = 'rgba(' + K.col + ',' + a + ')'; ctx.font = '600 ' + 12 * D + 'px system-ui,sans-serif';
     ctx.fillText(K.label, x, y - r - 10 * D);
+    if (K.ico) drawIco(ctx, K.ico, x - ctx.measureText(K.label).width / 2 - 20 * D, y - r - 10 * D - 14 * D, 16 * D, ctx.fillStyle);
     ctx.fillStyle = 'rgba(230,230,240,' + 0.8 * a + ')'; ctx.font = 11 * D + 'px system-ui,sans-serif';
     ctx.fillText(q.name + ' · ' + Math.round(Math.hypot(q.x - p.x, q.y - p.y) * S) + ' m', x, y + r + 11 * D);
   }

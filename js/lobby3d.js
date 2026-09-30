@@ -80,8 +80,8 @@ function hostLobbyDance(id, m) {
 }
 function gotLobbyDance(m) { if (m.k >= 0) LOB.dance.set(m.id, { k: m.k, until: performance.now() + DANCE_MAX * 1000 }); else LOB.dance.delete(m.id); }
 { const bar = $('lbDances');
-  DANCES.forEach(([name, icon], k) => { const b = document.createElement('button'); b.className = 'dz'; b.title = name; b.textContent = icon; b.onclick = () => lobbyDance(k); bar.appendChild(b); });
-  const stop = document.createElement('button'); stop.className = 'dz'; stop.title = 'Stop dancing'; stop.textContent = '✋'; stop.onclick = () => lobbyDance(-1); bar.appendChild(stop); }
+  DANCES.forEach(([name, icon], k) => { const b = document.createElement('button'); b.className = 'dz'; b.title = name; b.innerHTML = ico(icon); b.onclick = () => lobbyDance(k); bar.appendChild(b); });
+  const stop = document.createElement('button'); stop.className = 'dz'; stop.title = 'Stop dancing'; stop.innerHTML = ico('stop'); stop.onclick = () => lobbyDance(-1); bar.appendChild(stop); }
 
 /* ---------- chat ---------- */
 function sendChat() {

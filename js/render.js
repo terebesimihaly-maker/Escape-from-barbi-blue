@@ -261,7 +261,7 @@ function drawFuseHint(t) {
   ctx.translate(cx, cy + 24 * D); ctx.rotate(a); ctx.fillStyle = 'rgba(255,200,100,' + pulse + ')';
   ctx.beginPath(); ctx.moveTo(13 * D, 0); ctx.lineTo(-7 * D, -8 * D); ctx.lineTo(-3 * D, 0); ctx.lineTo(-7 * D, 8 * D); ctx.fill(); ctx.restore();
   ctx.save(); ctx.fillStyle = 'rgba(255,210,140,.85)'; ctx.font = (11 * D) + 'px system-ui,sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText('🧩 ' + Math.round(bd / T) + ' tiles', cx + 20 * D, cy + 58 * D); ctx.restore();
+  drawIco(ctx, 'puzzle', cx + 20 * D - 22 * D, cy + 58 * D - 9 * D, 17 * D, ctx.fillStyle); ctx.fillText(Math.round(bd / T) + ' tiles', cx + 20 * D, cy + 58 * D); ctx.restore();
 }
 function drawTeamFx(t) {
   const p = player, cw = cvs.width, ch = cvs.height, D = DPR;

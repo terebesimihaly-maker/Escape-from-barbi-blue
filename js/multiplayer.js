@@ -297,7 +297,7 @@ function renderLobby() {
   L.players.forEach((pl, i) => {
     const li = document.createElement('li');
     const dot = document.createElement('span'); dot.className = 'dot'; dot.style.background = PlayerModel.TAGS[i % 4];
-    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = (i === 0 ? '👑 ' : '') + pl.name;
+    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = pl.name; if (i === 0) nm.insertAdjacentHTML('afterbegin', ico('crown') + ' ');
     if (pl.id === MP.myId) { const y = document.createElement('span'); y.className = 'you'; y.textContent = '  (you)'; nm.appendChild(y); }
     if (pl.away) { const y = document.createElement('span'); y.className = 'you'; y.textContent = '  (reconnecting…)'; nm.appendChild(y); }
     const rd = document.createElement('span'); rd.className = 'rd' + (pl.ready ? ' on' : ''); rd.textContent = pl.ready ? 'Ready' : 'Not ready';

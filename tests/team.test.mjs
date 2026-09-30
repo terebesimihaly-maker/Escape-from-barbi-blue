@@ -63,7 +63,7 @@ check(await until(B, () => bb.player.dance === -1, null, 10000), 'walking stops 
 check(await until(A, id => bb.MP.others.get(id).dance === -1, benId, 15000), 'for Anna too');
 check(await until(B, () => { const p = bb.player, c = bb.camera.position; return Math.hypot(c.x - p.x * S, c.z - p.y * S) < 0.2; }, null, 15000), 'and Ben\'s camera is back in his eyes');
 await A.evaluate(() => { document.getElementById('emoteBtn').dispatchEvent(new PointerEvent('pointerdown')); });
-check(await A.evaluate(() => !document.getElementById('emoteRing').classList.contains('hidden')), 'on a touch screen, the 💃 button opens the wheel');
+check(await A.evaluate(() => !document.getElementById('emoteRing').classList.contains('hidden')), 'on a touch screen, the dance button opens the wheel');
 await A.evaluate(() => { document.querySelectorAll('#emoteRing .seg')[7].dispatchEvent(new PointerEvent('pointerdown')); });
 check(await until(B, id => bb.MP.others.get(id).dance === 7 && bb.MP.others.get(id).av.anim.current === 'd_hype', annaId, 15000), 'Anna taps "Hype": Ben sees her jumping');
 check(await A.evaluate(() => document.getElementById('emoteRing').classList.contains('hidden')), 'and the wheel closes');

@@ -37,7 +37,7 @@ function resetFloorExtras() {
 function unlock(id) {
   if (achieved[id] || !ACH.some(a => a[0] === id)) return false;
   achieved[id] = Date.now(); try { localStorage.setItem('bb_ach', JSON.stringify(achieved)); } catch (e) {}
-  const a = ACH.find(a => a[0] === id); toast('🏆 ' + a[1], a[2]); return true;
+  const a = ACH.find(a => a[0] === id); toast(a[1], a[2], 'trophy'); return true;
 }
 // (the host, or single player) something a player did that earns one: theirs to unlock, on their own device
 function award(id, ach, msg) {
@@ -45,12 +45,12 @@ function award(id, ach, msg) {
   else hostEmit({ t: 'ach', id, a: ach, msg });
 }
 const toasts = [];
-function toast(title, sub) {
-  toasts.push([title, sub]); if (toasts.length === 1) nextToast();
+function toast(title, sub, icon) {
+  toasts.push([title, sub, icon]); if (toasts.length === 1) nextToast();
 }
 function nextToast() {
   const t = toasts[0]; if (!t) return; const el = $('toast');
-  el.firstChild.textContent = t[0]; el.lastChild.textContent = t[1]; el.classList.add('on');
+  el.firstChild.textContent = t[0]; if (t[2]) el.firstChild.insertAdjacentHTML('afterbegin', ico(t[2]) + ' '); el.lastChild.textContent = t[1]; el.classList.add('on');
   setTimeout(() => { el.classList.remove('on'); setTimeout(() => { toasts.shift(); nextToast(); }, 450); }, 3200);
 }
 // escaped a floor (single player, or together): everything that counts for it
@@ -66,7 +66,7 @@ function floorAchievements(i, secs) {
   if (MP.on && !player.dead && [...MP.others.values()].every(o => !o.dead)) unlock('team');
 }
 function noteAchievements(n) { if (n >= 10) unlock('reader'); if (n >= NOTES_TOTAL) unlock('bookworm'); }
-function updateNoteHud() { $('hNote').textContent = notes.length ? '📜 ' + notes.filter(n => n.read).length + '/' + notes.length : ''; }
+function updateNoteHud() { $('hNote').innerHTML = notes.length ? ico('note') + ' ' + notes.filter(n => n.read).length + '/' + notes.length : ''; }
 
 // every frame of play: her chasing you (and losing you), pings, the overlay
 function updateExtras(dt) {
@@ -80,7 +80,7 @@ function renderAchievements() {
   const ul = $('achList'); ul.textContent = '';
   for (const [id, name, desc] of ACH) {
     const li = document.createElement('li'), got = !!achieved[id]; li.className = got ? 'got' : '';
-    const i = document.createElement('span'); i.className = 'i'; i.textContent = got ? '🏆' : '🔒';
+    const i = document.createElement('span'); i.className = 'i'; i.innerHTML = ico(got ? 'trophy' : 'lock');
     const t = document.createElement('span'), b = document.createElement('b'), s = document.createElement('small');
     b.textContent = name; s.textContent = desc; t.append(b, s); li.append(i, t); ul.appendChild(li);
   }
