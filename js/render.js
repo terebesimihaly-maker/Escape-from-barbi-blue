@@ -314,7 +314,7 @@ function drawGrain(a) {
 
 function renderGame(t) {
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cvs.width, cvs.height);
-  if (MP.on && MP.scareT > 0) { MP.scareT -= lastDt; renderDead(lastDt, true); return; }
+  if (MP.on && MP.scareT > 0) { MP.scareT -= realDt; renderDead(lastDt, true); return; }   // (1.8 real seconds, however slow the frames)
   if (renderer) render3D(t);
   drawScreenFx(t);
 }

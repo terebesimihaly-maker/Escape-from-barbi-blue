@@ -5,7 +5,7 @@
    (The game is split over several plain scripts that share one scope; index.html loads them in order.) */
 'use strict';
 
-const LOB = { scene: null, cam: null, figs: new Map(), dance: new Map(), bubbles: new Map(), lamp: null, t: 0 };
+const LOB = { scene: null, cam: null, figs: new Map(), dance: new Map(), bubbles: new Map(), lamp: null, throwL: null, t: 0, acc: 1 };
 const CHAT_MAX = 120, CHAT_KEEP = 40;
 const cleanChat = t => String(t || '').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, CHAT_MAX);
 
@@ -24,11 +24,15 @@ function lobbyScene() {
   const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.18, 12), new THREE.MeshStandardMaterial({ color: 0x221a10, emissive: 0xffa050, emissiveIntensity: 2.2 }));
   glass.position.y = 0.12; lantern.add(glass);
   const cap = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.07, 12), new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.7, roughness: 0.4 })); cap.position.y = 0.245; lantern.add(cap);
-  const light = new THREE.PointLight(0xffa860, 7, 7, 1.6); light.position.y = 0.3; light.castShadow = true; lantern.add(light); sc.add(lantern);
+  // (the lantern's glow; its shadows come from one spotlight thrown up onto the wall behind them: a point light's shadows would
+  // draw every character six more times a frame)
+  const light = new THREE.PointLight(0xffa860, 7, 7, 1.6); light.position.y = 0.3; lantern.add(light); sc.add(lantern);
+  const throwL = new THREE.SpotLight(0xffa860, 5, 9, 1.0, 0.7, 1.4); throwL.position.set(0, 0.3, 1.1); throwL.target.position.set(0, 1.2, -2.2);
+  throwL.castShadow = true; throwL.shadow.mapSize.set(1024, 1024); throwL.shadow.bias = -0.0005; throwL.shadow.radius = 3; sc.add(throwL, throwL.target);
   sc.add(new THREE.HemisphereLight(0x4a5a90, 0x100808, 0.5));
   const key = new THREE.DirectionalLight(0x8fa0ff, 0.7); key.position.set(-2, 3, 4); sc.add(key);
   const cam = new THREE.PerspectiveCamera(36, 1, 0.05, 30); cam.position.set(0, 1.35, 4.6); cam.lookAt(0, 1.0, 0);
-  Object.assign(LOB, { scene: sc, cam, lamp: light });
+  Object.assign(LOB, { scene: sc, cam, lamp: light, throwL });
 }
 // where each of the (up to) four stands: side by side, the owner in the middle left
 const LOBBY_SPOTS = [[-0.45, 0], [0.45, 0], [-1.35, -0.25], [1.35, -0.25]];
@@ -49,13 +53,15 @@ function syncLobbyFigures() {
 }
 function renderLobby3D(dt) {
   if (!renderer || !playerTemplate || !MP.lobby) { renderTitle(dt); return; }
+  // (a lobby only needs 30 frames a second: the rest of the time goes to the connection and the page)
+  LOB.acc += dt; if (LOB.acc < 1 / 31) return; dt = LOB.acc; LOB.acc = 0;
   lobbyScene(); syncLobbyFigures(); LOB.t += dt;
   const now = performance.now();
   for (const [id, f] of LOB.figs) {
     const d = LOB.dance.get(id), dancing = d && now < d.until && DANCES[d.k];
     f.av.update(dt, { speed: 0, stand: true, dance: dancing ? DANCES[d.k][2] : null, lightOn: false });
   }
-  LOB.lamp.intensity = 7 * (calm() ? 1 : 0.85 + 0.15 * Math.sin(LOB.t * 9) * Math.sin(LOB.t * 3.1));
+  const fl = calm() ? 1 : 0.85 + 0.15 * Math.sin(LOB.t * 9) * Math.sin(LOB.t * 3.1); LOB.lamp.intensity = 7 * fl; LOB.throwL.intensity = 5 * fl;
   const w = cvs.width, h = cvs.height; if (LOB.cam.aspect !== w / h) { LOB.cam.aspect = w / h; LOB.cam.updateProjectionMatrix(); }
   // (a narrow screen: step back so all four fit)
   LOB.cam.position.z = w < h ? 7.2 : 4.6; LOB.cam.lookAt(0, 1.0, 0);

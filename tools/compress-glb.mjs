@@ -2,15 +2,20 @@
 // lib/meshopt_decoder.js) and quantized normals, UVs, colours and skin weights. Positions stay exact floats, because the
 // game reads them (js/player-model.js reshapes faces and weights hair by height, in metres).
 //   npm i @gltf-transform/core @gltf-transform/extensions @gltf-transform/functions meshoptimizer
-//   node tools/compress-glb.mjs in.glb out.glb
+//   node tools/compress-glb.mjs in.glb out.glb [ratio [error [keep]]]   (also simplify the meshes to about that share of their triangles)
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTMeshoptCompression } from '@gltf-transform/extensions';
-import { quantize, reorder, prune, dedup } from '@gltf-transform/functions';
-import { MeshoptEncoder, MeshoptDecoder } from 'meshoptimizer';
-const [src, dst] = process.argv.slice(2);
-await MeshoptEncoder.ready; await MeshoptDecoder.ready;
+import { quantize, reorder, prune, dedup, weld, simplifyPrimitive } from '@gltf-transform/functions';
+import { MeshoptEncoder, MeshoptDecoder, MeshoptSimplifier } from 'meshoptimizer';
+const [src, dst, ratio, err, keep] = process.argv.slice(2);
+await MeshoptEncoder.ready; await MeshoptDecoder.ready; await MeshoptSimplifier.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder, 'meshopt.decoder': MeshoptDecoder });
 const doc = await io.read(src);
+if (ratio) {                                             // (keep: a mesh name left at full detail, e.g. a skirt whose folds would facet)
+  await doc.transform(weld());
+  for (const m of doc.getRoot().listMeshes()) if (m.getName() !== keep)
+    for (const p of m.listPrimitives()) simplifyPrimitive(p, { simplifier: MeshoptSimplifier, ratio: +ratio, error: +(err || 0.0015) });
+}
 await doc.transform(dedup(), prune({ keepAttributes: true }), reorder({ encoder: MeshoptEncoder }),
   quantize({ pattern: /^(NORMAL|TEXCOORD_\d+|COLOR_\d+|WEIGHTS_\d+|JOINTS_\d+)$/, quantizeNormal: 10, quantizeTexcoord: 12, quantizeColor: 8, quantizeWeight: 8 }));
 doc.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.QUANTIZE });

@@ -16,7 +16,7 @@ function adaptResolution(ms, dt) {
 }
 function frame(now) {
   requestAnimationFrame(frame);        // (first, so one bad frame can never freeze the game)
-  const ms = now - last, dt = Math.min(0.05, ms / 1000); last = now; lastDt = dt;
+  const ms = now - last, dt = Math.min(0.05, ms / 1000); last = now; lastDt = dt; realDt = Math.min(0.25, ms / 1000);
   if (state === 'play' && renderer) adaptResolution(ms, dt);
   if (renderer) renderer.info.reset();                   // (the performance overlay counts this frame's draws: js/extras.js)
   try {

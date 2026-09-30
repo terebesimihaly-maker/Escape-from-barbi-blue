@@ -10,7 +10,7 @@ let shake = 0, deadT = 0, flicker = 1, flickTarget = 1, flickT = 0, hbTimer = 0,
 // loose floorboards (js/stealth.js): how long one is (world units); the long ones right across a corridor, and how often a board is one
 const BOARD_LEN = 24, BOARD_MID_LEN = 46, BOARD_MID_CHANCE = 0.1;
 let musicTimer = 0, musicI = 0, hideTarget = null, hideCool = 0, breathShown = false, deathReason = '';
-let titleEyes = null, titleT = 0, reviveTarget = null, revP = 0, lastDt = 0.016, reviveHeld = false;
+let titleEyes = null, titleT = 0, reviveTarget = null, revP = 0, lastDt = 0.016, realDt = 0.016, reviveHeld = false;
 
 // A floor is made in two steps, so that in multiplayer the host can make it once and send the same house to everyone:
 // generateFloor builds the maze and places everything (n = number of players), applyFloor sets the game up from that data.
