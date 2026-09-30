@@ -1,9 +1,9 @@
-/* Escape from Barbi Blue: Setup, settings, the floors' content and the maze (the game logic works on a flat grid: a tile is T = 40 units).
+/* Escape from Barbi Blue: Setup, settings, the floors' content and the maze (the game logic works on a flat grid: a tile is T = 50 units).
    (The game is split over several plain scripts that share one scope; index.html loads them in order.) */
 'use strict';
 
 /* ---------- setup ---------- */
-const T = 40;                       // world units per tile
+const T = 50;                       // world units per tile (2.25 m: wide enough for two players side by side)
 const cvs = document.getElementById('c'), ctx = cvs.getContext('2d');   // 2D overlay on top of the 3D view
 const faceCv = document.createElement('canvas'); faceCv.width = faceCv.height = 512;
 const fctx = faceCv.getContext('2d');
@@ -24,9 +24,10 @@ function resize() {
   titleCam.updateProjectionMatrix();
 }
 // Graphics: Low = no shadows, no glow, lower resolution. Medium = flashlight shadows and beam pattern. High = plus glow (bloom)
+let resScale = 1;                 // dynamic resolution (js/main.js lowers it when frames get slow)
 function applyQuality() {
   if (!renderer) return;
-  const q = settings.quality, pr = q === 'low' ? 1 : Math.min(DPR, LOWQ ? 1.5 : 2);
+  const q = settings.quality, pr = (q === 'low' ? 1 : Math.min(DPR, LOWQ ? 1.5 : 2)) * resScale;
   renderer.setPixelRatio(pr); renderer.setSize(W, H, false);
   flash.castShadow = q !== 'low';
   flash.map = q !== 'low' ? flashCookie : null;
@@ -47,7 +48,7 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 const angDiff = (a, b) => { let d = (a - b) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
 const lerpAngle = (a, b, k) => a - angDiff(a, b) * k;
 /* ---------- settings (kept on this device) ---------- */
-const settings = { sens: 1, vol: 0.9, quality: matchMedia('(pointer: coarse)').matches ? 'medium' : 'high', fov: 80, invert: false, calm: false };
+const settings = { sens: 1, vol: 0.9, quality: matchMedia('(pointer: coarse)').matches ? 'medium' : 'high', fov: 80, invert: false, calm: false, difficulty: 'medium' };
 try { Object.assign(settings, JSON.parse(localStorage.getItem('bb_settings') || '{}')); } catch (e) {}
 const saveSettings = () => { try { localStorage.setItem('bb_settings', JSON.stringify(settings)); } catch (e) {} };
 function applySettings() {
@@ -55,7 +56,7 @@ function applySettings() {
   $('setVol').value = settings.vol; $('outVol').textContent = Math.round(settings.vol * 100) + '%';
   $('setFov').value = settings.fov; $('outFov').textContent = Math.round(settings.fov) + '°';
   $('setInvert').checked = !!settings.invert; $('setCalm').checked = !!settings.calm;
-  document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.q === settings.quality));
+  document.querySelectorAll('#qSeg button').forEach(b => b.classList.toggle('on', b.dataset.q === settings.quality));
   if (typeof master !== 'undefined' && master) master.gain.value = settings.vol;
   if (typeof applyQuality === 'function') applyQuality();
   if (typeof resize === 'function' && typeof camera !== 'undefined' && camera) resize();
@@ -66,7 +67,7 @@ $('setFov').oninput = e => { settings.fov = +e.target.value; applySettings(); sa
 $('setInvert').onchange = e => { settings.invert = e.target.checked; saveSettings(); };
 $('setCalm').onchange = e => { settings.calm = e.target.checked; saveSettings(); };
 const calm = () => !!settings.calm;          // "Calm effects": no strobing or shaking (for anyone sensitive to flashing)
-document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { settings.quality = b.dataset.q; applySettings(); saveSettings(); });
+document.querySelectorAll('#qSeg button').forEach(b => b.onclick = () => { settings.quality = b.dataset.q; applySettings(); saveSettings(); });
 // the menu's "How to play" and "Settings" panels
 function openPanel(name) {
   document.querySelectorAll('#panel section').forEach(sec => sec.classList.toggle('hidden', sec.dataset.panel !== name));
@@ -92,7 +93,40 @@ const FLOORS = [
   { name: 'The Basement', cw: 9, ch: 15, fuses: 5,
     text: "It's wet down here. The humming is louder. This is where she was left.",
     style: 'concrete', floorA: '#2c2a25', wallTop: '#151410', face: '#4d3b2e', mortar: '#241d17', base: '#1b1611', frames: 0.05 },
+  // (floor: which floor painting, and which footsteps; walls: which wall painting; style: how js/house.js dresses it)
+  { name: 'The Attic', cw: 9, ch: 15, fuses: 5,
+    text: "The basement door didn't lead outside. It led up. Everything up here is covered in sheets, and something under them is breathing.",
+    style: 'attic', floor: 'wood', walls: 'attic', floorA: '#3a2c20', wallTop: '#140f0b', face: '#4a3726', pattern: '#3a2a1c', base: '#1f160f', frames: 0.06 },
+  { name: 'The Workshop', cw: 10, ch: 16, fuses: 6,
+    text: 'This is where she was made. Shelves of glass eyes watch you work. The front door is on the other side.',
+    style: 'workshop', floor: 'tile', walls: 'workshop', floorA: '#4a4640', floorB: '#191816', grout: '#0c0b0a', wallTop: '#12140f', face: '#4e5647', pattern: '#3c4236', base: '#15130f', frames: 0.2 },
 ];
+// difficulty: single player picks it with the floor; together, the lobby owner picks it for everyone.
+// speed/hear: her speed and hearing; sight: how far she sees (units); hunt: seconds added to the time between her screams;
+// spawn: seconds before she wakes; check: the chance she opens a wardrobe she stops at; phone: its cooldown;
+// down: seconds to revive a teammate; fuses: more or fewer fuses to find
+const DIFFS = {
+  easy:   { name: 'Easy', speed: 0.85, hear: 0.75, sight: 300, hunt: 18, spawn: 5, check: 0.12, phone: 35, down: 65, fuses: -1,
+            text: 'She is slower and hears less, and there is a fuse less to find. The phone recharges faster.' },
+  medium: { name: 'Medium', speed: 1, hear: 1, sight: 360, hunt: 0, spawn: 0, check: 0.3, phone: 45, down: 50, fuses: 0,
+            text: 'The house as it was meant to be played.' },
+  hard:   { name: 'Hard', speed: 1.1, hear: 1.3, sight: 430, hunt: -10, spawn: -1, check: 0.5, phone: 60, down: 40, fuses: 1,
+            text: 'She is faster (you can still outrun her), hears and sees further, and opens wardrobes more often. One more fuse.' },
+};
+let curDiff = 'medium';                                   // (the difficulty of the floor being played)
+const DF = () => DIFFS[curDiff] || DIFFS.medium;
+// progress (kept on this device): the floors you've escaped, and your best time on each. A floor opens once the one before it is escaped.
+const progress = { done: [], best: [] };
+try { Object.assign(progress, JSON.parse(localStorage.getItem('bb_progress') || '{}')); } catch (e) {}
+const saveProgress = () => { try { localStorage.setItem('bb_progress', JSON.stringify(progress)); } catch (e) {} };
+const unlocked = i => i === 0 || !!progress.done[i - 1];
+function floorDone(i, secs) {
+  progress.done[i] = true;
+  if (secs > 1 && (!progress.best[i] || secs < progress.best[i])) progress.best[i] = Math.round(secs);
+  saveProgress();
+}
+// what a floor looks and sounds like underfoot, and what its walls are painted with
+const floorKind = F => F.floor || F.style, wallKind = F => F.walls || F.style;
 const NOTES = [
   "Day 3.\nThe house keeps getting longer. I hear a music box behind the walls.\nMom says we don't own a music box.",
   "Don't run unless you have to.\nShe hears running.\nShe hears EVERYTHING.",
@@ -100,6 +134,10 @@ const NOTES = [
   "Her eyes glow in the dark.\nIf you can see them,\nshe can see you.",
   "Put all the fuses back and the door unlocks.\nBut the lights coming on wakes her up.\nBe ready to move.",
   "I can see the door.\nI can hear her humming right behind m",
+  "The attic ladder was already down.\nSomeone wanted me up here.\nThe sheets move when I'm not looking.",
+  "Wardrobes won't save you forever.\nIf she lost you close by,\nshe checks every one of them.",
+  "Workshop ledger, 1961.\nOrder 12: one porcelain doll, blue glass eyes.\nNever collected.",
+  "She only wants someone to stay.\nThe front door is past the workbenches.\nDon't look at the shelves.",
 ];
 const DECAL_WORDS = ['RUN', 'HIDE', 'SHE SEES', 'BLUE', "DON'T", 'LA LA LA', 'NO WAY OUT'];
 const MELODY = [659, 784, 988, 880, 784, 659, 740, 622, 659, 0, 523, 494, 523, 587, 659, 0];

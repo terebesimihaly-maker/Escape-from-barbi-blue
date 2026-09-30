@@ -8,7 +8,7 @@
 // PeerJS's free public server is only used to introduce the players to each other; the game itself goes browser to browser.
 const MP = { on: false, host: false, peer: null, conns: new Map(), hostConn: null, myId: '', code: '', lobby: null, others: new Map(),
   sendT: 0, menu: false, n: 1, leaving: false, inGame: false, overSent: false, floorDone: false, exitAsked: false, spec: 0, scareT: 0, kicked: false, rejected: '' };
-const PEER_PREFIX = 'escape-barbi-blue-', MAX_PLAYERS = 4, SEND_HZ = 15, DOWN_TIME = 50, REVIVE_TIME = 3;
+const PEER_PREFIX = 'escape-barbi-blue-', MAX_PLAYERS = 4, SEND_HZ = 15, REVIVE_TIME = 3;   // (time to revive: DIFFS[].down)
 // rejoining: a player who drops keeps their place for AWAY_TIME seconds and reconnects by themselves (for RECONNECT_FOR seconds);
 // after closing the page, the menu offers "Rejoin" for 10 minutes (the lobby code and their player id are kept on the device)
 const AWAY_TIME = 90, RECONNECT_FOR = 70, REJOIN_KEY = 'bb_rejoin', REJOIN_MAX = 10 * 60 * 1000, SILENT_MS = 15000;
@@ -73,7 +73,8 @@ function createLobby() {
   const peer = new peerjs.Peer(PEER_PREFIX + code, peerOptions()); MP.peer = peer;
   peer.on('open', id => {
     Object.assign(MP, { on: true, host: true, myId: id, code, overSent: false });
-    MP.lobby = { code, players: [{ id, name: myName, ready: false }], count: 0, started: false };
+    MP.lobby = { code, players: [{ id, name: myName, ready: false }], count: 0, started: false,
+      level: 0, diff: DIFFS[settings.difficulty] ? settings.difficulty : 'medium' };      // (the owner picks the floor and the difficulty)
     mpStatus(''); showLobby(); hostLobbyChanged();
   });
   peer.on('connection', hostAccept);
@@ -130,7 +131,7 @@ function hostLobbyChanged() {
   } else if (!all && MP.lobbyTimer) { clearInterval(MP.lobbyTimer); MP.lobbyTimer = null; L.count = 0; }
   hostSendLobby();
 }
-function hostSendLobby() { const L = MP.lobby; hostEmit({ t: 'lobby', lobby: { code: L.code, players: L.players, count: L.count, started: L.started } }); }
+function hostSendLobby() { const L = MP.lobby; hostEmit({ t: 'lobby', lobby: { code: L.code, players: L.players, count: L.count, started: L.started, level: L.level, diff: L.diff } }); }
 function hostHandle(id, m) {
   if (!m || typeof m !== 'object' || !MP.lobby) return;
   const pl = lobbyPlayer(id);
@@ -252,6 +253,12 @@ function renderLobby() {
     ul.appendChild(li);
   });
   for (let i = L.players.length; i < MAX_PLAYERS; i++) { const li = document.createElement('li'); li.className = 'empty'; li.textContent = 'Waiting for a player…'; ul.appendChild(li); }
+  // the floor and the difficulty: the owner picks (only floors the owner has opened), everyone else sees the choice
+  const sel = $('lbLevel'), lv = L.level || 0;
+  if (sel.options.length !== FLOORS.length) { sel.textContent = ''; FLOORS.forEach((F, i) => { const o = document.createElement('option'); o.value = i; sel.appendChild(o); }); }
+  FLOORS.forEach((F, i) => { const o = sel.options[i], open = unlocked(i); o.textContent = (i + 1) + '. ' + F.name + (MP.host && !open ? '  (locked)' : ''); o.disabled = MP.host && !open; });
+  sel.value = lv; sel.disabled = !MP.host;
+  document.querySelectorAll('#lbDiff button').forEach(b => { b.classList.toggle('on', b.dataset.d === (L.diff || 'medium')); b.disabled = !MP.host; });
   const me = lobbyPlayer(MP.myId), nReady = L.players.filter(p => p.ready).length;
   $('lbReady').textContent = me && me.ready ? 'Not ready' : 'Ready'; $('lbReady').classList.toggle('on', !!(me && me.ready));
   $('lbStatus').textContent = L.count > 0 ? 'Starting in ' + L.count + '…' :
@@ -272,6 +279,8 @@ $('lbName').addEventListener('input', e => {
   if (MP.host) { const me = lobbyPlayer(MP.myId); if (me) { me.name = myName; hostLobbyChanged(); } } else send(MP.hostConn, { t: 'name', name: myName });
 });
 $('lbLeave').onclick = () => { leaveMP(); toTitle(); openPanel('mp'); };
+$('lbLevel').onchange = e => { const L = MP.lobby, i = +e.target.value; if (!MP.host || !L || L.started) return; if (unlocked(i)) L.level = i; hostLobbyChanged(); };
+document.querySelectorAll('#lbDiff button').forEach(b => b.onclick = () => { const L = MP.lobby; if (!MP.host || !L || L.started) return; L.diff = b.dataset.d; hostLobbyChanged(); });
 $('rejoinBtn').onclick = () => { const r = loadRejoin(); if (!r) { updateRejoinBtn(); return; } unlockAudio(); primeVoice(); openPanel('mp'); joinLobby(r); };
 $('reconnLeave').onclick = () => { leaveMP(); toTitle(); openPanel('mp'); };
 
@@ -279,11 +288,12 @@ $('reconnLeave').onclick = () => { leaveMP(); toTitle(); openPanel('mp'); };
 function hostStartMatch() {
   const L = MP.lobby; if (!L || L.started) return;
   L.started = true; L.count = 0; MP.overSent = false; runTime = 0;
-  hostSendLobby(); hostStartFloor(0);
+  hostSendLobby(); hostStartFloor(L.level || 0, true);
 }
-function hostStartFloor(i) {
+function hostStartFloor(i, first) {
   const L = MP.lobby; if (!L) return;
-  const d = generateFloor(i, L.players.length);
+  const d = generateFloor(i, L.players.length, L.diff);
+  if (first) d.first = true;
   d.order = L.players.map(p => p.id); d.names = L.players.map(p => p.name);
   MP.floorData = d;                                   // (kept, for anyone who reconnects during this floor)
   MP.floorDone = false; MP.overSent = false;
@@ -349,7 +359,7 @@ function clientHandle(m) {
       MP.lastW = performance.now();
       MP.n = d.order.length; MP.inGame = true; MP.menu = false; MP.exitAsked = false; MP.scareT = 0; MP.spec = 0;
       ['lobby', 'title', 'panel', 'dead', 'win', 'trans', 'paused', 'note'].forEach(id => show(id, false));
-      if (m.d.i === 0) runTime = 0;
+      if (m.d.first) runTime = 0;
       applyFloor(d, slot);
       break; }
     case 'w': clientWorld(m); break;
@@ -364,9 +374,9 @@ function clientHandle(m) {
       break; }
     case 'down': {
       const q = meOrOther(m.id); if (!q) break;
-      q.down = true; q.dead = false; q.downLeft = DOWN_TIME; q.hidden = false;
+      q.down = true; q.dead = false; q.downLeft = DF().down; q.hidden = false;
       if (m.id === MP.myId) goDown(m.reason);
-      else { sfx.sting(); showMsg(nameOf(m.id) + ' is down! Revive them within ' + DOWN_TIME + ' seconds.', 3.5); }
+      else { sfx.sting(); showMsg(nameOf(m.id) + ' is down! Revive them within ' + DF().down + ' seconds.', 3.5); }
       break; }
     case 'bled': {
       const q = meOrOther(m.id); if (!q) break;
@@ -383,6 +393,7 @@ function clientHandle(m) {
       const o = MP.others.get(m.id); if (o) { removeAvatar(o); MP.others.delete(m.id); }
       showMsg(m.name + ' left the game.', 3); break; }
     case 'next': {
+      floorDone(floorIdx, levelTime);                  // (escaping together opens the next floor for everyone)
       stopSong(); $('pop').classList.remove('on'); setHud(false); show('downMsg', false); show('revive', false);
       state = 'trans'; setSprint(false);
       const F = FLOORS[m.i];
@@ -391,7 +402,7 @@ function clientHandle(m) {
       let n = 4; const tick = () => { $('tText').textContent = F.text + '  Everyone goes down together in ' + n + '…'; };
       tick(); clearInterval(MP.transTimer); MP.transTimer = setInterval(() => { n--; if (n <= 0 || state !== 'trans') { clearInterval(MP.transTimer); return; } tick(); }, 1000);
       break; }
-    case 'win': mpEnd(true); break;
+    case 'win': floorDone(floorIdx, levelTime); mpEnd(true); break;
     case 'over': mpEnd(false); break;
   }
 }

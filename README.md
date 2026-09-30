@@ -14,7 +14,7 @@ A first-person 3D horror maze for phones and desktop. Find the fuses, unlock the
   - `js/world3d.js`, `js/level.js`, `js/render.js`: the 3D world, building a floor, drawing a frame
   - `js/scares.js`: the jump scares
   - `js/cinematics.js`: the death screen and the title screen; `js/main.js`: the main loop and start-up
-- `js/house.js`: dresses each floor: skirting, rails and crown molding, framed doorways, lamps that really light the rooms (a few flicker or are dead), rugs and a runner carpet, porcelain dolls whose heads turn when you look away, teddy bears, side tables, grandfather clocks, basement pipes, crates, barrels and puddles, and a flashlight beam you can see in the air
+- `js/house.js`: dresses each floor: skirting, rails and crown molding, framed doorways, lamps that really light the rooms (a few flicker or are dead), rugs and a runner carpet, porcelain dolls whose heads turn when you look away, teddy bears, side tables, grandfather clocks, basement pipes, crates, barrels and puddles, the attic's sheet-covered furniture, trunks and cobwebs, the workshop's workbenches, shelves of doll heads, dress forms and dolls hanging on strings, and a flashlight beam you can see in the air
 - `models/barbi.glb`: her rigged model (made in Blender)
 - `js/barbi-anim.js`: her animations. The model has no animation clips, so they're built in code from the rig's bones.
   Standing, wandering and searching are real human motion capture (see below) with her own touches on top (the O-shaped legs,
@@ -27,6 +27,16 @@ A first-person 3D horror maze for phones and desktop. Find the fuses, unlock the
 - `tests/`: browser tests (see "Tests" below)
 - `lib/three.min.js`: three.js r186 + GLTFLoader + post-processing (MIT, see `lib/THREE-LICENSE.txt`)
 - `lib/peerjs.min.js`: PeerJS 1.5.5 for multiplayer (MIT, see `lib/PEERJS-LICENSE.txt`)
+
+## Floors and difficulty
+
+**Enter the house** shows the five floors: The Nursery, The Doll Hallway, The Basement, The Attic and The Workshop. A floor opens once you've escaped the one before it (your progress and best time per floor are kept on this device). Pick **Easy**, **Medium** or **Hard** above the list:
+
+- Easy: she's slower, hears and sees less, rarely opens wardrobes; one fuse less; the phone recharges in 35 s; 65 s to revive a teammate
+- Medium: the house as it was meant to be played (45 s phone, 50 s to revive)
+- Hard: she's faster (a sprint still gets away from her), hears and sees further, opens wardrobes more often, screams more; one fuse more; 60 s phone; 40 s to revive
+
+Playing together, the lobby owner picks the floor (from the ones they've opened) and the difficulty for everyone; escaping a floor together opens the next one for all of you.
 
 The game loads its files over HTTP, so open it from a web server (e.g. GitHub Pages, or `python3 -m http.server` locally), not by double-clicking the file.
 

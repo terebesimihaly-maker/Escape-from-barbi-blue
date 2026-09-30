@@ -8,8 +8,15 @@ await until(A, () => !document.getElementById('lobby').classList.contains('hidde
 const code = (await text(A, 'lbCode')).replace(/\s/g, '');
 await openMp(B); await fill(B, '#mpCode', code); await click(B, '#mpJoin');
 check(await until(B, () => !document.getElementById('lobby').classList.contains('hidden')), 'Ben joined');
+console.log('== the owner picks the floor and the difficulty');
+check(await B.evaluate(() => document.getElementById('lbLevel').disabled && [...document.querySelectorAll('#lbDiff button')].every(b => b.disabled)), 'Ben can see the choice but not change it');
+check(await A.evaluate(() => document.querySelector('#lbLevel option[value="2"]').disabled), 'Anna cannot pick a floor she has not opened yet');
+await A.evaluate(() => { progress.done = [true, true]; saveProgress(); renderLobby(); });
+await A.evaluate(() => { const s = document.getElementById('lbLevel'); s.value = 2; s.dispatchEvent(new Event('change')); document.querySelector('#lbDiff button[data-d="hard"]').click(); });
+check(await until(B, () => document.getElementById('lbLevel').value === '2' && document.querySelector('#lbDiff button.on').dataset.d === 'hard', null, 10000), 'Ben sees floor 3 and Hard');
 await click(A, '#lbReady'); await click(B, '#lbReady');
 check((await Promise.all([A, B].map(P => until(P, () => bb.state === 'play' && bb.MP.inGame, null, 30000)))).every(Boolean), 'the game started for both');
+check((await Promise.all([A, B].map(P => P.evaluate(() => bb.floorIdx === 2 && curDiff === 'hard')))).every(Boolean), 'on floor 3, on Hard, for both');
 await A.evaluate(() => { const m = bb.monster; m.active = false; m.spawnT = 1e9; });
 const benId = await B.evaluate(() => bb.MP.myId);
 

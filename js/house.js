@@ -4,6 +4,8 @@
                 teddy bears, toy blocks, rugs
      hallway  - dark wood, brass candle sconces, side tables with vases and candles, grandfather clocks, a runner carpet
      basement - rusty pipes, bare hanging bulbs, crates, barrels, wet puddles
+     attic    - bare bulbs, furniture under dust sheets, old trunks, cobwebs, a few dolls
+     workshop - green-shaded lamps, workbenches covered in doll parts, shelves of doll heads, dress forms, dolls hanging on strings
    Usage: const h = House.build(THREE, env); scene.add(h.group); every frame: h.update(dt, t, camera, player);
    env: { style, L (tile, m), H (wall height), GW, GH, isWall(x,y), faces, keep (Set of 'x,y' tiles to leave empty),
           wallMat, hash, toTex, glowTex, quality: 'low'|'medium'|'high', lowq (true on phones) } */
@@ -72,7 +74,10 @@ function build(THREE, env) {
     wood:     { trim: '#9e927e', rail: '#8f8470', lamp: 0xffc9b8, shade: '#f2b8c6', light: 0xffc0a8 },
     tile:     { trim: '#3b2718', rail: '#2f1f13', lamp: 0xffcf8a, shade: '#e6c07a', light: 0xffc47a },
     concrete: { trim: '#3a3631', rail: '#2c2925', lamp: 0xfff1d0, shade: '#fff4dc', light: 0xffe9c8 },
+    attic:    { trim: '#2e2218', rail: '#2e2218', lamp: 0xffe6b8, shade: '#fff0d0', light: 0xffd9a8 },
+    workshop: { trim: '#2a1d14', rail: '#3a2a1e', lamp: 0xf4ffd8, shade: '#2f5a36', light: 0xf0f2c8 },
   }[style];
+  const bulbs = style === 'concrete' || style === 'attic' || style === 'workshop';
 
   /* ---------- woodwork: skirting, chair rail, crown molding (real geometry, so it catches the light) ---------- */
   const trimTex = tex(woodCanvas(P.trim, 256, 32, false), true);
@@ -89,11 +94,13 @@ function build(THREE, env) {
     trim.box(len + 0.02, y1 - y0, d, cx + f.nx * d / 2, (y0 + y1) / 2, cz + f.nz * d / 2, ry);
   };
   for (const f of faces) {
-    if (style !== 'concrete') { strip(f, 0, 0.16, 0.026); strip(f, 0.155, 0.175, 0.034); }
-    else strip(f, 0, 0.1, 0.04);                          // (a concrete curb in the basement)
+    if (style === 'concrete') strip(f, 0, 0.1, 0.04);    // (a concrete curb in the basement)
+    else if (style === 'attic') strip(f, 0, 0.09, 0.02);  // (a plain floor board)
+    else { strip(f, 0, 0.16, 0.026); strip(f, 0.155, 0.175, 0.034); }
     if (style === 'wood') strip(f, 0.93, 0.98, 0.03);
     if (style === 'tile') strip(f, 0.84, 0.9, 0.028);
-    if (style !== 'concrete') strip(f, H - 0.12, H, 0.1, true);
+    if (style === 'workshop') strip(f, 0.93, 0.97, 0.05);
+    if (style !== 'concrete' && style !== 'attic') strip(f, H - 0.12, H, 0.1, true);
   }
 
   /* ---------- doorways: between the rooms of the maze, a framed opening with a header wall above it ---------- */
@@ -111,7 +118,7 @@ function build(THREE, env) {
     for (const s of [-1, 1]) { const [px, pz] = off(s * (L / 2 - 0.055), 0); frame.box(0.11, DOOR_H + 0.06, 0.34, px, (DOOR_H + 0.06) / 2, pz, ry); }
     frame.box(L, 0.12, 0.34, cx, DOOR_H + 0.03, cz, ry);
   }
-  const frameMat = std({ map: tex(woodCanvas(style === 'wood' ? '#a39680' : style === 'tile' ? '#3a2616' : '#3a2c20', 64, 256, true), true), roughness: 0.7 });
+  const frameMat = std({ map: tex(woodCanvas({ wood: '#a39680', tile: '#3a2616', concrete: '#3a2c20', attic: '#3a2a1c', workshop: '#2a1d14' }[style], 64, 256, true), true), roughness: 0.7 });
   const headerMat = env.wallMat.clone(); headerMat.vertexColors = false;   // (the walls' own corner shading doesn't apply here)
   [trim.mesh(trimMat, false), frame.mesh(frameMat, true), header.mesh(headerMat, true)].forEach(m => { if (m) group.add(m); });
 
@@ -131,7 +138,7 @@ function build(THREE, env) {
     glow.position.set(x, y, z); glow.scale.setScalar(kind === 'candle' ? 0.35 : 0.45); group.add(glow);
     fixtures.push({ pos: new THREE.Vector3(x, y, z), mat, glow, state, phase: Math.random() * 100, base: kind === 'candle' ? 0.6 : 1, level: 1, em: kind === 'shade' ? 0.9 : 1.8 });
   };
-  const fixDen = { wood: 0.16, tile: 0.2, concrete: 0 }[style];
+  const fixDen = { wood: 0.16, tile: 0.2 }[style] || 0;
   for (const f of faces) {
     if (busy(f) || hash(f.x * 5 + f.nx, f.y * 5 + f.nz, 95) > fixDen) continue;
     const cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2, ry = Math.atan2(f.nx, f.nz);
@@ -152,14 +159,17 @@ function build(THREE, env) {
       }
     }
   }
-  if (style === 'concrete') {                             // bare bulbs hanging from the ceiling
+  const shades = new Merge(THREE);
+  if (bulbs) {                                            // lamps hanging from the ceiling: bare bulbs, or (workshop) under a green metal shade
     for (let y = 1; y < env.GH; y += 2) for (let x = 1; x < env.GW; x += 2) {
-      if (isWall(x, y) || hash(x, y, 97) > 0.3) continue;
+      if (isWall(x, y) || hash(x, y, 97) > (style === 'workshop' ? 0.36 : 0.3)) continue;
       const cx = (x + 0.5) * L, cz = (y + 0.5) * L;
       fixStatic.box(0.008, 0.55, 0.008, cx, H - 0.27, cz, 0); fixStatic.box(0.05, 0.05, 0.05, cx, H - 0.56, cz, 0);
+      if (style === 'workshop') { const g = new THREE.CylinderGeometry(0.05, 0.24, 0.16, 16, 1, true); shades.add(g, new THREE.Matrix4().makeTranslation(cx, H - 0.64, cz)); }
       addFixture(cx, H - 0.63, cz, 'bulb');
     }
   }
+  const shm = shades.mesh(std({ color: 0x2f5a36, metalness: 0.5, roughness: 0.45, side: THREE.DoubleSide }), false); if (shm) group.add(shm);
   const fs = fixStatic.mesh(fixMetal, false); if (fs) group.add(fs);
   // the closest lamps get real lights (a small pool, moved around as you walk)
   const poolN = env.quality === 'low' ? 0 : lowq || env.quality === 'medium' ? 2 : 4;
@@ -288,6 +298,74 @@ function build(THREE, env) {
     const cm = crates.mesh(std({ map: tex(crateCanvas()), roughness: 0.8 }), true); if (cm) group.add(cm);
     const bm = barrels.mesh(std({ map: tex(barrelCanvas(), true), metalness: 0.35, roughness: 0.6 }), true); if (bm) group.add(bm);
   }
+  const swingers = [];                                    // (dolls hanging on strings: they sway)
+  if (style === 'attic') {
+    // furniture under dust sheets (a tapered shape, like a sheet thrown over a chair or a cabinet), old trunks, a few dolls
+    const sheets = new Merge(THREE), trunks = new Merge(THREE);
+    spots.forEach((f, i) => {
+      const r = hash(f.x * 3 + f.nx, f.y * 3 + f.nz, 190);
+      if (r < 0.14 * dens) { const tall = hash(f.x, f.y, 191) < 0.35, p = placeAt(f, (hash(f.x, f.y, 192) - 0.5) * 0.7, 0.3);
+        const g = new THREE.CylinderGeometry(tall ? 0.24 : 0.28, tall ? 0.38 : 0.44, tall ? 1.7 : 0.9, 4, 1); g.rotateY(Math.PI / 4);
+        sheets.add(g, new THREE.Matrix4().compose(new THREE.Vector3(p.x, tall ? 0.85 : 0.45, p.z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, p.ry + (hash(f.x, f.y, 193) - 0.5) * 0.3, 0)), new THREE.Vector3(1, 1, 0.75))); }
+      else if (r < 0.22 * dens) { const p = placeAt(f, (hash(f.x, f.y, 194) - 0.5) * 0.7, 0.24);
+        trunks.box(0.8, 0.42, 0.42, p.x, 0.21, p.z, p.ry); trunks.box(0.82, 0.06, 0.44, p.x, 0.45, p.z, p.ry); }
+      else if (r < 0.28 * dens) { const p = placeAt(f, (hash(f.x, f.y, 195) - 0.5) * 0.8, 0.22); dolls.push(makeDoll(THREE, env, p, i)); }
+    });
+    const sm = sheets.mesh(std({ map: tex(clothCanvas('#b8b0a0'), true), roughness: 0.95 }), true); if (sm) group.add(sm);
+    const tm = trunks.mesh(std({ map: tex(crateCanvas()), color: 0x8a6a4a, roughness: 0.7 }), true); if (tm) group.add(tm);
+    // cobwebs across the top corners
+    const web = std({ map: tex(webCanvas()), transparent: true, alphaTest: 0.1, side: THREE.DoubleSide, roughness: 1, depthWrite: false });
+    for (const f of faces) { if (hash(f.x * 5 + f.nx, f.y * 5 + f.nz, 196) > 0.14) continue;
+      const w = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.7), web), end = hash(f.x, f.y, 197) < 0.5 ? 0 : 1;
+      const ex = end ? f.x1 : f.x0, ez = end ? f.z1 : f.z0, tx = f.x1 - f.x0, tz = f.z1 - f.z0, tl = Math.hypot(tx, tz);
+      w.position.set(ex - (end ? 1 : -1) * tx / tl * 0.25 + f.nx * 0.25, H - 0.25, ez - (end ? 1 : -1) * tz / tl * 0.25 + f.nz * 0.25);
+      w.rotation.set(0, Math.atan2(f.nx, f.nz) + (end ? -1 : 1) * Math.PI / 4, 0); group.add(w); }
+  }
+  if (style === 'workshop') {
+    const bench = new Merge(THREE), shelf = new Merge(THREE), parts = new Merge(THREE), heads = [], forms = [];
+    spots.forEach((f, i) => {
+      const r = hash(f.x * 3 + f.nx, f.y * 3 + f.nz, 200), p0 = placeAt(f, 0, 0);
+      if (r < 0.12 * dens) {                              // a workbench with doll parts on it
+        const p = placeAt(f, (hash(f.x, f.y, 201) - 0.5) * 0.4, 0.26), c = Math.cos(p.ry), s = Math.sin(p.ry);
+        bench.box(1.1, 0.05, 0.48, p.x, 0.86, p.z, p.ry);
+        for (const [a, b] of [[-0.5, -0.2], [0.5, -0.2], [-0.5, 0.2], [0.5, 0.2]]) bench.box(0.05, 0.84, 0.05, p.x + a * c + b * s, 0.42, p.z - a * s + b * c, p.ry);
+        for (let k = 0; k < 4; k++) { const a = (hash(f.x, f.y, 202 + k) - 0.5) * 0.9, b = (hash(f.x, f.y, 206 + k) - 0.5) * 0.3, x = p.x + a * c + b * s, z = p.z - a * s + b * c;
+          if (k % 2) heads.push([x, 0.92, z, p.ry + hash(f.x, f.y, 210 + k) * 3]);
+          else parts.add(new THREE.CylinderGeometry(0.018, 0.022, 0.22, 8), new THREE.Matrix4().compose(new THREE.Vector3(x, 0.9, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, hash(f.x, f.y, 214 + k) * 3, 0)), new THREE.Vector3(1, 1, 1))); }
+      } else if (r < 0.26 * dens) {                       // shelves on the wall, lined with doll heads
+        const along = Math.hypot(f.x1 - f.x0, f.z1 - f.z0) * 0.8;
+        for (const h of [1.3, 1.78]) { const p = placeAt(f, 0, 0.13); shelf.box(along, 0.03, 0.24, p.x, h, p.z, p.ry);
+          const n = 5 + (hash(f.x, f.y, 220 + h * 10) * 3 | 0);
+          for (let k = 0; k < n; k++) { const q = placeAt(f, (k / (n - 1) - 0.5) * along * 0.9, 0.13); heads.push([q.x, h + 0.085, q.z, q.ry + (hash(f.x + k, f.y, 230) - 0.5) * 0.6]); } }
+      } else if (r < 0.31 * dens) { forms.push(placeAt(f, (hash(f.x, f.y, 240) - 0.5) * 0.7, 0.3)); }   // a dress form
+    });
+    const bm = bench.mesh(woodMat, true); if (bm) group.add(bm);
+    const sm = shelf.mesh(woodMat, true); if (sm) group.add(sm);
+    const porcelain = std({ color: 0xf2ebe4, roughness: 0.25 });
+    const pm = parts.mesh(porcelain, true); if (pm) group.add(pm);
+    if (heads.length) {                                   // all the heads: one instanced mesh (one draw call)
+      const faceTex = env.toTex(dollFaceCanvas(false)); faceTex.offset.set(0.25, 0);
+      const im = new THREE.InstancedMesh(new THREE.SphereGeometry(0.075, 16, 12), std({ map: faceTex, roughness: 0.3 }), heads.length);
+      const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1), v = new THREE.Vector3();
+      heads.forEach(([x, y, z, ry], i) => { q.setFromEuler(e.set(0, ry, 0)); m4.compose(v.set(x, y, z), q, one); im.setMatrixAt(i, m4); });
+      im.castShadow = true; group.add(im);
+    }
+    const fabric = std({ color: 0x6a5a4a, roughness: 0.9 }), metal = std({ color: 0x222222, metalness: 0.7, roughness: 0.4 });
+    const torso = new THREE.LatheGeometry([[0, 0], [0.17, 0.02], [0.2, 0.18], [0.16, 0.36], [0.19, 0.55], [0.14, 0.68], [0.05, 0.74], [0, 0.76]].map(([a, b]) => new THREE.Vector2(a, b)), 20);
+    for (const p of forms) { const g = new THREE.Group(), t = new THREE.Mesh(torso, fabric); t.position.y = 0.95; t.scale.set(1, 1, 0.75); t.castShadow = true; g.add(t);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.95, 6), metal); pole.position.y = 0.48; g.add(pole);
+      const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.03, 12), metal); foot.position.y = 0.015; g.add(foot);
+      g.position.set(p.x, 0, p.z); g.rotation.y = p.ry; group.add(g); }
+    // dolls hanging from the ceiling on strings, in some rooms
+    for (let y = 1; y < env.GH; y += 2) for (let x = 1; x < env.GW; x += 2) {
+      if (isWall(x, y) || env.keep.has(x + ',' + y) || hash(x, y, 250) > 0.12 * dens) continue;
+      const pivot = new THREE.Group(); pivot.position.set((x + 0.5 + (hash(x, y, 251) - 0.5) * 0.4) * L, H, (y + 0.5 + (hash(x, y, 252) - 0.5) * 0.4) * L);
+      const len = 0.9 + hash(x, y, 253) * 0.4, str = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, len, 3), metal); str.position.y = -len / 2; pivot.add(str);
+      const d = makeDoll(THREE, env, { x: 0, z: 0, ry: 0, y: 0 }, x * 7 + y);
+      d.obj.position.set(0, -len - 0.45, 0); d.obj.rotation.set(0, hash(x, y, 254) * 6, 0); pivot.add(d.obj);
+      group.add(pivot); swingers.push({ pivot, ph: hash(x, y, 255) * 6, sp: 0.6 + hash(x, y, 256) * 0.5 });
+    }
+  }
   dolls.forEach(d => group.add(d.obj));
 
   /* ---------- a flashlight beam you can see in the dusty air ---------- */
@@ -337,6 +415,7 @@ function build(THREE, env) {
       if (!seen) d.head.rotation.y += diff * Math.min(1, dt * 4);
     }
     for (const c of clocks) c.pendulum.rotation.z = Math.sin(t * Math.PI) * 0.18;
+    for (const s of swingers) { s.pivot.rotation.z = Math.sin(t * s.sp + s.ph) * 0.06; s.pivot.rotation.x = Math.sin(t * s.sp * 0.7 + s.ph * 2) * 0.04; }
     if (beam) { beam.material.uniforms.uT.value = t; beam.material.uniforms.uI.value = flash && flash.visible ? 0.045 * Math.min(1.2, flash.intensity / 25) : 0; }
   }
   function dispose() {
@@ -366,15 +445,7 @@ function makeDoll(THREE, env, p, seed) {
     const arm = mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.15, 8), porcelain, s * 0.08, 0.24, 0.03); arm.rotation.set(0.5, 0, s * 0.35);
   }
   const head = new THREE.Group(); head.position.set(0, 0.4, 0); g.add(head);
-  const face = mk(128, 128), c = face.getContext('2d');
-  c.fillStyle = '#f2ebe4'; c.fillRect(0, 0, 128, 128);
-  const cheeks = c.createRadialGradient(40, 74, 1, 40, 74, 14); cheeks.addColorStop(0, 'rgba(220,120,130,.5)'); cheeks.addColorStop(1, 'rgba(220,120,130,0)');
-  c.fillStyle = cheeks; c.fillRect(20, 55, 40, 40); c.save(); c.translate(48, 0); c.fillStyle = cheeks; c.fillRect(20, 55, 40, 40); c.restore();
-  const glowEyes = seed % 3 === 0;
-  c.fillStyle = glowEyes ? '#7fd8ff' : '#111'; c.beginPath(); c.ellipse(46, 60, 7, 9, 0, 0, TAU); c.ellipse(82, 60, 7, 9, 0, 0, TAU); c.fill();
-  c.fillStyle = '#000'; c.beginPath(); c.arc(46, 61, 3, 0, TAU); c.arc(82, 61, 3, 0, TAU); c.fill();
-  c.fillStyle = '#a1202c'; c.beginPath(); c.ellipse(64, 88, 7, 4, 0, 0, TAU); c.fill();
-  c.strokeStyle = 'rgba(40,30,30,.7)'; c.lineWidth = 1; c.beginPath(); c.moveTo(78, 30); c.lineTo(86, 48); c.lineTo(80, 60); c.stroke();   // a crack
+  const glowEyes = seed % 3 === 0, face = dollFaceCanvas(glowEyes);
   const faceTex = env.toTex(face); faceTex.center.set(0.5, 0.5); faceTex.rotation = 0; faceTex.offset.set(0.25, 0);
   const skull = new THREE.Mesh(new THREE.SphereGeometry(0.075, 20, 16), new THREE.MeshStandardMaterial({ map: faceTex, roughness: 0.25,
     emissive: glowEyes ? 0x3a90c0 : 0x000000, emissiveMap: glowEyes ? faceTex : null, emissiveIntensity: glowEyes ? 0.5 : 0 }));
@@ -384,6 +455,32 @@ function makeDoll(THREE, env, p, seed) {
   g.position.set(p.x, y0, p.z); g.rotation.y = p.ry;
   g.updateMatrixWorld(true);
   return { obj: g, head, ry: p.ry, target: 0, headWorld: head.getWorldPosition(new THREE.Vector3()) };
+}
+// a porcelain doll's face (painted onto a sphere: the face sits at the front)
+function dollFaceCanvas(glowEyes) {
+  const face = mk(128, 128), c = face.getContext('2d');
+  c.fillStyle = '#f2ebe4'; c.fillRect(0, 0, 128, 128);
+  const cheeks = c.createRadialGradient(40, 74, 1, 40, 74, 14); cheeks.addColorStop(0, 'rgba(220,120,130,.5)'); cheeks.addColorStop(1, 'rgba(220,120,130,0)');
+  c.fillStyle = cheeks; c.fillRect(20, 55, 40, 40); c.save(); c.translate(48, 0); c.fillStyle = cheeks; c.fillRect(20, 55, 40, 40); c.restore();
+  c.fillStyle = glowEyes ? '#7fd8ff' : '#111'; c.beginPath(); c.ellipse(46, 60, 7, 9, 0, 0, TAU); c.ellipse(82, 60, 7, 9, 0, 0, TAU); c.fill();
+  c.fillStyle = '#000'; c.beginPath(); c.arc(46, 61, 3, 0, TAU); c.arc(82, 61, 3, 0, TAU); c.fill();
+  c.fillStyle = '#a1202c'; c.beginPath(); c.ellipse(64, 88, 7, 4, 0, 0, TAU); c.fill();
+  c.strokeStyle = 'rgba(40,30,30,.7)'; c.lineWidth = 1; c.beginPath(); c.moveTo(78, 30); c.lineTo(86, 48); c.lineTo(80, 60); c.stroke();   // a crack
+  return face;
+}
+function clothCanvas(base) {
+  const c = mk(128, 128), g = c.getContext('2d'); g.fillStyle = base; g.fillRect(0, 0, 128, 128);
+  for (let k = 0; k < 18; k++) { const x = Math.random() * 128; const gr = g.createLinearGradient(x - 6, 0, x + 6, 0);
+    gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.5, 'rgba(0,0,0,.14)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - 6, 0, 12, 128); }   // folds
+  noiseFill(g, 128, 128, 2500, 0.06, true);
+  const dg = g.createLinearGradient(0, 0, 0, 128); dg.addColorStop(0, 'rgba(90,80,60,.25)'); dg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = dg; g.fillRect(0, 0, 128, 128);   // dust on top
+  return c;
+}
+function webCanvas() {
+  const c = mk(128, 128), g = c.getContext('2d'); g.strokeStyle = 'rgba(220,220,210,.55)'; g.lineWidth = 1;
+  for (let a = 0; a <= Math.PI / 2 + 0.01; a += Math.PI / 12) { g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(a) * 128, Math.sin(a) * 128); g.stroke(); }
+  for (let r = 14; r < 128; r += 14 + Math.random() * 6) { g.beginPath(); for (let a = 0; a <= Math.PI / 2 + 0.01; a += Math.PI / 12) { const rr = r * (0.9 + Math.random() * 0.15); g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } g.stroke(); }
+  return c;
 }
 function makeBear(THREE, p) {
   const g = new THREE.Group(), fur = new THREE.MeshStandardMaterial({ color: 0x7a5234, roughness: 1 }), dark = new THREE.MeshStandardMaterial({ color: 0x120c08, roughness: 0.3 });

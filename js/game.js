@@ -3,15 +3,20 @@
 'use strict';
 
 /* ---------- update ---------- */
+// the phone button shows its cooldown (only touch the page when the text changes)
+let phoneTxt = '';
+function updatePhoneBtn() {
+  const b = $('phone'), t = phoneCool > 0 ? Math.ceil(phoneCool) + 's' : 'PHONE';
+  if (t !== phoneTxt) { phoneTxt = t; b.textContent = t; b.disabled = phoneCool > 0; }
+}
 function update(dt) {
-  runTime += dt;
+  runTime += dt; levelTime += dt;
   if (msgTimer > 0) { msgTimer -= dt; if (msgTimer <= 0) $('msg').style.opacity = 0; }
   shake = Math.max(0, shake - dt * 12);
   hideCool -= dt;
   updateDust(dt);
   if (popT > 0) { popT -= dt; if (popT <= 0) $('pop').classList.remove('on'); }
-  if (phoneCool > 0) { phoneCool = Math.max(0, phoneCool - dt); const b = $('phone');
-    b.disabled = phoneCool > 0; b.textContent = phoneCool > 0 ? Math.ceil(phoneCool) + 's' : 'PHONE'; }
+  if (phoneCool > 0) { phoneCool = Math.max(0, phoneCool - dt); updatePhoneBtn(); }
   sceneCool -= dt;
   updatePlayer(dt);
   if (state !== 'play') return;
@@ -30,7 +35,7 @@ function update(dt) {
 
   // she screams every so often and knows where you are
   if (monster.active && (!MP.on || MP.host)) { huntTimer -= dt;
-    if (huntTimer <= 0) { huntTimer = rnd(45, 70) - floorIdx * 8 - (MP.n - 1) * 2; monster.huntT = 6;
+    if (huntTimer <= 0) { huntTimer = huntTime(floorIdx, MP.n, DF()); monster.huntT = 6;
       if (MP.on) hostEmit({ t: 'scream' });
       else { startScream(); sfx.scream(clamp(1 - d / 700, 0.2, 0.8)); shake = 7; showMsg('A scream tears through the house. She knows where you are. HIDE.', 3.5); } } }
   creakTimer -= dt; if (creakTimer <= 0) { creakTimer = rnd(7, 18);        // the house creaks, somewhere around you

@@ -25,7 +25,7 @@ function buildLevel() {
   const ftx = floorTexture(F);   // the floor's own picture doubles as its relief: dark seams and grout sit lower
   // (a physically based floor: varnished boards and polished tiles throw the flashlight and the lamps back at you)
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(GW * L, GH * L), new THREE.MeshStandardMaterial({ map: ftx, bumpMap: ftx, bumpScale: 2.5,
-    roughness: { wood: 0.5, tile: 0.28, concrete: 0.85 }[F.style], metalness: 0, color: new THREE.Color().setScalar(F.style === 'tile' ? 2.6 : 1.8) }));
+    roughness: { wood: 0.5, tile: 0.28, concrete: 0.85 }[floorKind(F)], metalness: 0, color: new THREE.Color().setScalar(floorKind(F) === 'tile' ? 2.6 : 1.8) }));
   floor.rotation.x = -Math.PI / 2; floor.position.set(GW * L / 2, 0, GH * L / 2); floor.receiveShadow = true; G.add(floor);
   const ct = ceilingTexture(F); ct.repeat.set(GW, GH);
   const ceil = new THREE.Mesh(new THREE.PlaneGeometry(GW * L, GH * L), new THREE.MeshLambertMaterial({ map: ct, bumpMap: ct, bumpScale: 2 }));
@@ -33,7 +33,7 @@ function buildLevel() {
   const faces = [];
   const wallTx = wallTexture(F);
   const walls = new THREE.Mesh(wallGeometry(faces), new THREE.MeshLambertMaterial({ map: wallTx, bumpMap: wallTx.userData.bump, bumpScale: 3,
-    vertexColors: true, color: new THREE.Color().setScalar(F.style === 'tile' ? 2.2 : 1) }));
+    vertexColors: true, color: new THREE.Color().setScalar(wallKind(F) === 'tile' ? 2.2 : wallKind(F) === 'attic' ? 1.4 : 1) }));
   walls.castShadow = walls.receiveShadow = true; G.add(walls);
   // the house around the maze: woodwork, doorways, lamps, furniture and props (js/house.js)
   const keep = new Set([...closets.map(c => Math.floor(c.x / T) + ',' + Math.floor(c.y / T)), exit.tx + ',' + exit.ty]);
@@ -56,19 +56,21 @@ function buildLevel() {
 function floorTexture(F) {
   const res = Math.min(2, (LOWQ ? 1536 : 2048) / (Math.max(GW, GH) * T));
   const c = mkCanvas(Math.ceil(GW * T * res), Math.ceil(GH * T * res)), g = c.getContext('2d');
-  g.setTransform(res, 0, 0, res, 0, 0);
-  g.fillStyle = '#000'; g.fillRect(0, 0, GW * T, GH * T);
+  g.setTransform(res * T / PT, 0, 0, res * T / PT, 0, 0);
+  g.fillStyle = '#000'; g.fillRect(0, 0, GW * PT, GH * PT);
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (!grid[y][x]) paintFloor(g, F, x, y);
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (!grid[y][x]) paintShade(g, x, y);
   for (const d of decals) paintDecal(g, d);
   return toTex(c);
 }
+// (the floor is painted in a 40-unit design space per tile, PT, and scaled to the real tile size)
+const PT = 40;
 function paintFloor(g, F, x, y) {
-  const X = x * T, Y = y * T;
-  if (F.style === 'wood') {
+  const X = x * PT, Y = y * PT;
+  if (floorKind(F) === 'wood') {
     for (let k = 0; k < 4; k++) {
-      const row = y * 4 + k, py = Y + k * 10, seam = X + 4 + hash(row, x, 1) * (T - 8);
-      for (const [a, b] of [[X, seam], [seam, X + T]]) {
+      const row = y * 4 + k, py = Y + k * 10, seam = X + 4 + hash(row, x, 1) * (PT - 8);
+      for (const [a, b] of [[X, seam], [seam, X + PT]]) {
         const v = hash(row, Math.round(a), 2);
         g.fillStyle = F.floorA; g.fillRect(a, py, b - a + 0.3, 10.3);
         g.fillStyle = v < 0.5 ? 'rgba(0,0,0,' + (0.5 - v) * 0.5 + ')' : 'rgba(255,215,190,' + (v - 0.5) * 0.14 + ')';
@@ -78,10 +80,10 @@ function paintFloor(g, F, x, y) {
           g.beginPath(); g.moveTo(a, gy); g.bezierCurveTo(a + (b - a) * 0.3, gy - 1, a + (b - a) * 0.6, gy + 1, b, gy); g.stroke(); }
         if (hash(row, a, 5) > 0.6) { g.fillStyle = 'rgba(0,0,0,.5)'; g.beginPath(); g.arc(a + 1.6, py + 5, 0.55, 0, 7); g.fill(); }
       }
-      g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(X, py + 9.4, T, 0.6); g.fillRect(seam, py, 0.6, 10);
-      g.fillStyle = 'rgba(255,225,205,.07)'; g.fillRect(X, py, T, 0.5);
+      g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(X, py + 9.4, PT, 0.6); g.fillRect(seam, py, 0.6, 10);
+      g.fillStyle = 'rgba(255,225,205,.07)'; g.fillRect(X, py, PT, 0.5);
     }
-  } else if (F.style === 'tile') {
+  } else if (floorKind(F) === 'tile') {
     for (let k = 0; k < 4; k++) {
       const ix = x * 2 + (k % 2), iy = y * 2 + (k >> 1), tx = ix * 20, ty = iy * 20, v = hash(ix, iy, 4);
       g.fillStyle = (ix + iy) % 2 ? F.floorB : F.floorA; g.fillRect(tx, ty, 20.3, 20.3);
@@ -89,15 +91,15 @@ function paintFloor(g, F, x, y) {
       if (v > 0.84) { g.strokeStyle = 'rgba(0,0,0,.65)'; g.lineWidth = 0.6; g.beginPath();
         g.moveTo(tx + 2, ty + 3 + v * 10); g.lineTo(tx + 9, ty + 10); g.lineTo(tx + 12, ty + 17); g.moveTo(tx + 9, ty + 10); g.lineTo(tx + 18, ty + 6 + v * 8); g.stroke(); }
     }
-    g.fillStyle = F.grout; g.fillRect(X, Y, T, 0.9); g.fillRect(X, Y + 20, T, 0.9); g.fillRect(X, Y, 0.9, T); g.fillRect(X + 20, Y, 0.9, T);
+    g.fillStyle = F.grout; g.fillRect(X, Y, PT, 0.9); g.fillRect(X, Y + 20, PT, 0.9); g.fillRect(X, Y, 0.9, PT); g.fillRect(X + 20, Y, 0.9, PT);
   } else {
-    g.fillStyle = F.floorA; g.fillRect(X, Y, T + 0.3, T + 0.3);
+    g.fillStyle = F.floorA; g.fillRect(X, Y, PT + 0.3, PT + 0.3);
     for (let k = 0; k < 8; k++) { const v = hash(x, y, 10 + k);
       g.fillStyle = v < 0.55 ? 'rgba(0,0,0,.13)' : 'rgba(255,240,220,.045)';
-      g.beginPath(); g.arc(X + hash(x, y, 20 + k) * T, Y + hash(x, y, 30 + k) * T, 2 + v * 8, 0, 7); g.fill(); }
+      g.beginPath(); g.arc(X + hash(x, y, 20 + k) * PT, Y + hash(x, y, 30 + k) * PT, 2 + v * 8, 0, 7); g.fill(); }
     if (hash(x, y, 40) > 0.72) { g.strokeStyle = 'rgba(0,0,0,.55)'; g.lineWidth = 0.6; g.beginPath();
-      let cx = X + hash(x, y, 41) * T, cy = Y; g.moveTo(cx, cy);
-      for (let q = 1; q <= 5; q++) { cx += (hash(x, y, 42 + q) - 0.5) * 12; cy += T / 5; g.lineTo(cx, cy); } g.stroke(); }
+      let cx = X + hash(x, y, 41) * PT, cy = Y; g.moveTo(cx, cy);
+      for (let q = 1; q <= 5; q++) { cx += (hash(x, y, 42 + q) - 0.5) * 12; cy += PT / 5; g.lineTo(cx, cy); } g.stroke(); }
     if (hash(x, y, 50) > 0.78) { const px = X + 10 + hash(x, y, 51) * 20, py = Y + 10 + hash(x, y, 52) * 20;
       const pg = g.createRadialGradient(px - 3, py - 3, 1, px, py, 13);
       pg.addColorStop(0, 'rgba(140,170,210,.4)'); pg.addColorStop(0.5, 'rgba(25,35,60,.55)'); pg.addColorStop(1, 'rgba(10,15,25,0)');
@@ -105,16 +107,16 @@ function paintFloor(g, F, x, y) {
   }
 }
 function paintShade(g, x, y) { // corners and wall bases are darker
-  const X = x * T, Y = y * T;
+  const X = x * PT, Y = y * PT;
   const band = (x0, y0, x1, y1, a, rx, ry, rw, rh) => { const gr = g.createLinearGradient(x0, y0, x1, y1);
     gr.addColorStop(0, 'rgba(0,0,0,' + a + ')'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(rx, ry, rw, rh); };
-  if (isWall(x, y - 1)) band(0, Y, 0, Y + 9, 0.55, X, Y, T, 9);
-  if (isWall(x - 1, y)) band(X, 0, X + 9, 0, 0.55, X, Y, 9, T);
-  if (isWall(x + 1, y)) band(X + T, 0, X + T - 9, 0, 0.55, X + T - 9, Y, 9, T);
-  if (isWall(x, y + 1)) band(0, Y + T, 0, Y + T - 9, 0.55, X, Y + T - 9, T, 9);
+  if (isWall(x, y - 1)) band(0, Y, 0, Y + 9, 0.55, X, Y, PT, 9);
+  if (isWall(x - 1, y)) band(X, 0, X + 9, 0, 0.55, X, Y, 9, PT);
+  if (isWall(x + 1, y)) band(X + PT, 0, X + PT - 9, 0, 0.55, X + PT - 9, Y, 9, PT);
+  if (isWall(x, y + 1)) band(0, Y + PT, 0, Y + PT - 9, 0.55, X, Y + PT - 9, PT, 9);
 }
 function paintDecal(g, d) {
-  g.save(); g.translate(d.x, d.y); g.rotate(d.rot);
+  g.save(); g.translate(d.x * PT / T, d.y * PT / T); g.rotate(d.rot);
   if (d.type === 'stain') {
     const sg = g.createRadialGradient(0, 0, 0, 0, 0, d.s);
     sg.addColorStop(0, 'rgba(70,4,10,.6)'); sg.addColorStop(1, 'rgba(70,4,10,0)');
@@ -131,7 +133,8 @@ function paintDecal(g, d) {
 }
 function ceilingTexture(F) {
   const c = mkCanvas(128, 128), g = c.getContext('2d');
-  g.fillStyle = F.style === 'concrete' ? '#2a2724' : '#2b2528'; g.fillRect(0, 0, 128, 128);
+  g.fillStyle = F.style === 'concrete' ? '#2a2724' : F.style === 'attic' ? '#241a12' : '#2b2528'; g.fillRect(0, 0, 128, 128);
+  if (F.style === 'attic') for (let x = 0; x < 128; x += 16) { g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x, 0, 2, 128); }   // (boards)
   for (let k = 0; k < 40; k++) { g.fillStyle = Math.random() < 0.6 ? 'rgba(0,0,0,.12)' : 'rgba(255,240,220,.03)';
     g.beginPath(); g.arc(Math.random() * 128, Math.random() * 128, 3 + Math.random() * 14, 0, 7); g.fill(); }
   g.strokeStyle = 'rgba(0,0,0,.5)'; g.lineWidth = 1; g.beginPath(); let x = 20, y = 0; g.moveTo(x, y);
@@ -146,12 +149,19 @@ function wallTexture(F) {
   const hc = mkCanvas(w, h), hg = hc.getContext('2d');
   hg.fillStyle = '#808080'; hg.fillRect(0, 0, w, h);
   for (let k = 0; k < 900; k++) { hg.fillStyle = 'rgba(' + (Math.random() < 0.5 ? '0,0,0' : '255,255,255') + ',.05)'; hg.fillRect(Math.random() * w, Math.random() * h, 2 + Math.random() * 4, 2 + Math.random() * 4); }
-  if (F.style === 'wood') {
+  const kind = wallKind(F);
+  if (kind === 'attic') {                  // bare planks: raised boards, deep gaps
+    for (let x = 0; x < w; x += 32) { hg.fillStyle = 'rgb(' + Array(3).fill(150 + (Math.random() * 30 | 0)).join(',') + ')'; hg.fillRect(x + 3, 0, 27, h); hg.fillStyle = '#202020'; hg.fillRect(x, 0, 3, h); }
+  } else if (kind === 'workshop') {        // cracked plaster above, boards below
+    hg.fillStyle = '#9a9a9a'; hg.fillRect(0, rail, w, h - rail);
+    for (let x = 0; x < w; x += 24) { hg.fillStyle = '#383838'; hg.fillRect(x, rail, 2, h - rail); }
+    hg.fillStyle = '#e8e8e8'; hg.fillRect(0, rail - 10, w, 12); hg.fillStyle = '#303030'; hg.fillRect(0, rail + 2, w, 4);
+  } else if (kind === 'wood') {
     hg.fillStyle = '#9a9a9a'; hg.fillRect(0, rail, w, base - rail);
     for (let x = 0; x < w; x += 96) { hg.strokeStyle = '#303030'; hg.lineWidth = 5; hg.strokeRect(x + 12, rail + 26, 72, base - rail - 46);
       hg.fillStyle = '#b0b0b0'; hg.fillRect(x + 16, rail + 30, 64, base - rail - 54); }
     hg.fillStyle = '#e0e0e0'; hg.fillRect(0, rail - 7, w, 14); hg.fillStyle = '#404040'; hg.fillRect(0, rail + 7, w, 3);
-  } else if (F.style === 'tile') {
+  } else if (kind === 'tile') {
     hg.fillStyle = '#a8a8a8'; hg.fillRect(0, rail, w, h - rail);
     hg.fillStyle = '#303030'; for (let y = rail; y < h; y += 32) { hg.fillRect(0, y, w, 3); for (let x = 0; x < w; x += 48) hg.fillRect(x, y, 3, 32); }
     hg.fillStyle = '#e0e0e0'; hg.fillRect(0, rail - 6, w, 12);
@@ -163,7 +173,28 @@ function wallTexture(F) {
   }
   hg.fillStyle = '#d0d0d0'; hg.fillRect(0, base, w, h - base); hg.fillStyle = '#404040'; hg.fillRect(0, base, w, 3);
   g.fillStyle = F.face; g.fillRect(0, 0, w, h);
-  if (F.style === 'wood') {            // nursery: striped wallpaper with little flowers, wooden panels below
+  if (kind === 'attic') {              // attic: bare, uneven planks with nails and dark gaps
+    for (let x = 0; x < w; x += 32) { const v = Math.random();
+      g.fillStyle = F.face; g.fillRect(x, 0, 32, h);
+      g.fillStyle = v < 0.5 ? 'rgba(0,0,0,' + (0.35 * (0.5 - v)) + ')' : 'rgba(255,220,180,' + (0.08 * (v - 0.5)) + ')'; g.fillRect(x, 0, 32, h);
+      g.strokeStyle = 'rgba(0,0,0,.18)'; g.lineWidth = 1;
+      for (let k = 0; k < 5; k++) { const gx = x + 4 + Math.random() * 24; g.beginPath(); g.moveTo(gx, 0); g.bezierCurveTo(gx + 3, h * 0.3, gx - 3, h * 0.7, gx + 1, h); g.stroke(); }
+      g.fillStyle = '#0a0705'; g.fillRect(x, 0, 3, h);
+      g.fillStyle = 'rgba(20,20,20,.8)'; for (const ny of [60, h * 0.5, h - 70]) { g.beginPath(); g.arc(x + 16, ny, 1.6, 0, 7); g.fill(); }
+      if (Math.random() < 0.3) { const ky = Math.random() * h; g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(x + 16, ky, 4, 7, 0, 0, 7); g.fill(); }   // a knot
+    }
+  } else if (kind === 'workshop') {    // workshop: stained plaster, a shelf rail, dark boards below
+    g.fillStyle = F.face; g.fillRect(0, 0, w, rail);
+    for (let k = 0; k < 60; k++) { const x = Math.random() * w, y = Math.random() * rail, r = 8 + Math.random() * 40;
+      const sg = g.createRadialGradient(x, y, 0, x, y, r); sg.addColorStop(0, Math.random() < 0.5 ? 'rgba(0,0,0,.1)' : 'rgba(255,255,230,.05)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = sg; g.fillRect(x - r, y - r, r * 2, r * 2); }
+    g.strokeStyle = 'rgba(20,20,15,.55)'; g.lineWidth = 1;
+    for (let k = 0; k < 3; k++) { let x = Math.random() * w, y = Math.random() * rail * 0.6; g.beginPath(); g.moveTo(x, y);
+      for (let q = 0; q < 6; q++) { x += (Math.random() - 0.5) * 30; y += 10 + Math.random() * 25; g.lineTo(x, y); } g.stroke(); }
+    g.fillStyle = '#2a1d14'; g.fillRect(0, rail, w, h - rail);
+    for (let x = 0; x < w; x += 24) { g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(x, rail, 2, h - rail); g.fillStyle = 'rgba(255,220,190,' + (Math.random() * 0.05) + ')'; g.fillRect(x + 2, rail, 22, h - rail); }
+    g.fillStyle = '#3a2a1e'; g.fillRect(0, rail - 10, w, 12); g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(0, rail + 2, w, 4);
+  } else if (kind === 'wood') {            // nursery: striped wallpaper with little flowers, wooden panels below
     g.fillStyle = F.pattern; for (let x = 0; x < w; x += 48) g.fillRect(x + 8, 0, 14, rail);
     g.fillStyle = F.dot;
     for (let x = 0; x < w; x += 48) for (let y = 24, r = 0; y < rail - 14; y += 44, r++) {
@@ -174,7 +205,7 @@ function wallTexture(F) {
     for (let x = 0; x < w; x += 96) { g.strokeStyle = 'rgba(0,0,0,.5)'; g.lineWidth = 4; g.strokeRect(x + 12, rail + 26, 72, base - rail - 46);
       g.strokeStyle = 'rgba(255,220,190,.08)'; g.lineWidth = 2; g.strokeRect(x + 15, rail + 29, 72, base - rail - 46); }
     g.fillStyle = '#5a3a28'; g.fillRect(0, rail - 7, w, 14); g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(0, rail + 7, w, 3);
-  } else if (F.style === 'tile') {     // hallway: damask wallpaper over old tiles
+  } else if (kind === 'tile') {     // hallway: damask wallpaper over old tiles
     g.fillStyle = F.pattern;
     for (let x = 0; x < w; x += 64) for (let y = 0, r = 0; y < rail; y += 80, r++) {
       const cx = x + 32 + (r % 2) * 32, cy = y + 40;

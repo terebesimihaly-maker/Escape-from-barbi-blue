@@ -47,3 +47,9 @@ export async function solo(b, quality = 'low', w = 640, h = 360) {
   return p;
 }
 export const pageErrors = [];
+// single player: "Enter the house", then a floor from the list (and optionally a difficulty first)
+export async function startSolo(p, lv = 0, diff) {
+  await click(p, '#play');
+  if (diff) await click(p, `#diffSeg button[data-d="${diff}"]`);
+  await click(p, `#lvList button[data-lv="${lv}"]`);
+}

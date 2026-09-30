@@ -61,11 +61,18 @@
         <li><kbd>Right side</kbd><span>drag to look around</span></li>
         <li><kbd>RUN</kbd><span>hold to sprint (she hears running)</span></li>
         <li><kbd>HIDE</kbd><span>get into a wardrobe when you're next to one</span></li>
-        <li><kbd>PHONE</kbd><span>text her (every 45 s)</span></li>
+        <li><kbd>PHONE</kbd><span>text her (it recharges: 35 s on Easy, 45 s on Medium, 60 s on Hard)</span></li>
       </ul>
       <p class="hint">Her song gets louder the closer she is. If you can see her blue eyes, she can see you. If she's chasing you, a text makes her stop and leave for 15 seconds. Don't let her see you climb into a wardrobe.</p>
       <p class="hint">Headphones on. Silent mode off.</p>
       <p class="hint">Playing together: stand next to a downed teammate and hold <b class="pc-only">E</b><b class="touch-only">REVIVE</b> for 3 seconds. The arrow in the top right corner points to them.</p>
+    </section>
+    <section data-panel="levels">
+      <h2>The house</h2>
+      <div class="row"><span>Difficulty</span><div class="seg" id="diffSeg"><button data-d="easy">Easy</button><button data-d="medium">Medium</button><button data-d="hard">Hard</button></div></div>
+      <p class="hint" id="diffHint"></p>
+      <ol id="lvList" class="lvlist"></ol>
+      <p class="hint">Escape a floor to open the next one.</p>
     </section>
     <section data-panel="mp">
       <h2>Play together</h2>
@@ -83,7 +90,7 @@
       <label class="row"><span>Field of view</span><input type="range" id="setFov" min="65" max="110" step="1"><output id="outFov"></output></label>
       <label class="row"><span>Invert looking up and down</span><input type="checkbox" id="setInvert"></label>
       <label class="row"><span>Calm effects<small>no strobing, no screen shake, gentler flicker</small></span><input type="checkbox" id="setCalm"></label>
-      <div class="row"><span>Graphics</span><div class="seg"><button data-q="low">Low</button><button data-q="medium">Medium</button><button data-q="high">High</button></div></div>
+      <div class="row"><span>Graphics</span><div class="seg" id="qSeg"><button data-q="low">Low</button><button data-q="medium">Medium</button><button data-q="high">High</button></div></div>
       <div class="row col"><span>Her song</span>
         <div class="song"><label for="songFile">Pick a song&hellip;</label><span id="songName">Chase song</span>
           <button id="songTest" class="hidden">&#9654; Test</button>
@@ -102,6 +109,8 @@
     <p class="hint center">Give this code to your friends. Up to 4 players.</p>
     <ul id="lbList" class="plist"></ul>
     <label class="row"><span>Your nametag</span><input id="lbName" maxlength="14" autocomplete="off" spellcheck="false"></label>
+    <label class="row"><span>Floor</span><select id="lbLevel"></select></label>
+    <div class="row"><span>Difficulty</span><div class="seg" id="lbDiff"><button data-d="easy">Easy</button><button data-d="medium">Medium</button><button data-d="hard">Hard</button></div></div>
     <p id="lbStatus" class="lbstatus"></p>
     <div class="lbbtns"><button class="big" id="lbReady">Ready</button><button class="small" id="lbLeave">Leave lobby</button></div>
   </div>

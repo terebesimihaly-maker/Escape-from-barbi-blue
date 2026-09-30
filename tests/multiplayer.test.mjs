@@ -1,3 +1,4 @@
+// (positions are in world units; a tile is 50 units, the start room is tiles 1..3)
 // Multiplayer: lobby (code, full, kick, nametags, ready), then the shared game (spawn, fuses, blocking, down/revive, wardrobes, floors, game over, leaving).
 import { launch, player, check, summary, visible, text, until, openMp, OUT, click, fill } from './lib.mjs';
 const b = await launch();
@@ -42,7 +43,7 @@ check(started.every(Boolean), 'the game starts for all 3 players', started);
 const grids = await Promise.all([A, B, C].map(P => P.evaluate(() => bb.grid.map(r => r.join('')).join('|'))));
 check(grids[0] === grids[1] && grids[1] === grids[2], 'everyone got the same house');
 const pos = await Promise.all([A, B, C].map(P => P.evaluate(() => [bb.player.x, bb.player.y])));
-check(pos.every(([x, y]) => x > 40 && x < 160 && y > 40 && y < 160), 'everyone spawned in the start room', pos);
+check(pos.every(([x, y]) => x > 50 && x < 200 && y > 50 && y < 200), 'everyone spawned in the start room', pos);
 const dmin = Math.min(...[[0, 1], [0, 2], [1, 2]].map(([i, j]) => Math.hypot(pos[i][0] - pos[j][0], pos[i][1] - pos[j][1])));
 check(dmin >= 22, 'nobody spawned inside someone else', dmin);
 const fz = await A.evaluate(() => bb.fuses.length), fzB = await B.evaluate(() => bb.fuses.length);
@@ -59,12 +60,12 @@ check(await A.evaluate(() => [...bb.MP.others.values()].every(o => o.av && o.av.
 for (const P of [A, B, C]) check(await P.evaluate(() => [...bb.MP.others.values()].filter(o => o.av && o.av.obj.parent).length === 2), P.pname + ' sees 2 teammate figures in the world');
 // Alice looks at the other two and takes a picture
 await A.evaluate(() => { const o = [...bb.MP.others.values()]; const mx = (o[0].x + o[1].x) / 2, my = (o[0].y + o[1].y) / 2;
-  bb.player.x = 60; bb.player.y = 100; bb.player.ang = Math.atan2(my - 100, mx - 60); bb.player.pitch = -0.05; });
-await B.evaluate(() => { bb.player.x = 140; bb.player.y = 65; bb.player.ang = Math.PI; });
-await C.evaluate(() => { bb.player.x = 145; bb.player.y = 140; bb.player.ang = Math.PI * 0.9; });
+  bb.player.x = 75; bb.player.y = 125; bb.player.ang = Math.atan2(my - 125, mx - 75); bb.player.pitch = -0.05; });
+await B.evaluate(() => { bb.player.x = 175; bb.player.y = 81; bb.player.ang = Math.PI; });
+await C.evaluate(() => { bb.player.x = 181; bb.player.y = 175; bb.player.ang = Math.PI * 0.9; });
 await until(A, () => [...bb.MP.others.values()].every(o => Math.hypot(o.x - o.tx, o.y - o.ty) < 3), null, 20000); await A.waitForTimeout(1500); await A.screenshot({ timeout: 120000, path: OUT + '/game_teammates.png' });
 const seen = await A.evaluate(() => [...bb.MP.others.values()].map(o => [o.name, Math.round(o.x), Math.round(o.y)]));
-check(seen.some(([n, x, y]) => n.startsWith('Bob') && Math.abs(x - 140) < 6 && Math.abs(y - 65) < 6), "the host sees Bobby where Bobby's own game says he is", seen);
+check(seen.some(([n, x, y]) => n.startsWith('Bob') && Math.abs(x - 175) < 6 && Math.abs(y - 81) < 6), "the host sees Bobby where Bobby's own game says he is", seen);
 console.log('== her position is the same for everyone');
 await A.evaluate(() => { const m = bb.monster; m.active = true; m.spawnT = 0; m.state = 'wander'; m.target = null; });
 await until(B, () => bb.monster.active, null, 30000); await A.waitForTimeout(2000);
@@ -72,14 +73,14 @@ const [mA, mB] = await Promise.all([A.evaluate(() => [bb.monster.x, bb.monster.y
 check(mB[2] && Math.hypot(mA[0] - mB[0], mA[1] - mB[1]) < 40, 'a joiner sees her at the host\'s position', { mA, mB });
 await freeze();
 console.log('== body blocking');
-await B.evaluate(() => { bb.player.x = 140; bb.player.y = 100; });
-await C.evaluate(() => { bb.player.x = 60; bb.player.y = 145; });
-await A.evaluate(() => { bb.player.x = 60; bb.player.y = 100; bb.player.ang = 0; bb.player.pitch = 0; });
+await B.evaluate(() => { bb.player.x = 175; bb.player.y = 125; });
+await C.evaluate(() => { bb.player.x = 75; bb.player.y = 181; });
+await A.evaluate(() => { bb.player.x = 75; bb.player.y = 125; bb.player.ang = 0; bb.player.pitch = 0; });
 await A.waitForTimeout(1500);
 await A.keyboard.down('KeyW'); await A.waitForTimeout(4000); await A.keyboard.up('KeyW');
 const blk = await A.evaluate(() => { const o = [...bb.MP.others.values()].find(q => q.name.startsWith('Bob')); return [bb.player.x, bb.player.y, o.x, o.y]; });
 const dBlk = Math.hypot(blk[0] - blk[2], blk[1] - blk[3]);
-check(blk[0] > 90, 'Alice walked towards Bobby', blk);
+check(blk[0] > 112, 'Alice walked towards Bobby', blk);
 check(dBlk >= 20, 'Alice stopped at Bobby instead of walking through him (distance ' + dBlk.toFixed(1) + ')', blk);
 console.log('== one person per wardrobe');
 const cl = await A.evaluate(() => { const c = bb.closets[0]; return { x: c.x + c.ox * 10, y: c.y + c.oy * 10, ang: Math.atan2(-c.oy, -c.ox) }; });
@@ -109,9 +110,9 @@ const both = await Promise.all([B, C].map(P => P.evaluate(() => bb.player.hidden
 check(both.filter(Boolean).length === 1, 'two players hiding at the same moment: only one stays inside', both);
 for (const P of [B, C]) await P.evaluate(() => { if (bb.player.hidden) bb.toggleHide(); });
 console.log('== down and revive');
-await B.evaluate(() => { bb.player.x = 100; bb.player.y = 100; });
-await C.evaluate(() => { bb.player.x = 60; bb.player.y = 60; });
-await A.evaluate(() => { bb.player.x = 150; bb.player.y = 150; bb.player.ang = Math.PI * 1.25; });
+await B.evaluate(() => { bb.player.x = 125; bb.player.y = 125; });
+await C.evaluate(() => { bb.player.x = 75; bb.player.y = 75; });
+await A.evaluate(() => { bb.player.x = 187; bb.player.y = 187; bb.player.ang = Math.PI * 1.25; });
 await A.waitForTimeout(1500);
 await A.evaluate(id => bb.downPlayer({ id }, 'test'), Bid);
 check(await until(B, () => bb.player.down, null, 8000), 'Bobby goes down on his own screen');

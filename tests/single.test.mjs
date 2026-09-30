@@ -1,11 +1,11 @@
 // Single player: a full run through the main features.
-import { launch, solo, check, summary, until, click, text } from './lib.mjs';
+import { launch, solo, check, summary, until, click, text, startSolo } from './lib.mjs';
 const b = await launch();
 const p = await solo(b);
 console.log('== single player still works');
-await click(p, '#play');
+await startSolo(p);
 check(await until(p, () => bb.state === 'play'), 'the game starts');
-check(await p.evaluate(() => bb.fuses.length === 3 && !bb.MP.on && Math.abs(bb.player.x - 60) < 1), '3 fuses, start tile, no multiplayer');
+check(await p.evaluate(() => bb.fuses.length === 3 && !bb.MP.on && Math.abs(bb.player.x - bb.T * 1.5) < 1), '3 fuses, start tile, no multiplayer');
 await p.evaluate(() => { bb.monster.active = false; bb.monster.spawnT = 1e9; });
 const f = await p.evaluate(() => [bb.fuses[0].x, bb.fuses[0].y]);
 await p.evaluate(f => { bb.player.x = f[0]; bb.player.y = f[1]; }, f);

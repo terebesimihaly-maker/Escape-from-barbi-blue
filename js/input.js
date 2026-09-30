@@ -17,7 +17,10 @@ function lockMouse() {
   if (!canLock || locked()) return;
   try { const r = cvs.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) {}
 }
-document.addEventListener('pointerlockchange', () => { if (!locked() && state === 'play') pause(); });
+// Pointer lock sometimes reports one huge, fake mouse movement: right after the lock starts (or comes back), and now and
+// then at random in some browsers. That's the view "jumping" by itself. Skip the first moves after locking, and impossible jumps.
+let lockSkip = 0;
+document.addEventListener('pointerlockchange', () => { lockSkip = 3; if (!locked() && state === 'play') pause(); });
 // turn the view. Inside a wardrobe you can still look around, but only through the doors
 function lookBy(dx, dy) {
   const p = player; if (state !== 'play') return;
@@ -25,7 +28,13 @@ function lookBy(dx, dy) {
   if (p.hidden) { p.hideYaw = clamp(p.hideYaw + dx, -0.7, 0.7); p.hidePitch = clamp(p.hidePitch - dy, -0.4, 0.4); }
   else { p.ang += dx; p.pitch = clamp(p.pitch - dy, -1.1, 1.1); }
 }
-document.addEventListener('mousemove', e => { if (locked()) lookBy(e.movementX * MOUSE_SENS * settings.sens, e.movementY * MOUSE_SENS * settings.sens); });
+document.addEventListener('mousemove', e => {
+  if (!locked()) return;
+  if (lockSkip > 0) { lockSkip--; return; }
+  const dx = e.movementX || 0, dy = e.movementY || 0;
+  if (Math.abs(dx) > 250 || Math.abs(dy) > 250) return;   // (no hand moves a mouse that far between two events)
+  lookBy(dx * MOUSE_SENS * settings.sens, dy * MOUSE_SENS * settings.sens);
+});
 // left side of the screen: a joystick to walk; right side (or a mouse drag, if the cursor isn't locked): look around
 cvs.addEventListener('pointerdown', e => {
   if (state !== 'play') return;
@@ -62,9 +71,9 @@ $('revive').addEventListener('pointerdown', e => { e.preventDefault(); reviveHel
 function usePhone() {
   if (state !== 'play' || phoneCool > 0 || player.down || player.dead || MP.menu) return;
   if (MP.on) {                                      // together: the host decides if she leaves; the phone recharges slower
-    phoneCool = 50; sfx.buzz(); $('popRes').textContent = ''; $('pop').classList.add('on'); popT = 3.5; toHost({ t: 'phone' }); return;
+    phoneCool = DF().phone + 5; updatePhoneBtn(); sfx.buzz(); $('popRes').textContent = ''; $('pop').classList.add('on'); popT = 3.5; toHost({ t: 'phone' }); return;
   }
-  phoneCool = 45; sfx.buzz();
+  phoneCool = DF().phone; updatePhoneBtn(); sfx.buzz();
   const m = monster, chasing = m.active && (m.state === 'chase' || m.state === 'hunt');
   $('popRes').textContent = '';
   $('pop').classList.add('on'); popT = 3.5;
@@ -134,7 +143,31 @@ function toTitle() {
 }
 function loadBest() { try { const b = localStorage.getItem('bb_best'); $('best').textContent = b ? 'Best escape: ' + fmtTime(+b) : ''; } catch (e) {} }
 const fmtTime = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
-$('play').onclick = () => { unlockAudio(); primeVoice(); show('title', false); runTime = 0; startFloor(0); lockMouse(); };
+// "Enter the house" opens the floor list (with the difficulty); a floor starts from there
+$('play').onclick = () => { unlockAudio(); renderLevels(); openPanel('levels'); };
+function playFloor(i) {
+  if (!unlocked(i)) return;
+  closePanel(); primeVoice(); show('title', false); runTime = 0; runFrom = i; startFloor(i); lockMouse();
+}
+function renderLevels() {
+  document.querySelectorAll('#diffSeg button').forEach(b => b.classList.toggle('on', b.dataset.d === settings.difficulty));
+  $('diffHint').textContent = (DIFFS[settings.difficulty] || DIFFS.medium).text;
+  const ul = $('lvList'); ul.textContent = '';
+  FLOORS.forEach((F, i) => {
+    const open = unlocked(i), done = !!progress.done[i], li = document.createElement('li'), b = document.createElement('button');
+    b.className = 'lv' + (open ? '' : ' locked') + (done ? ' done' : ''); b.dataset.lv = i; b.disabled = !open;
+    const n = document.createElement('span'); n.className = 'n'; n.textContent = i + 1;
+    const t = document.createElement('span'); t.className = 't';
+    const nm = document.createElement('b'); nm.textContent = F.name;
+    const sub = document.createElement('small');
+    sub.textContent = !open ? 'Locked · escape ' + FLOORS[i - 1].name + ' first' : done ? 'Escaped' + (progress.best[i] ? ' · best ' + fmtTime(progress.best[i]) : '') : i === 0 ? 'Start here' : 'Not escaped yet';
+    t.append(nm, sub);
+    const st = document.createElement('span'); st.className = 's'; st.textContent = !open ? '🔒' : done ? '✓' : '▶';
+    b.append(n, t, st); b.onclick = () => playFloor(i);
+    li.appendChild(b); ul.appendChild(li);
+  });
+}
+document.querySelectorAll('#diffSeg button').forEach(b => b.onclick = () => { settings.difficulty = b.dataset.d; saveSettings(); renderLevels(); });
 $('retry').onclick = () => { unlockAudio(); stopSong(); show('dead', false); if (MP.on) { showLobby(); return; } startFloor(floorIdx); lockMouse(); };
 $('menu1').onclick = () => { if (MP.on) leaveMP(); toTitle(); };
 $('menu2').onclick = () => { if (ac) ac.resume(); if (MP.on) leaveMP(); toTitle(); };
@@ -166,10 +199,12 @@ function die(reason) {
 function nextFloor() {
   stopSong();
   $('pop').classList.remove('on');
+  floorDone(floorIdx, levelTime);                       // (opens the next floor in the menu)
   if (floorIdx >= FLOORS.length - 1) {
     state = 'win'; setHud(false);
     $('wTime').textContent = 'Time: ' + fmtTime(runTime);
-    try { const b = +localStorage.getItem('bb_best'); if (!b || runTime < b) localStorage.setItem('bb_best', runTime); } catch (e) {}
+    // (the best escape only counts for a run from the first floor)
+    if (runFrom === 0) try { const b = +localStorage.getItem('bb_best'); if (!b || runTime < b) localStorage.setItem('bb_best', runTime); } catch (e) {}
     show('win', true); return;
   }
   state = 'trans'; setHud(false); setSprint(false);

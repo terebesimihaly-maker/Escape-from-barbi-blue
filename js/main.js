@@ -5,9 +5,19 @@
 /* ---------- loop ---------- */
 let last = performance.now(), gameT = 0;
 const loopErrors = new Set();
+// dynamic resolution: when frames stay slow for a while, draw fewer pixels (down to 60%); when there's room again, more
+let frameAvg = 16, slowT = 0, fastT = 0;
+function adaptResolution(ms, dt) {
+  if (ms > 250) return;                                   // (a hidden tab or a hitch, not a trend)
+  frameAvg += (ms - frameAvg) * 0.05;
+  if (frameAvg > 26) { slowT += dt; fastT = 0; } else if (frameAvg < 17) { fastT += dt; slowT = 0; } else slowT = fastT = 0;
+  if (slowT > 2 && resScale > 0.6) { resScale = Math.max(0.6, resScale * 0.85); slowT = 0; frameAvg = 20; applyQuality(); }
+  else if (fastT > 6 && resScale < 1) { resScale = Math.min(1, resScale / 0.85); fastT = 0; applyQuality(); }
+}
 function frame(now) {
   requestAnimationFrame(frame);        // (first, so one bad frame can never freeze the game)
-  const dt = Math.min(0.05, (now - last) / 1000); last = now; lastDt = dt;
+  const ms = now - last, dt = Math.min(0.05, ms / 1000); last = now; lastDt = dt;
+  if (state === 'play' && renderer) adaptResolution(ms, dt);
   try {
     if (MP.on) mpTick(dt);
     if (state === 'play') { gameT += dt; update(dt); }

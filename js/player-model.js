@@ -84,14 +84,19 @@ function create(THREE, opts) {
   setName(opts.name || 'Player');
 
   let phase = 0, fall = 0, breath = Math.random() * 6;
+  // hidden (in a wardrobe) or away: hide the body and the nametag, but keep the flashlight in the scene (at 0).
+  // (turning a light off changes how many lights there are, and that makes every material recompile: a stutter)
+  let shown = true;
+  function showParts(v) { if (v === shown) return; shown = v;
+    root.traverse(o => { if (o.isMesh || o.isSprite) { if (o.userData.vis0 === undefined) o.userData.vis0 = o.visible; o.visible = v && o.userData.vis0; } }); }
   function update(dt, s) {
-    root.visible = !s.hidden;
+    showParts(!(s.hidden || s.away));
     breath += dt;
     const lying = s.down || s.dead;
     fall += ((lying ? 1 : 0) - fall) * Math.min(1, dt * 6);
     body.rotation.x = -Math.PI / 2 * fall; body.position.y = 0.16 * fall;
     tag.position.y = 2.08 - 1.45 * fall;                     // the nametag comes down with them
-    light.visible = !s.dead && s.lightOn !== false;
+    light.intensity = s.dead || s.hidden || s.away || s.lightOn === false ? 0 : 14;
     if (lying) {
       // on their back; while still alive one hand reaches up for help
       const reach = s.dead ? 0 : 1;
@@ -229,16 +234,22 @@ function createHuman(THREE, opts) {
 
   // after the animation: tilt the head and the flashlight arm with where the player looks
   const head = bone('head'), arm = bone('upperarm01R'), _q = new THREE.Quaternion(), _p = new THREE.Quaternion(), _ax = new THREE.Vector3();
+  const _r = new THREE.Quaternion();
   function turnWorld(b, axis, ang) {
     if (!b) return;
     b.parent.getWorldQuaternion(_p); b.getWorldQuaternion(_q);
-    _q.premultiply(new THREE.Quaternion().setFromAxisAngle(axis, ang));
+    _q.premultiply(_r.setFromAxisAngle(axis, ang));
     b.quaternion.copy(_p.invert().multiply(_q));
   }
   let fall = 0;
+  // hidden (in a wardrobe) or away: hide the body and the nametag, but keep the flashlight in the scene (at 0).
+  // (turning a light off changes how many lights there are, and that makes every material recompile: a stutter)
+  let shown = true;
+  function showParts(v) { if (v === shown) return; shown = v;
+    root.traverse(o => { if (o.isMesh || o.isSprite) { if (o.userData.vis0 === undefined) o.userData.vis0 = o.visible; o.visible = v && o.userData.vis0; } }); }
   function update(dt, s) {
-    root.visible = !s.hidden;
-    light.visible = !s.dead && s.lightOn !== false;
+    showParts(!(s.hidden || s.away));
+    light.intensity = s.dead || s.hidden || s.away || s.lightOn === false ? 0 : 14;
     const v = s.speed || 0, lying = s.down || s.dead;
     fall += ((lying ? 1 : 0) - fall) * Math.min(1, dt * 6);
     tag.position.y = tagH - (tagH - 0.75) * fall;

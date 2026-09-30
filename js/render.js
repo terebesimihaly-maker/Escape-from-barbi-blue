@@ -35,7 +35,8 @@ function render3D(t) {
   const p = player, m = monster;
   if (!level || level.grid !== grid) buildLevel();
   placeCamera(t); setListener(camera);
-  flash.visible = !p.hidden && !p.dead; flash.intensity = FLASH_I * (calm() ? 0.8 + 0.2 * flicker : flicker) * (p.down ? 0.5 : 1);
+  // (the flashlight is dimmed to 0 rather than switched off: switching lights on and off makes every material recompile, a stutter)
+  flash.intensity = p.hidden || p.dead ? 0 : FLASH_I * (calm() ? 0.8 + 0.2 * flicker : flicker) * (p.down ? 0.5 : 1);
   aura.intensity = p.hidden ? (closetScene && closetScene.t > 0 ? 3.5 : 3.2) : 1.2; aura.distance = p.hidden ? 8 : 4.5;
 
   // her
@@ -60,6 +61,10 @@ function render3D(t) {
     for (const e of barbi.eyes) if (e.userData.base) e.scale.setScalar(e.userData.base * (1 - 0.65 * near));
   }
   drawPhantom();
+  // a new floor: compile every material now (her included, even while she's hidden), not the first time each one is seen
+  if (!level.compiled && renderer.compileAsync) { level.compiled = true;
+    const was = barbi ? barbi.obj.visible : false; if (barbi) barbi.obj.visible = true;
+    renderer.compileAsync(scene, camera).catch(() => {}); if (barbi) barbi.obj.visible = was; }
   // in the wardrobe scene the camera turns to look her in the eyes as she leans in
   if (barbi && closetScene && p.closet && barbi.eyes.length) {
     const k = clamp((closetScene.t - SC.lean) / (SC.leanEnd - SC.lean), 0, 1) * (closetScene.t < SC.vanish ? 1 : 0);
@@ -79,9 +84,8 @@ function render3D(t) {
   }
   // teammates
   if (MP.on) for (const o of MP.others.values()) { if (!o.av) continue;
-    o.av.obj.visible = !o.away;                        // (lost the connection: not drawn until they're back)
     o.av.obj.position.set(o.x * S, 0, o.y * S); o.av.obj.rotation.y = Math.PI / 2 - o.ang;
-    o.av.update(lastDt, { speed: o.spd * S, sprinting: o.sprinting, down: o.down, dead: o.dead, hidden: o.hidden, pitch: o.pitch, lightOn: settings.quality !== 'low' });
+    o.av.update(lastDt, { speed: o.spd * S, sprinting: o.sprinting, down: o.down, dead: o.dead, hidden: o.hidden, away: o.away, pitch: o.pitch, lightOn: settings.quality !== 'low' });
     o.av.setName(o.dead ? o.name + ' ✝' : o.down ? o.name + ' · ' + Math.ceil(o.downLeft) + 's' : o.name, o.down || o.dead); }
   // things on the floor
   for (const f of fuses) if (f.obj) { f.obj.visible = !f.got;

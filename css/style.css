@@ -142,3 +142,16 @@ h2{font-weight:400;letter-spacing:5px;color:#86a8ff;text-transform:uppercase;mar
 .row span small{display:block;color:#8f8aa3;font:12px system-ui,sans-serif;letter-spacing:0;margin-top:2px}
 .row input[type=checkbox]{width:22px;height:22px;accent-color:#6f8cff;flex:none}
 .row:has(input[type=checkbox]) > span{flex:1}
+/* the floor list */
+.lvlist{list-style:none;margin:8px 0;padding:0;display:flex;flex-direction:column;gap:5px}
+.lv{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;padding:7px 12px;text-align:left;cursor:pointer;
+  background:rgba(20,26,54,.55);border:1px solid rgba(134,168,255,.28);border-radius:5px;color:#dfe4f7;font:15px Georgia,serif}
+.lv:not(:disabled):hover,.lv:not(:disabled):focus-visible{background:rgba(40,60,140,.55);border-color:#9fb8ff;outline:none}
+.lv .n{flex:none;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(134,168,255,.18);font-size:14px}
+.lv .t{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.lv .t small{color:#9a96ad;font:12px system-ui,sans-serif}
+.lv .s{flex:none;font-size:16px;color:#9fb8ff}
+.lv.done .n{background:rgba(90,200,140,.25)} .lv.done .s{color:#7fe0a8}
+.lv.locked{opacity:.5;cursor:not-allowed}
+#lbLevel{flex:1;min-width:0;background:rgba(20,26,54,.8);color:#e6ebff;border:1px solid rgba(134,168,255,.4);border-radius:4px;padding:8px;font:14px system-ui,sans-serif}
+.seg button:disabled{opacity:.55;cursor:default}

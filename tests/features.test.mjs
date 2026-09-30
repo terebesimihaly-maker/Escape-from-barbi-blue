@@ -1,8 +1,8 @@
 // Her hand-made sprint, her smarter searching, and the jump scares.
-import { launch, solo, check, summary, until, click, OUT, pageErrors } from './lib.mjs';
+import { launch, solo, check, summary, until, click, OUT, pageErrors, startSolo } from './lib.mjs';
 const b = await launch();
 const p = await solo(b, 'low', 640, 360);   // (the test browser draws on the CPU: keep it light, and give it time)
-await click(p, '#play');
+await startSolo(p);
 check(await until(p, () => bb.state === 'play'), 'the game starts');
 const calm = () => p.evaluate(() => { const m = bb.monster; m.active = false; m.spawnT = 1e9; m.state = 'wander'; });
 await calm();
@@ -33,7 +33,7 @@ const ahead = await p.evaluate(() => { let best = null;
   for (const q of bb.CELLS()) { let n = 0; while (!bb.isWall(q[0] + n + 1, q[1])) n++; if (n >= 3) { best = q; break; } }
   if (!best) return { skip: true };
   const from = bb.center(best), a = aheadOf(from, 1, 0, 2); return { from, a }; });
-check(ahead.skip || ahead.a.x > ahead.from.x + 40, 'hunting by ear, she aims a couple of tiles ahead of you', ahead);
+check(ahead.skip || ahead.a.x > ahead.from.x + 50, 'hunting by ear, she aims a couple of tiles ahead of you', ahead);
 // the wardrobes: you hide in one right where she lost you; she comes to check it
 await p.evaluate(() => { const c = bb.closets[0], P = bb.player; P.x = c.x + c.ox * 10; P.y = c.y + c.oy * 10; });
 await until(p, () => !!document.querySelector('#hide:not(.hidden)'), null, 32000);

@@ -3,7 +3,7 @@
 'use strict';
 
 /* ---------- rendering (3D, three.js) ---------- */
-// The game logic still works in the flat world units above (a tile is T = 40 units, y runs down the map).
+// The game logic still works in the flat world units above (a tile is T = 50 units, y runs down the map).
 // The 3D world is in metres: world (x, y) sits at (x * S, height, y * S).
 const S = 0.045, TILE_M = T * S, WALL_H = 3.0, EYE = 1.62, M_SCALE = 1.38;
 const LOWQ = matchMedia('(pointer: coarse)').matches;
@@ -177,12 +177,13 @@ function sceneDoor(t) {
   return 1 - ease(clamp((t - SC.shut) / (SC.end - SC.shut - 0.1), 0, 1));
 }
 // where she stands during the scene, in world units in front of the wardrobe's centre (the doors are at -CLOSET_FRONT)
-const SC_STAND = 20, SC_LEAN = 14;
+// (measured from the wardrobe's doors, so the scene looks the same whatever the tile size)
+const SC_STAND_D = 13.3, SC_LEAN_D = 7.3;          // (+ CLOSET_FRONT, from js/level.js)
 function sceneAlong(t, c) {
   if (t < 0) { let n = 0; while (n < 2 && !isWall(Math.floor(c.x / T) + c.ox * (n + 1), Math.floor(c.y / T) + c.oy * (n + 1))) n++;
-    return SC_STAND + (-t / 1.4) * n * T; }                                     // walking up to the doors
+    return CLOSET_FRONT + SC_STAND_D + (-t / 1.4) * n * T; }                                     // walking up to the doors
   const k = clamp((t - SC.lean) / (SC.leanEnd - SC.lean), 0, 1);
-  return SC_STAND + (SC_LEAN - SC_STAND) * k * k * (3 - 2 * k);                  // stepping in through the open door
+  return CLOSET_FRONT + SC_STAND_D + (SC_LEAN_D - SC_STAND_D) * k * k * (3 - 2 * k);                  // stepping in through the open door
 }
 // she moves over to the open door (on your right) while it swings open, and leans in through it
 function sceneSide(t) { const k = clamp((t - SC.open) / (SC.lean + 0.3 - SC.open), 0, 1); return 9.5 * k * k * (3 - 2 * k); }

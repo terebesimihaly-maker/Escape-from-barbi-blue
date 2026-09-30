@@ -91,7 +91,7 @@ const sfx = {
       osc.frequency.setValueAtTime(95, t + o); osc.frequency.exponentialRampToValueAtTime(38, t + o + 0.14);
       env(g, t + o, 0.01, v * (i ? 0.6 : 1), 0.16); osc.connect(g); out(g); osc.start(t + o); osc.stop(t + o + 0.35); }); },
   // your own footsteps, by floor: creaky boards (nursery), hard tiles (hallway), wet concrete (basement)
-  step(run, at) { if (!ac) return; const t = ac.currentTime, style = FLOORS[floorIdx].style, v = run ? 1 : 0.4, g = ac.createGain();
+  step(run, at) { if (!ac) return; const t = ac.currentTime, style = floorKind(FLOORS[floorIdx]), v = run ? 1 : 0.4, g = ac.createGain();
     if (at) out3d(g, at.x, at.y, 0.05); else out(g);
     const burst = (type, fr, q, peak, dec) => { const s = noise(), f = ac.createBiquadFilter(), eg = ac.createGain(); f.type = type; f.frequency.value = fr; f.Q.value = q;
       env(eg, t, 0.003, peak * v, dec); s.connect(f); f.connect(eg); eg.connect(g); s.start(t); s.stop(t + dec + 0.05); };
@@ -108,7 +108,7 @@ const sfx = {
   herStep(x, y, run, drag) { if (!ac) return; const t = ac.currentTime, g = ac.createGain(); out3d(g, x, y, 0.05);
     const o = ac.createOscillator(), og = ac.createGain(); o.frequency.setValueAtTime(95, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.16);
     env(og, t, 0.004, run ? 0.5 : 0.3, 0.2); o.connect(og); og.connect(g); o.start(t); o.stop(t + 0.3);
-    const s = noise(), f = ac.createBiquadFilter(), sg = ac.createGain(); f.type = 'bandpass'; f.frequency.value = FLOORS[floorIdx].style === 'concrete' ? 800 : 420; f.Q.value = 1.1;
+    const s = noise(), f = ac.createBiquadFilter(), sg = ac.createGain(); f.type = 'bandpass'; f.frequency.value = floorKind(FLOORS[floorIdx]) === 'concrete' ? 800 : 420; f.Q.value = 1.1;
     env(sg, t, 0.003, run ? 0.35 : 0.22, 0.08); s.connect(f); f.connect(sg); sg.connect(g); s.start(t); s.stop(t + 0.12);
     if (drag) { const d = noise(), df = ac.createBiquadFilter(), dg = ac.createGain(); df.type = 'bandpass'; df.Q.value = 3;
       df.frequency.setValueAtTime(700, t + 0.12); df.frequency.linearRampToValueAtTime(450, t + 0.5);

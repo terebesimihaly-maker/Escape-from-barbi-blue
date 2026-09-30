@@ -43,7 +43,7 @@ function checkWardrobe(m, k, alive) {
   if (!q) return;
   if (!MP.on && q.me && sceneCool <= 0) {                // single player: "I know you're in here..."
     closetScene = { t: 0, spoke: false }; return; }
-  if (Math.random() < 0.3) downPlayer(q, 'She checked the wardrobe.');   // (in multiplayer the others can still revive you)
+  if (Math.random() < DF().check) downPlayer(q, 'She checked the wardrobe.');   // (in multiplayer the others can still revive you)
 }
 
 function updateMonster(dt) {
@@ -58,10 +58,10 @@ function updateMonster(dt) {
       m.active = true; showMsg('Somewhere in the house, a music box starts playing.', 3); }
     return; }
   // together she hears a little further and moves a little faster (but a sprinting player can always get away from her)
-  const hearMul = 1 + 0.05 * (n - 1), spdMul = 1 + 0.03 * (n - 1);
+  const D = DF(), hearMul = (1 + 0.05 * (n - 1)) * D.hear, spdMul = (1 + 0.03 * (n - 1)) * D.speed;
   const dist = q => Math.hypot(q.x - m.x, q.y - m.y);
   let seen = null, sd = 1e9;
-  for (const q of alive) if (!q.hidden) { const d = dist(q); if (d < 360 && d < sd && los(m.x, m.y, q.x, q.y)) { sd = d; seen = q; } }
+  for (const q of alive) if (!q.hidden) { const d = dist(q); if (d < D.sight && d < sd && los(m.x, m.y, q.x, q.y)) { sd = d; seen = q; } }
   // she remembers which way you were going (from where she last saw or heard you)
   const track = q => {
     if (m.ti === q.id && m.last) { const vx = q.x - m.last.x, vy = q.y - m.last.y, l = Math.hypot(vx, vy);
@@ -90,7 +90,7 @@ function updateMonster(dt) {
   if (kq && kq.hidden) { m.state = 'chase'; m.last = { x: kq.x, y: kq.y }; m.ti = kq.id; }
   else if (kcId) { m.kc = null; m.knowsCloset = false; }
 
-  const chaseSpd = Math.min(160, (118 + floorIdx * 10 + fusesGot * 3) * spdMul);   // (you sprint at 170)
+  const chaseSpd = Math.min(D.speed > 1 ? 165 : 160, (118 + floorIdx * 8 + fusesGot * 3) * spdMul);    // (you sprint at 170)
   let spd = 23 * spdMul, target;                  // wandering: a slow, stalking walk
   if ((m.state === 'chase' || m.state === 'hunt') && !m.last) m.last = { x: m.x, y: m.y };
   if (m.state === 'chase' || m.state === 'hunt') {
