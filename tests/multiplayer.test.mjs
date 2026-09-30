@@ -120,7 +120,7 @@ check(await until(B, () => bb.player.down, null, 8000), 'Bobby goes down on his 
 check(await until(C, () => [...bb.MP.others.values()].some(o => o.name.startsWith('Bob') && o.down), null, 8000), 'Cara sees Bobby down');
 check(await until(B, () => !document.getElementById('downMsg').classList.contains('hidden') && /down/i.test(document.getElementById('downMsg').textContent), null, 30000), 'Bobby sees the "You\'re down" countdown', await text(B, 'downMsg'));
 const dl1 = await B.evaluate(() => bb.player.downLeft); await B.waitForTimeout(3000); const dl2 = await B.evaluate(() => bb.player.downLeft);
-check(dl1 <= 50 && dl2 < dl1, 'the 50 second clock is running', [dl1, dl2]);
+check(dl1 <= 90 && dl1 > 60 && dl2 < dl1, 'the 90 second clock is running', [dl1, dl2]);
 await A.evaluate(() => { bb.player.ang = 0.8; });            // facing away from Bobby, so the arrow points behind
 await A.waitForTimeout(1500); await A.screenshot({ timeout: 120000, path: OUT + '/game_indicator.png' });
 await B.screenshot({ timeout: 120000, path: OUT + '/game_down.png' });
