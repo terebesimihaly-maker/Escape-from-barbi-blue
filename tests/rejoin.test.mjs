@@ -48,11 +48,12 @@ check(Math.hypot(posAfter[0] - posBefore[0], posAfter[1] - posBefore[1]) < 30, '
 check(await until(A, id => { const o = bb.MP.others.get(id); return o && !o.away; }, benId, 15000), 'Anna sees Ben back again');
 check(await B.evaluate(id => bb.MP.myId === id, benId), 'as the same player');
 
-console.log('== every labyrinth box on the basement (2 players, Hard)');
+console.log('== every puzzle box on the basement (2 players, Hard)');
 const fz = await A.evaluate(() => bb.fuses.map((f, k) => ({ k, got: f.got })));
-check(fz.length === 3, 'the basement has 3 labyrinth boxes on Hard', fz.length);
+const want = await A.evaluate(() => puzzleCount(2, 'hard'));
+check(fz.length === want, 'the basement has ' + want + ' puzzle boxes on Hard', fz.length);
 for (const f of fz.filter(f => !f.got)) { await B.evaluate(k => { openPuzzle(k); if (pzOpen) pzOpen.won = 0.001; }, f.k); await until(A, k => bb.fuses[k].got, f.k, 20000); }
-check((await Promise.all([A, B].map(P => until(P, () => bb.fusesGot === 3 && bb.powerOn, null, 20000)))).every(Boolean), 'Ben solves all 3: both see 3 of 3, the door opens');
+check((await Promise.all([A, B].map(P => until(P, n => bb.fusesGot === n && bb.powerOn, want, 20000)))).every(Boolean), 'Ben solves all ' + want + ': both see ' + want + ' of ' + want + ', the door opens');
 
 console.log('== a player who never comes back');
 await B.context().close();

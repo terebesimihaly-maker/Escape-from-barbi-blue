@@ -47,7 +47,8 @@ check(pos.every(([x, y]) => x > 50 && x < 200 && y > 50 && y < 200), 'everyone s
 const dmin = Math.min(...[[0, 1], [0, 2], [1, 2]].map(([i, j]) => Math.hypot(pos[i][0] - pos[j][0], pos[i][1] - pos[j][1])));
 check(dmin >= 22, 'nobody spawned inside someone else', dmin);
 const fz = await A.evaluate(() => bb.fuses.length), fzB = await B.evaluate(() => bb.fuses.length);
-check(fz === 2 && fzB === 2, 'floor 1: the same 2 labyrinth boxes for everyone', [fz, fzB]);
+const want1 = await A.evaluate(() => puzzleCount(0, curDiff));
+check(fz === want1 && fzB === want1, 'floor 1: the same ' + want1 + ' puzzle boxes for everyone', [fz, fzB]);
 
 // ---------------- in the game ----------------
 const ids = await A.evaluate(() => ({ A: bb.MP.myId, others: [...bb.MP.others.values()].map(o => [o.name, o.id]) }));
