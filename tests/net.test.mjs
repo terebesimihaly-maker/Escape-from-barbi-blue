@@ -1,10 +1,11 @@
 // Joining a lobby when things go wrong: a wrong code, an owner whose game doesn't answer, a first attempt that fails
 // (tried again by itself), the relay (TURN) setting, the countdown, and four players joining.
-import { launch, player, check, summary, until, openMp, click, fill, text, pageErrors, URL as GAME } from './lib.mjs';
+import { launch, player, check, summary, until, openMp, click, fill, text, pageErrors, lobbyBuilt, URL as GAME } from './lib.mjs';
 const b = await launch();
 const A = await player(b, 'Anna'), B = await player(b, 'Ben'), C = await player(b, 'Cara'), D = await player(b, 'Dan');
 await openMp(A); await click(A, '#mpCreate');
 await until(A, () => !document.getElementById('lobby').classList.contains('hidden'));
+await lobbyBuilt(A);
 const code = (await text(A, 'lbCode')).replace(/\s/g, '');
 
 console.log('== a wrong code');

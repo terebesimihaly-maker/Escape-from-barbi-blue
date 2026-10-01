@@ -1,11 +1,12 @@
 // (positions are in world units; a tile is 50 units, the start room is tiles 1..3)
 // Multiplayer: lobby (code, full, kick, nametags, ready), then the shared game (spawn, labyrinth boxes, blocking, down/revive, wardrobes, floors, game over, leaving).
-import { launch, player, check, summary, visible, text, until, openMp, OUT, click, fill } from './lib.mjs';
+import { launch, player, check, summary, visible, text, until, openMp, OUT, click, fill, lobbyBuilt } from './lib.mjs';
 const b = await launch();
 console.log('== lobby');
 const A = await player(b, 'Alice', 800, 450), B = await player(b, 'Bob'), C = await player(b, 'Cara'), D = await player(b, 'Dan');
 await openMp(A); await click(A, '#mpCreate');
 check(await until(A, () => !document.getElementById('lobby').classList.contains('hidden')), 'host sees the lobby screen');
+await lobbyBuilt(A);
 const code = (await text(A, 'lbCode')).replace(/\s/g, '');
 check(/^\d{6}$/.test(code), 'lobby code is 6 digits', code);
 for (const P of [B, C, D]) { await openMp(P); await fill(P, '#mpCode', code); await click(P, '#mpJoin');

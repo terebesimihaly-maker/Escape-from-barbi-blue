@@ -43,6 +43,9 @@ export async function player(b, name, w = 480, h = 300) {
 export const visible = (p, id) => p.evaluate(id => !document.getElementById(id).classList.contains('hidden'), id);
 export const text = (p, id) => p.evaluate(id => document.getElementById(id).textContent, id);
 export async function until(p, fn, arg, ms = 30000) { try { await p.waitForFunction(fn, arg, { timeout: ms, polling: 200 }); return true; } catch (e) { return false; } }
+// the lobby owner's 3D lobby has finished building (its shaders: slow with software rendering, where they can't build in the
+// background and hold the page meanwhile; join only after, as a real GPU would have taken well under a second)
+export const lobbyBuilt = p => until(p, () => LOB.roomReady && LOB.figs.size > 0 && LOB.stage.children.length === 0, null, 180000);
 export async function openMp(p) { await p.evaluate(() => document.querySelector('nav [data-panel=mp]').click()); }
 export const click = (p, sel) => p.evaluate(sel => { const e = document.querySelector(sel); if (!e) throw new Error('no ' + sel); e.click(); }, sel);
 export const fill = (p, sel, v) => p.evaluate(([sel, v]) => { const e = document.querySelector(sel); e.value = v; e.dispatchEvent(new Event('input')); e.dispatchEvent(new Event('change')); }, [sel, v]);

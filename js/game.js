@@ -151,7 +151,7 @@ function updatePlayer(dt) {
     for (const o of MP.others.values()) if (o.down && !o.dead) { const d = Math.hypot(o.x - p.x, o.y - p.y); if (d < bd && los(p.x, p.y, o.x, o.y)) { bd = d; reviveTarget = o; } } }
   const holding = !MP.menu && (keyDown('use') || reviveHeld);
   if (reviveTarget && holding && !p.moving) {
-    revP += dt / REVIVE_TIME;
+    revP += realDt / REVIVE_TIME;                    // (3 real seconds of holding, however slow the frames)
     if (revP >= 1) { toHost({ t: 'revive', id: reviveTarget.id }); revP = 0; }
   } else revP = Math.max(0, revP - dt * 2);
   show('revive', !!reviveTarget);
