@@ -38,13 +38,24 @@ def fresh(outputs, inputs=()):
     try: newest = max(os.path.getmtime(p) for p in base if os.path.exists(p)); return all(os.path.getmtime(o) > newest for o in outputs)
     except (OSError, ValueError): return False
 
+def _digest(paths):
+    import hashlib
+    h = hashlib.sha1()
+    for p in paths:
+        if os.path.exists(p): h.update(open(p, 'rb').read())
+    return h.hexdigest()
+# what this run is built from, taken as it starts (a source edited while a build runs must not count as built)
+INPUTS = _digest([os.path.abspath(sys.argv[0]), __file__, defs.__file__, defs.SRC])
+
 def fresh_asset(asset, inputs=()):
-    """an asset script's skip test: its .blend is fresh (above) and was built the way this run asks (a --preview build never
-       passes for a full one, nor the other way round)"""
+    """an asset script's skip test: its .blend exists, was built from exactly these sources (the script, this library,
+       defs.py, js/kitdefs.js and inputs, by content) and the way this run asks (a --preview build never passes for a full
+       one, nor the other way round)"""
+    if OPTS.force: return False
     reg = os.path.join(TMP, 'assets', asset + '.json'); blend = os.path.join(TMP, asset + '.blend')
-    try: same = json.load(open(reg)).get('preview', False) == OPTS.preview
+    try: r = json.load(open(reg))
     except (OSError, ValueError): return False
-    return same and fresh([blend], inputs)
+    return os.path.exists(blend) and r.get('preview', False) == OPTS.preview and r.get('inputs') == INPUTS + _digest(inputs)
 
 # ---------------------------------------------------------------- scene
 def reset(samples=16):
@@ -734,7 +745,7 @@ def baked_material(name, files, double=False):
     return m
 
 # ---------------------------------------------------------------- saving, export, compression
-def register(asset, roots, blend=None):
+def register(asset, roots, blend=None, inputs=()):
     """save the scene's finished nodes (roots and everything under them; nothing else) as /tmp/efbb-kit/<asset>.blend and
        record which kit nodes it provides, for pack.py"""
     blend = blend or os.path.join(TMP, asset + '.blend'); keep = set()
@@ -745,7 +756,7 @@ def register(asset, roots, blend=None):
     bpy.ops.wm.save_as_mainfile(filepath=blend)
     os.makedirs(os.path.join(TMP, 'assets'), exist_ok=True)
     json.dump({'asset': asset, 'blend': blend, 'nodes': [r.name for r in roots], 'time': time.time(), 'placeholder': asset.startswith('placeholder'),
-               'preview': OPTS.preview},
+               'preview': OPTS.preview, 'inputs': INPUTS + _digest(inputs)},
               open(os.path.join(TMP, 'assets', asset + '.json'), 'w'), indent=1)
     return blend
 

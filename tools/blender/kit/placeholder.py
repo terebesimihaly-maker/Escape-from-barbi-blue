@@ -206,8 +206,7 @@ if __name__ == '__main__':
     import pack
     t0 = time.time(); styles = [s for s in defs.files() if OPTS.want(s)]
     for s in styles:
-        blend = os.path.join(TMP, f'placeholder_{s}.blend')
-        if kitlib.fresh([blend]): print('placeholder', s, 'up to date'); continue
+        if kitlib.fresh_asset('placeholder_' + s): print('placeholder', s, 'up to date'); continue
         build(s); print('placeholder', s, f'{time.time() - t0:.1f}s')
     for s in styles:
         for t in kitlib.TIERS: pack.pack(s, t)
