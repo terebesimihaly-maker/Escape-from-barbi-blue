@@ -2,10 +2,11 @@
 # top views side by side, labelled with the name, triangles and size, under a neutral studio light (a soft grey dome, a big
 # key light, fill and rim, AgX), on a grey floor. With --moody, also one shot the way the game lights a room at night: a single
 # warm lamp, a cool moonlight fill from a window, near-black everywhere else, from a standing player's eye height.
-# It reads the uncompressed GLB pack.py exported (/tmp/efbb-kit/pack/<tier>/<file>.glb: Blender can't read meshopt), so what
-# it shows is the shipped geometry and textures.
+# It reads the uncompressed GLB pack.py exported (/tmp/efbb-kit/pack/<tier>/<file>.glb: Blender can't read meshopt); with
+# --shipped, the file in models/kit itself, decoded and dequantised first through gltf-transform (to see the lo tier's
+# simplified meshes as they ship).
 #   /tmp/claude-0/bpyenv/bin/python tools/blender/kit/contact_sheets.py [--file wood] [--tier hi] [--only <node or id>,...]
-#       [--out dir] [--size 560] [--samples 96] [--moody] [--real (skip the nodes still grey-box placeholders)]
+#       [--out dir] [--size 560] [--samples 96] [--moody] [--closeup] [--shipped] [--real (skip the nodes still grey-box placeholders)]
 import sys, os, math, time, json
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import bpy
@@ -59,6 +60,13 @@ def sheet(node, objs, out, size, samples, info):
     for t in tiles: img.paste(t, (x, 26)); x += t.width
     ImageDraw.Draw(img).text((8, 6), f'{node}   {info}', fill=(230, 230, 230)); img.save(out); return out
 
+def closeup(node, objs, out, size, samples):
+    """a tight 3/4 look at the upper half, about as close as a player gets: where texture faults show"""
+    sc = bpy.context.scene; cam = sc.camera; sc.render.resolution_x = int(size * 1.5); sc.render.resolution_y = size; sc.cycles.samples = samples
+    lo, hi = bounds(objs); c = Vector(((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, lo.z + (hi.z - lo.z) * 0.62)); r = max(0.15, (hi - lo).length / 2)
+    aim(cam, c, (math.sin(0.75), -math.cos(0.75), 0.55), r / math.tan(cam.data.angle / 2) * 0.55); render(sc, out)
+    sc.render.resolution_x = sc.render.resolution_y = size; return out
+
 def moody(node, objs, out, size, samples):
     """the game's night: one warm lamp (2700 K), a cool moon fill through a window, the rest near black; eye height 1.6 m"""
     sc = bpy.context.scene
@@ -83,12 +91,33 @@ def moody(node, objs, out, size, samples):
     sc.world.node_tree.nodes['Background'].inputs['Strength'].default_value = 0.8; cam.data.lens = 50
     return out
 
+DECODE = r"""
+import { NodeIO } from '@gltf-transform/core';
+import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
+import { dequantize } from '@gltf-transform/functions';
+import { MeshoptDecoder } from 'meshoptimizer';
+await MeshoptDecoder.ready;
+const [src, dst] = process.argv.slice(2);
+const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder });
+const doc = await io.read(src); await doc.transform(dequantize());
+for (const e of doc.getRoot().listExtensionsUsed()) if (['EXT_meshopt_compression', 'KHR_mesh_quantization'].includes(e.extensionName)) e.dispose();
+await io.write(dst, doc);
+"""
+def decoded(path):
+    """a copy of a shipped (meshopt, quantised) GLB that Blender can import"""
+    import subprocess
+    js = kitlib.node_script(DECODE, 'kit-decode.mjs'); out = os.path.join(TMP, 'sheets', 'decoded_' + os.path.basename(os.path.dirname(path)) + '_' + os.path.basename(path))
+    os.makedirs(os.path.dirname(out), exist_ok=True); r = subprocess.run(['node', js, path, out], cwd=kitlib.GLTFT, capture_output=True, text=True)
+    if r.returncode: raise RuntimeError('decode failed: ' + r.stderr[-1500:])
+    return out
+
 def main():
     f = arg('--file', 'wood'); tier = arg('--tier', 'hi'); only = set(arg('--only').split(',')) if arg('--only') else None
     size = int(arg('--size', 560)); samples = int(arg('--samples', 96)); out_dir = arg('--out', os.path.join(TMP, 'sheets', tier, f))
     os.makedirs(out_dir, exist_ok=True); t0 = time.time()
     sc = kitlib.reset(samples); sc.cycles.use_denoising = True; sc.render.film_transparent = False
-    bpy.ops.import_scene.gltf(filepath=os.path.join(TMP, 'pack', tier, f + '.glb'))
+    src = decoded(os.path.join(kitlib.KITDIR, tier, f + '.glb')) if '--shipped' in sys.argv else os.path.join(TMP, 'pack', tier, f + '.glb')
+    bpy.ops.import_scene.gltf(filepath=src)
     studio(sc); outs = []
     try: man = json.load(open(os.path.join(kitlib.KITDIR, 'manifest.json')))['nodes']
     except (OSError, ValueError, KeyError): man = {}
@@ -104,6 +133,7 @@ def main():
         lo, hi = bounds(objs); dims = hi - lo
         info = f'{tc} tris   {dims.x:.2f} x {dims.y:.2f} x {dims.z:.2f} m   {tier}'
         outs.append(sheet(n['name'], objs, os.path.join(out_dir, n['name'] + '.png'), size, samples, info))
+        if '--closeup' in sys.argv: outs.append(closeup(n['name'], objs, os.path.join(out_dir, n['name'] + '_closeup.png'), size, samples))
         if '--moody' in sys.argv: outs.append(moody(n['name'], objs, os.path.join(out_dir, n['name'] + '_moody.png'), size, samples))
         print('sheet', outs[-1], f'{time.time() - t0:.0f}s')
     return outs

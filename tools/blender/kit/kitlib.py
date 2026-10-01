@@ -38,6 +38,14 @@ def fresh(outputs, inputs=()):
     try: newest = max(os.path.getmtime(p) for p in base if os.path.exists(p)); return all(os.path.getmtime(o) > newest for o in outputs)
     except (OSError, ValueError): return False
 
+def fresh_asset(asset, inputs=()):
+    """an asset script's skip test: its .blend is fresh (above) and was built the way this run asks (a --preview build never
+       passes for a full one, nor the other way round)"""
+    reg = os.path.join(TMP, 'assets', asset + '.json'); blend = os.path.join(TMP, asset + '.blend')
+    try: same = json.load(open(reg)).get('preview', False) == OPTS.preview
+    except (OSError, ValueError): return False
+    return same and fresh([blend], inputs)
+
 # ---------------------------------------------------------------- scene
 def reset(samples=16):
     """an empty scene: Cycles on the best device (never EEVEE or Workbench: they abort here), metres, Standard view (bakes)"""
@@ -115,20 +123,21 @@ def ensure_attrs(ob, wear=0.0, prand=None, grain=None):
     if 'wear' not in me.attributes: attr(ob, 'wear', [wear] * n)
     if 'prand' not in me.attributes: attr(ob, 'prand', [random.random() if prand is None else prand] * n)
 
-def curvature(ob, spread=2, gain=6.0):
-    """convexity per vertex ('curv', 0 flat or hollow .. 1 a sharp outside edge), from the angle between each vertex normal
-       and its neighbours' offsets, smoothed a little: where edge wear and chips go (Cycles' pointiness, but deterministic)"""
+def curvature(ob, edge=0.004, flat=0.025, spread=1):
+    """convexity per vertex ('curv', 0 flat or hollow .. 1 a sharp outside edge): how fast the normal turns across each edge,
+       in 1/m (exact for a circle: 1/r), so a 2 cm spindle stays 0 while a 4 mm rounded edge or a bead's crest is 1, whatever
+       the mesh density. Where edge wear and chips go (Cycles' pointiness, but deterministic and scale-true)."""
     bm = bmesh.new(); bm.from_mesh(ob.data); bm.verts.ensure_lookup_table(); bm.normal_update()
     c = []
     for v in bm.verts:
-        s = 0.0
+        k = 0.0
         for e in v.link_edges:
-            d = e.other_vert(v).co - v.co
-            if d.length > 1e-9: s += -v.normal.dot(d.normalized())
-        c.append(s / max(1, len(v.link_edges)))
+            u = e.other_vert(v); d = v.co - u.co; l2 = d.length_squared
+            if l2 > 1e-12: k = max(k, (v.normal - u.normal).dot(d) / l2)
+        c.append(max(0.0, min(1.0, (k - 1 / flat) / (1 / edge - 1 / flat))))
     for _ in range(spread):
-        c = [(c[v.index] + sum(c[e.other_vert(v).index] for e in v.link_edges)) / (1 + len(v.link_edges)) for v in bm.verts]
-    bm.free(); attr(ob, 'curv', [max(0.0, min(1.0, x * gain)) for x in c])
+        c = [(2 * c[v.index] + sum(c[e.other_vert(v).index] for e in v.link_edges)) / (2 + len(v.link_edges)) for v in bm.verts]
+    bm.free(); attr(ob, 'curv', c)
 
 def surface(name, P, G=None, W=None, UV=None, wrap=False, caps=(False, False), mats=()):
     """a quad-grid mesh: P[i][j] positions (rows i along, columns j across; wrap closes the columns into a tube, outward when j
@@ -255,7 +264,7 @@ class Mat:
     def __init__(self, name):
         self.m = bpy.data.materials.new(name); self.m.use_nodes = True; self.nt = self.m.node_tree
         self.b = self.nt.nodes['Principled BSDF']; self.out_node = self.nt.nodes['Material Output']
-        self.m['kit'] = 1
+        self.m['kit'] = 1; self.m.use_backface_culling = True       # (exported single-sided: doubleSided only where a piece needs it)
     def n(self, kind, **kw):
         node = self.nt.nodes.new(kind)
         for k, v in kw.items():
@@ -323,6 +332,13 @@ class Mat:
         if t: return t.outputs['Color']
         t = self.n('ShaderNodeTexImage', label='CAV', name='CAV'); t.image = _white(); t.interpolation = 'Linear'
         t.image.colorspace_settings.name = 'Non-Color'; return t.outputs['Color']
+    def edge(self):
+        """the baked, denoised edge map (1 on outside edges, 0 on flat faces and in hollows): where varnish, paint and pile wear
+           through first. bake_set() fills the EDGE image (black until then)"""
+        t = self.nt.nodes.get('EDGE')
+        if t: return t.outputs['Color']
+        t = self.n('ShaderNodeTexImage', label='EDGE', name='EDGE'); t.image = _flat('kit_black', 0.0); t.interpolation = 'Linear'
+        return t.outputs['Color']
     def bump(self, h, strength=0.5, dist=0.001, normal=None):
         bp = self.n('ShaderNodeBump', i_Strength=strength, i_Distance=dist); self.l(h, bp.inputs['Height'])
         if normal is not None: self.l(normal, bp.inputs['Normal'])
@@ -335,25 +351,28 @@ class Mat:
         if normal is not None: self.l(normal, self.b.inputs['Normal'])
         return self.m
 
-def _white():
-    im = bpy.data.images.get('kit_white')
-    if not im: im = bpy.data.images.new('kit_white', 4, 4, float_buffer=True); im.pixels.foreach_set([1.0] * 64)
-    return im
+def _flat(name, v):
+    im = bpy.data.images.get(name)
+    if not im: im = bpy.data.images.new(name, 4, 4, float_buffer=True); im.generated_color = (v, v, v, 1)   # (Cycles reads a generated image's colour, not pixels written into it)
+    im.colorspace_settings.name = 'Non-Color'; return im
+def _white(): return _flat('kit_white', 1.0)
 
 def aged(m, col, rough, h, up_dust=0.5, grime=0.7, edge_wear=0.0, wear_col=None, wear_rough=0.6):
     """the life a piece has had, over any base: grime packed into every crevice (the baked cavity), edges and handled parts
-       worn through to what is underneath (curv and the 'wear' attribute, broken up by noise), dust settled on whatever faces
+       worn through to what is underneath (the baked edge map and the 'wear' attribute, broken up by noise), dust settled on whatever faces
        up and wasn't touched, fine scratches. Returns colour, roughness and height sockets."""
     pos = m.attr('gpos', True); cav = m.math('POWER', m.cavity(), 1.0)
     cavf = m.n('ShaderNodeSeparateColor'); m.l(cav, cavf.inputs[0]); cav = cavf.outputs[0]
     # worn through: handled areas and sharp edges, ragged
     if edge_wear or wear_col is not None:
-        wn = m.noise(pos, 38, 5, 0.6); wn2 = m.noise(pos, 7, 3, 0.5)
-        w = m.math('ADD', m.math('MULTIPLY', m.attr('wear'), 1.05), m.math('MULTIPLY', m.attr('curv'), edge_wear))
-        w = m.math('ADD', w, m.math('MULTIPLY', m.math('SUBTRACT', m.math('ADD', wn, m.math('MULTIPLY', wn2, 0.6)), 0.8), 0.9))
-        worn = m.remap(w, 0.42, 0.58, smooth=True)
-        col = m.mix(worn, col, wear_col if wear_col is not None else col); rough = m.mixf(worn, rough, wear_rough)
-        h = m.math('SUBTRACT', h, m.math('MULTIPLY', worn, 0.25))
+        wn = m.noise(pos, 38, 5, 0.6); wn2 = m.noise(pos, 7, 3, 0.5); wn3 = m.noise(pos, 140, 3, 0.6)
+        w = m.math('ADD', m.math('MULTIPLY', m.attr('wear'), 1.05), m.math('MULTIPLY', m.math('POWER', m.edge(), 1.0), edge_wear))
+        w = m.math('ADD', w, m.math('MULTIPLY', m.math('SUBTRACT', m.math('ADD', m.math('ADD', wn, m.math('MULTIPLY', wn2, 0.6)), m.math('MULTIPLY', wn3, 0.5)), 1.05), 0.9))
+        wc = wear_col if wear_col is not None else col
+        thin = m.remap(w, 0.30, 0.46, smooth=True); worn = m.remap(w, 0.46, 0.60, smooth=True)   # (thinned first, then through)
+        col = m.mix(m.math('MULTIPLY', thin, 0.5), col, wc); col = m.mix(worn, col, wc)
+        rough = m.mixf(worn, m.mixf(thin, rough, (wear_rough + 0.4) / 2), wear_rough)
+        h = m.math('SUBTRACT', h, m.math('ADD', m.math('MULTIPLY', worn, 0.25), m.math('MULTIPLY', thin, 0.08)))
     else: worn = m.val(0.0)
     # grime in the crevices (darker, browner, duller), heaviest at the very bottom of each
     gn = m.noise(pos, 24, 5, 0.6)
@@ -404,18 +423,20 @@ def wood(name, species='beech', finish='varnish', stain=None, age=1.0, paint=Non
     bare = m.hsv(col, 0.5, 0.75, 0.9)                       # (old bare wood: greyed, a little darker than fresh)
     rough = m.remap(fib, 0.3, 0.7, 0.62, 0.78)
     if finish == 'varnish':
-        wc = m.mix(1.0, col, lin(stain) if stain else (1, 1, 1), 'MULTIPLY')
-        vc = m.mix(1.0, wc, (0.62, 0.42, 0.22), 'MULTIPLY')                       # (amber varnish, darkened with age)
+        # the stain takes its hue and saturation, the grain keeps its light and dark (multiplying warm by warm by warm would
+        # end orange); then amber varnish, darkened with age
+        wc = m.hsv(m.mix(1.0, col, lin(stain), 'COLOR'), 0.5, 1.0, 0.27) if stain else m.hsv(col, 0.5, 1.0, 0.75)
+        vc = m.mix(1.0, wc, (0.92, 0.8, 0.62), 'MULTIPLY')
         cr = m.voronoi(m.map(pos, (1, 1, 0.45)), 340, 'Distance', 'DISTANCE_TO_EDGE')   # crazing: a fine network of cracks
         crack = m.math('MULTIPLY', m.remap(cr, 0.035, 0.0), m.remap(m.noise(pos, 6, 3), 0.45, 0.65, 0.0, age))
         vc = m.mix(m.math('MULTIPLY', crack, 0.7), vc, m.hsv(vc, 0.5, 1.0, 0.35))
-        vr = m.remap(m.noise(pos, 30, 4), 0.3, 0.7, 0.30, 0.48)                    # (old varnish: satin, patchy)
+        vr = m.remap(m.noise(pos, 30, 4), 0.3, 0.7, 0.24, 0.40)                    # (old varnish: satin, patchy)
         sc = m.math('MAXIMUM', m.lines(pos, 9, 0.010, 70, 0.4), m.lines(pos, 13, 0.008, 90, 2.1))
         sc = m.math('MULTIPLY', sc, m.remap(m.noise(pos, 3.5, 2), 0.4, 0.62, 0.0, 0.8 * age))
-        vc = m.mix(m.math('MULTIPLY', sc, 0.55), vc, m.hsv(bare, 0.5, 0.7, 1.15)); vr = m.mixf(sc, vr, 0.62)
+        vc = m.mix(m.math('MULTIPLY', sc, 0.35), vc, m.hsv(bare, 0.5, 0.7, 0.85)); vr = m.mixf(sc, vr, 0.55)
         h = m.math('SUBTRACT', m.math('MULTIPLY', h, 0.35), m.math('ADD', m.math('MULTIPLY', crack, 0.25), m.math('MULTIPLY', sc, 0.3)))
         # half worn: thinned varnish lighter and more orange, then bare (and hand-darkened) wood
-        col, rough, h, worn = aged(m, vc, vr, h, up_dust=0.55 * age, grime=0.75, edge_wear=0.7, wear_col=m.mix(0.25, bare, (0.10, 0.07, 0.045)), wear_rough=0.55)
+        col, rough, h, worn = aged(m, vc, vr, h, up_dust=0.55 * age, grime=0.75, edge_wear=0.7, wear_col=m.mix(0.55, m.hsv(col, 0.5, 0.85, 0.5), (0.05, 0.032, 0.02)), wear_rough=0.45)
     elif finish == 'paint':
         pc = lin(paint or '#e8dcc8')
         pn = m.noise(pos, 14, 4); pcol = m.mix(m.remap(pn, 0.3, 0.7, 0.0, 0.25), pc, (pc[0] * 0.82, pc[1] * 0.8, pc[2] * 0.74))   # (yellowed unevenly)
@@ -436,8 +457,9 @@ def fabric(name, color='#9b6e6a', weave=1.0, fade=0.5, stripes=None, velvet=Fals
         sx = m.n('ShaderNodeSeparateXYZ'); m.l(pos, sx.inputs[0])
         s = m.math('SINE', m.math('MULTIPLY', sx.outputs['X'], 6.283 / stripes[1]))
         col = m.mix(m.remap(s, 0.35, 0.55, smooth=True), col, lin(stripes[0]))
-    # the weave: warp and weft threads
-    sx = m.n('ShaderNodeSeparateXYZ'); m.l(pos, sx.inputs[0]); f = 2400 * weave
+    # the weave: warp and weft threads (none under a velvet's pile)
+    if velvet: weave = 0.0
+    sx = m.n('ShaderNodeSeparateXYZ'); m.l(pos, sx.inputs[0]); f = 1500 * weave
     wa = m.math('SINE', m.math('MULTIPLY', sx.outputs['X'], f)); we = m.math('SINE', m.math('MULTIPLY', sx.outputs['Y'], f))
     cell = m.math('SINE', m.math('MULTIPLY', m.math('ADD', sx.outputs['X'], sx.outputs['Y']), f * 0.5))
     thread = m.mixf(m.remap(cell, -1, 1), m.math('ABSOLUTE', wa), m.math('ABSOLUTE', we))
@@ -523,7 +545,9 @@ def _bake_image(name, px, float_=True, color=False):
     im = bpy.data.images.get(name)
     if im: bpy.data.images.remove(im)
     im = bpy.data.images.new(name, px, px, alpha=False, float_buffer=float_)
-    im.colorspace_settings.name = 'Linear Rec.709' if color else 'Non-Color'
+    # raw floats, the colour bake too (it is linear anyway): with a colour space set, image.save() writes display-encoded values
+    # into the EXR (0.146 comes back 0.418), and the colour would be encoded twice
+    im.colorspace_settings.name = 'Non-Color'
     return im
 
 def _target_nodes(objs, im):
@@ -616,10 +640,10 @@ def _metal_to_emit(objs):
             nt.nodes.remove(em)
     return back
 
-def bake_set(objs, name, px=2048, samples=64, high=None, cage=0.02, cavity=0.05, ao_dist=0.25, margin=None, out_dir=None):
+def bake_set(objs, name, px=2048, samples=64, high=None, cage=0.02, cavity=0.05, ao_dist=0.25, edge=0.008, margin=None, out_dir=None):
     """bake objs (all sharing one uv0 atlas) into name's maps in out_dir (default /tmp/efbb-kit/tex/<name>):
-         cavity (AO 5 cm) and AO (25 cm, samples spp), both denoised; the cavity is fed back into the materials (CAV) so grime,
-         dust and wear follow the real crevices; then DIFFUSE colour, ROUGHNESS, metalness (emission trick) and a tangent
+         cavity (AO 5 cm), AO (25 cm, samples spp) and edges (AO looking inward, 8 mm), all denoised; cavity and edges are fed
+         back into the materials (CAV, EDGE) so grime, dust and wear follow the real crevices and edges; then DIFFUSE colour, ROUGHNESS, metalness (emission trick) and a tangent
          NORMAL map (selected-to-active from high = {low object: high object} where a sculpted source exists).
        Writes albedo/normal/orm .hi/.md/.lo.webp and returns {map: hi path} plus timings."""
     sc = bpy.context.scene; px = res(px); samples = spp(samples); t0 = time.time(); times = {}
@@ -642,12 +666,24 @@ def bake_set(objs, name, px=2048, samples=64, high=None, cage=0.02, cavity=0.05,
     for k, dist in (('cav', cavity), ('ao', ao_dist)):
         sc.world.light_settings.distance = dist; im = _bake_image(f'{name}_{k}', px); bake('AO', im, samples)
         save_exr(im, exr(k + '_raw')); t = time.time(); denoise_image(exr(k + '_raw'), exr(k)); times['denoise_' + k] = round(time.time() - t, 1)
+    # edges: occlusion looking into the wood (8 mm): a ray from a rounded outside edge soon leaves through the next face, on a
+    # flat face of a board it doesn't (a 9 mm spindle scores ~0.2: mild). The same on any mesh density: a vertex attribute
+    # can't tell a flat face from a corner when only the corners have vertices.
+    em = bpy.data.materials.get('kit_edge')
+    if not em:
+        e = Mat('kit_edge'); ao = e.n('ShaderNodeAmbientOcclusion', inside=True, only_local=True, samples=16, i_Distance=edge)
+        emi = e.n('ShaderNodeEmission'); e.l(e.remap(e.math('SUBTRACT', 1.0, ao.outputs['AO']), 0.10, 0.45, smooth=True), emi.inputs['Color'])
+        e.l(emi.outputs[0], e.out_node.inputs['Surface']); em = e.m
+    for sl, _ in slots: sl.material = em
+    im = _bake_image(f'{name}_edge', px); _target_nodes(objs, im); sc.cycles.samples = max(4, samples // 4); t = time.time()
+    bpy.ops.object.bake(type='EMIT'); times['edge'] = round(time.time() - t, 1); save_exr(im, exr('edge_raw')); denoise_image(exr('edge_raw'), exr('edge'))
     for sl, m in slots: sl.material = m
-    cav = bpy.data.images.load(exr('cav'), check_existing=False); cav.colorspace_settings.name = 'Non-Color'
-    for o in objs:
-        for slot in o.material_slots:
-            n = slot.material.node_tree.nodes.get('CAV')
-            if n: n.image = cav
+    for key, node in (('cav', 'CAV'), ('edge', 'EDGE')):
+        img = bpy.data.images.load(exr(key), check_existing=False); img.colorspace_settings.name = 'Non-Color'
+        for o in objs:
+            for slot in o.material_slots:
+                n = slot.material.node_tree.nodes.get(node)
+                if n: n.image = img
     col = _bake_image(f'{name}_col', px, color=True); sc.render.bake.use_pass_direct = sc.render.bake.use_pass_indirect = False
     sc.render.bake.use_pass_color = True; bake('DIFFUSE', col, max(4, samples // 8)); save_exr(col, exr('col'))
     rough = _bake_image(f'{name}_rough', px); bake('ROUGHNESS', rough, 4); save_exr(rough, exr('rough'))
@@ -679,12 +715,13 @@ def _gltf_output_group():
     g.interface.new_socket('Occlusion', socket_type='NodeSocketFloat'); g.interface.new_socket('Thickness', socket_type='NodeSocketFloat')
     g.nodes.new('NodeGroupOutput'); g.nodes.new('NodeGroupInput'); return g
 
-def baked_material(name, files):
-    """the material that ships: plain Principled with the baked albedo (sRGB), normal map and ORM (R occlusion through the
+def baked_material(name, files, double=False):
+    """the material that ships (single-sided unless double): plain Principled with the baked albedo (sRGB), normal map and ORM (R occlusion through the
        glTF output group, G roughness, B metalness), every map one image file the exporter passes through unchanged"""
     old = bpy.data.materials.get(name)
     if old: old.name = name + '_src'
     m = bpy.data.materials.new(name); m.use_nodes = True; nt = m.node_tree; b = nt.nodes['Principled BSDF']
+    m.use_backface_culling = not double                     # (a peel or a card textured on both sides: double=True)
     def tex(key, srgb):
         t = nt.nodes.new('ShaderNodeTexImage'); t.image = bpy.data.images.load(files[key], check_existing=True)
         t.image.name = f'{name}_{key}'                     # (unique: every asset's files are called albedo.hi.webp...)
@@ -707,7 +744,8 @@ def register(asset, roots, blend=None):
     bpy.ops.outliner.orphans_purge(do_recursive=True)
     bpy.ops.wm.save_as_mainfile(filepath=blend)
     os.makedirs(os.path.join(TMP, 'assets'), exist_ok=True)
-    json.dump({'asset': asset, 'blend': blend, 'nodes': [r.name for r in roots], 'time': time.time(), 'placeholder': asset.startswith('placeholder')},
+    json.dump({'asset': asset, 'blend': blend, 'nodes': [r.name for r in roots], 'time': time.time(), 'placeholder': asset.startswith('placeholder'),
+               'preview': OPTS.preview},
               open(os.path.join(TMP, 'assets', asset + '.json'), 'w'), indent=1)
     return blend
 

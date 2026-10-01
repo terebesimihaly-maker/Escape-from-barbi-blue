@@ -203,7 +203,9 @@ def arm(side, mats):
         tip = max(0.0, (f - 0.92) / 0.08); w *= math.sqrt(max(0.02, 1 - tip ** 2)); th *= math.sqrt(max(0.05, 1 - tip ** 2.5))
         dz = -0.0055 * smooth((f - 0.72) / 0.2)
         return kitlib.rounded_rect(w, th, min(0.005, w / 2.2, th / 2.2), 2, 0.0, dz, r_top=min(0.010, w / 2.1, th / 2.05))
-    wear = lambda k, j, p: min(1.0, 0.95 * smooth((k / (n - 1) - 0.35) / 0.35) * (1.0 if j in (2, 3, 4, 5) else 0.55) + 0.1)
+    def wear(k, j, p):                                      # (the hand rest's top and the knuckle, a little down the sides)
+        f = k / (n - 1); top = j in (2, 3, 4, 5)
+        return min(1.0, 0.8 * smooth((f - 0.6) / 0.3) * (1.0 if top else 0.3) + 0.6 * smooth((f - 0.9) / 0.08) + 0.06)
     return kitlib.sweep(f'arm{side:+d}', path, sec, wear, caps=(True, True), mats=mats)
 
 # ---------------------------------------------------------------- cushion (a tufted squab tied to the stiles)
@@ -272,7 +274,7 @@ def ties(mats):
                 f = i / 5; pt = knot + Vector((s * dx * f * 1.5, -0.006 - 0.012 * f * f, -ln * f)) + Vector((0, 0, 0.0))
                 tp.append((pt, Vector((1, 0, 0)), Vector((0, -1, 0.15)).normalized()))
             objs.append(kitlib.sweep(f'tietail{s:+d}{k}', tp, lambda i: kitlib.rounded_rect(0.010 - 0.002 * i / 5, 0.0016, 0.0007, 1), caps=(True, True), mats=mats))
-        cx, cy = cush_outline(0.25 + s * 0.13)[0] * 0.97, 0.075; cz = seat_top(cx, cy) + 0.035
+        cx, cy = cush_outline(0.25 - s * 0.13)[0] * 0.97, 0.075; cz = seat_top(cx, cy) + 0.035   # (this side's back corner)
         a0 = Vector((cx, cy, cz)); a1 = knot + Vector((0, 0.004, -0.002)); tp = []
         for i in range(6):
             f = i / 5; pt = a0.lerp(a1, f) + Vector((0, 0, 0.006 * math.sin(math.pi * f)))
@@ -283,15 +285,15 @@ def ties(mats):
 # ---------------------------------------------------------------- assembly
 def geometry():
     t0 = time.time(); sc = kitlib.reset()
-    WOOD = kitlib.wood('rc_wood', 'beech', 'varnish', stain='#9c6a48', age=1.0)
-    VEL = kitlib.fabric('rc_velvet', '#a0676c', weave=1.0, fade=0.75, velvet=True, age=1.0)
+    WOOD = kitlib.wood('rc_wood', 'beech', 'varnish', stain='#6b5038', age=1.0)
+    VEL = kitlib.fabric('rc_velvet', '#7e4650', weave=1.0, fade=0.35, velvet=True, age=1.0)
     W = [WOOD]; F = [VEL]; parts = []
     parts.append(seat(W))
     for s in (-1, 1):
         parts.append(rocker(s, W))
         a, b = FL(s); parts.append(kitlib.lathe(f'fleg{s:+d}', FRONT_LEG, a, b, 10, (-s, 1, 0), lambda t, ang, p: 0.35 * smooth((0.2 - t) / 0.12) + 0.06, mats=W))
         a, b = BL(s); parts.append(kitlib.lathe(f'bleg{s:+d}', BACK_LEG, a, b, 10, (-s, 0, 0), lambda t, ang, p: 0.25 * smooth((0.2 - t) / 0.12) + 0.04, mats=W))
-        a, b = ST(s); parts.append(kitlib.lathe(f'stile{s:+d}', STILE, a, b, 12, (0, 1, 0), lambda t, ang, p: 0.7 * smooth((t - 0.72) / 0.18) + 0.05, mats=W))
+        a, b = ST(s); parts.append(kitlib.lathe(f'stile{s:+d}', STILE, a, b, 12, (0, 1, 0), lambda t, ang, p: 0.42 * smooth((t - 0.75) / 0.18) + 0.04, mats=W))
         f, bk = on_line(*FL(s), 0.200), on_line(*BL(s), 0.200)
         parts.append(kitlib.lathe(f'sstr{s:+d}', SIDE_STRETCHER, f, bk, 8, (-s, 0, 0), lambda t, ang, p: 0.05, mats=W))
         top = arm_at(-0.235) * Vector((s, 1, 1)); top.z -= 0.004
@@ -345,6 +347,5 @@ def build():
     print(f'rocking chair done: {info["tris"]} triangles, {time.time() - t0:.0f}s')
 
 if __name__ == '__main__':
-    blend = os.path.join(TMP, ASSET + '.blend')
-    if kitlib.fresh([blend]): print('rocking chair up to date')
+    if kitlib.fresh_asset(ASSET): print('rocking chair up to date')
     else: build()

@@ -74,14 +74,14 @@ const fearK = () => player ? clamp((player.fear - 0.35) / 0.65, 0, 1) : 0;
 // while she only pretends to be gone, you don't feel her there (that's the trick), unless you can actually see her
 function herQuiet() {
   const m = monster, p = player; if (!m.quiet) return 0;
-  return Math.hypot(m.x - p.x, m.y - p.y) < 420 && !p.hidden && los(p.x, p.y, m.x, m.y) ? 0 : m.quiet;
+  return Math.hypot(m.x - p.x, m.y - p.y) < 420 && !p.hidden && losSight(p.x, p.y, m.x, m.y, false) ? 0 : m.quiet;
 }
 function updateFear(dt) {
   const p = player, m = monster;
   if (p.dead) { p.fear = Math.max(0, p.fear - dt * 0.2); return; }
   let rise = 0;
   if (m.active) {
-    const d = Math.hypot(m.x - p.x, m.y - p.y), sees = d < 450 && !p.hidden && los(p.x, p.y, m.x, m.y);
+    const d = Math.hypot(m.x - p.x, m.y - p.y), sees = d < 450 && !p.hidden && losSight(p.x, p.y, m.x, m.y, false);   // (not through tall furniture)
     rise += clamp(1 - d / 380, 0, 1) * (1 - herQuiet()) * 0.25;
     if (m.state === 'chase' && m.ti === (MP.on ? MP.myId : 'me')) rise += 0.2;
     if (sees) rise += 0.06;

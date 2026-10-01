@@ -405,7 +405,7 @@ function clientHandle(m) {
       // still on that floor (only the connection dropped): just catch up on what happened; after a reload: the whole floor
       const same = MP.inGame && grid && floorIdx === m.d.i && grid.map(r => r.join('')).join('') === m.d.rows.join('') && (state === 'play' || state === 'trans');
       if (same) { m.got.forEach((g, k) => { if (g) applyFuse(k); }); if (m.power && !powerOn) { powerOn = true; updateFuseHud(); } break; }
-      clientHandle({ t: 'floor', d: m.d });
+      clientHandle({ t: 'floor', d: m.d }); if (!MP.inGame) break;   // (refused: built by another version of the game)
       m.got.forEach((g, k) => { if (g && fuses[k]) { fuses[k].got = true; fusesGot++; puzzleSolved(k); } });
       powerOn = !!m.power; updateFuseHud(); runTime = m.rt || 0;
       const y = m.you, p = player;
@@ -416,6 +416,8 @@ function clientHandle(m) {
       break; }
     case 'lockedout': if (player.hidden) { exitHide(); lockedOut(); } break;
     case 'floor': {
+      // (a house laid out by another version of the game: its furniture and nav wouldn't match ours, so we can't play it together)
+      if (m.d.v !== LAYOUT_VERSION || m.d.kv !== KIT.version) { endClient('This house was built by a different version of the game. Update and rejoin.'); break; }
       const d = m.d, slot = Math.max(0, d.order.indexOf(MP.myId)); MP.mySlot = slot;
       for (const [id, o] of MP.others) if (!d.order.includes(id)) { removeAvatar(o); MP.others.delete(id); }
       d.order.forEach((id, i) => { if (id === MP.myId) return;

@@ -22,8 +22,9 @@ await B.evaluate(() => { const p = bb.player, tx = Math.floor(p.x / T), ty = Mat
 await B.keyboard.press('KeyQ');
 check(await until(A, id => team.pings.some(q => q.by === id && q.k === 'go' && q.name === 'Ben'), benId, 15000), 'Ben presses Q: Anna sees his ping ("Here", with his name)');
 check(await until(B, () => team.pings.some(q => q.name === 'You'), null, 10000), 'Ben sees it too, as "You"');
-const pg = await A.evaluate(id => { const q = team.pings.find(q => q.by === id); return { x: q.x, y: q.y, wall: bb.isWall(Math.floor(q.x / T), Math.floor(q.y / T)) }; }, benId);
-check(!pg.wall, 'it marks the floor where he was looking, not inside a wall', pg);
+const pg = await A.evaluate(id => { const q = team.pings.find(q => q.by === id);
+  return { x: q.x, y: q.y, wall: bb.isWall(Math.floor(q.x / T), Math.floor(q.y / T)), box: bb.SOLIDS().some(s => q.x > s.x0 && q.x < s.x1 && q.y > s.y0 && q.y < s.y1) }; }, benId);
+check(!pg.wall && !pg.box, 'it marks the floor where he was looking, not inside a wall or a piece of furniture', pg);
 await A.screenshot({ path: OUT + '/ping.png' });
 // looking right at her: "She's here!"
 await A.evaluate(() => { const m = bb.monster; m.active = true; m.state = 'lurk'; m.fakeT = 1e9; m.fakeFor = null; m.screamT = 1e9; });

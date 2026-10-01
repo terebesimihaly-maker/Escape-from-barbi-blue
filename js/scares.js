@@ -17,11 +17,11 @@ function resetScares() {
   scares.next = rnd(20, 30); scares.active = null; scares.doll = null; scares.phantom = null; scares.steps = null; scares.dim = 1; scares.app = null; scares.s = null;
   if (scares.dust) scares.dust.visible = false;
 }
-// is this point (in world units, at height h metres) in front of you, and not behind a wall?
+// is this point (in world units, at height h metres) in front of you, and not behind a wall (or tall furniture)?
 function inView(x, y, h, cone) {
   const cam = camera, f = _v.set(0, 0, -1).applyQuaternion(cam.quaternion);
   const dx = x * S - cam.position.x, dy = h - cam.position.y, dz = y * S - cam.position.z, d = Math.hypot(dx, dy, dz) || 1;
-  return (dx * f.x + dy * f.y + dz * f.z) / d > (cone || 0.75) && los(player.x, player.y, x, y);
+  return (dx * f.x + dy * f.y + dz * f.z) / d > (cone || 0.75) && losSight(player.x, player.y, x, y, false);
 }
 function scareCalm() {
   const p = player, m = monster;
@@ -78,7 +78,7 @@ function startPhantom() {
   for (const s of [1, -1]) if (!side && !isWall(tx - dy * s, ty + dx * s)) side = s;
   let x = tx * T + T / 2 - dx * 6, y = ty * T + T / 2 - dy * 6;
   if (side) { x += -dy * side * T * 0.42; y += dx * side * T * 0.42; }
-  if (!los(p.x, p.y, x, y)) return false;
+  if (!los(p.x, p.y, x, y) || blocked(x, y, 12)) return false;           // (never standing in a piece of furniture)
   scares.phantom = { x, y, ang: Math.atan2(p.y - y, p.x - x), t: 0, seen: 0, looked: false };
   return true;
 }
@@ -132,7 +132,7 @@ function startDash() {
     if (n >= 2 && !isWall(tx - dy, ty + dx) && !isWall(tx + dy, ty - dx)) {            // a crossing: open on both sides
       const cx = (tx + 0.5) * T, cy = (ty + 0.5) * T, side = Math.random() < 0.5 ? 1 : -1;
       scares.s = { t: 0, x0: cx - dy * side * T * 1.2, y0: cy + dx * side * T * 1.2, x1: cx + dy * side * T * 1.2, y1: cy - dx * side * T * 1.2, stepT: 0 };
-      if (!los(p.x, p.y, cx, cy)) return false; return true; } }
+      return los(p.x, p.y, cx, cy) && clearLine(scares.s.x0, scares.s.y0, scares.s.x1, scares.s.y1, 10); } }   // (and never through furniture)
   return false;
 }
 function updateDash(dt) {
@@ -169,6 +169,8 @@ function updateDoor(dt) {
 const scareDoorOpen = c => scares.active === 'door' && scares.s && scares.s.c === c ? scares.s.open || 0 : 0;
 
 /* ---------- footsteps on the floor above ---------- */
+// (the ceiling over you: the halls are higher, the servant corridors lower; js/layout.js)
+const ceilHere = () => ceilAt(Math.floor(player.x / T), Math.floor(player.y / T)) || WALL_H;
 function startCeiling() {
   const p = player, a = p.ang + (Math.random() < 0.5 ? 1 : -1) * Math.PI / 2;      // they cross over you, from one side to the other
   scares.steps = { n: 0, of: 7, t: 0.2, x0: p.x + Math.cos(a) * 120, y0: p.y + Math.sin(a) * 120, x1: p.x - Math.cos(a) * 120, y1: p.y - Math.sin(a) * 120 };
@@ -184,18 +186,18 @@ function updateCeiling(dt) {
   const s = scares.steps; s.t -= dt;
   if (s.t <= 0 && s.n < s.of) {
     const k = s.n / (s.of - 1), x = s.x0 + (s.x1 - s.x0) * k, y = s.y0 + (s.y1 - s.y0) * k, near = 1 - Math.abs(k - 0.5) * 1.2;
-    sfx.ceilingStep(0.35 * near + 0.1, { x, y, h: WALL_H + 0.4 });
+    sfx.ceilingStep(0.35 * near + 0.1, { x, y, h: ceilHere() + 0.4 });
     if (Math.abs(k - 0.5) < 0.2) { shake = Math.max(shake, 1.5); dropDust(x, y); }
     s.n++; s.t = s.n === s.of ? 0.9 : 0.62 + Math.random() * 0.1;
-  } else if (s.t <= 0 && s.n === s.of) { s.n++; sfx.drag(0.12, { x: s.x1, y: s.y1, h: WALL_H + 0.4 }); s.t = 2.2; }
+  } else if (s.t <= 0 && s.n === s.of) { s.n++; sfx.drag(0.12, { x: s.x1, y: s.y1, h: ceilHere() + 0.4 }); s.t = 2.2; }
   else if (s.t <= 0) { scares.steps = null; endScare(true); }
   const dp = scares.dust;
   if (dp && dp.visible) { const pos = dp.geometry.attributes.position, v = dp.userData.v;
     for (let i = 0; i < pos.count; i++) { v[i] += dt * 1.6; pos.setY(i, Math.max(0.02, pos.getY(i) - v[i] * dt)); } pos.needsUpdate = true; }
 }
 function dropDust(x, y) {
-  const dp = scares.dust, pos = dp.geometry.attributes.position, v = dp.userData.v;
-  for (let i = 0; i < pos.count; i++) { pos.setXYZ(i, (x + rnd(-25, 25)) * S, WALL_H - rnd(0, 0.3), (y + rnd(-25, 25)) * S); v[i] = rnd(0, 0.4); }
+  const dp = scares.dust, pos = dp.geometry.attributes.position, v = dp.userData.v, h = ceilHere();
+  for (let i = 0; i < pos.count; i++) { pos.setXYZ(i, (x + rnd(-25, 25)) * S, h - rnd(0, 0.3), (y + rnd(-25, 25)) * S); v[i] = rnd(0, 0.4); }
   pos.needsUpdate = true; dp.visible = true;
 }
 

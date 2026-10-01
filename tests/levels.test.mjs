@@ -100,7 +100,7 @@ await p.evaluate(() => { const m = bb.monster; m.active = false; m.spawnT = 1e9;
 await p.evaluate(() => { let best = null; for (const q of bb.CELLS()) { let n = 0; while (!bb.isWall(q[0] + n + 1, q[1])) n++; if (!best || n > best[2]) best = [q[0], q[1], n]; }
   bb.player.x = (best[0] + 0.5) * bb.T; bb.player.y = (best[1] + 0.5) * bb.T; bb.player.ang = 0; bb.player.pitch = 0; });
 await p.waitForTimeout(2500); await p.screenshot({ path: OUT + '/floor4.png' });
-check(await p.evaluate(() => bb.level && bb.level.house && bb.level.house.group.children.length > 5), 'the attic is dressed (lamps, sheets, trunks, cobwebs)');
+check(await p.evaluate(() => bb.level && bb.level.house && (bb.level.house.group.children.length > 5 || bb.level.house.kitCount > 20)), 'the attic is dressed (lamps, sheets, trunks, cobwebs)');
 await p.evaluate(() => { bb.fuses.forEach((f, k) => bb.applyFuse(k)); const m = bb.monster; m.active = false; m.spawnT = 1e9; bb.player.x = bb.exit.x; bb.player.y = bb.exit.y; });
 check(await until(p, () => bb.state === 'trans'), 'floor 4 escaped');
 await click(p, '#tGo');

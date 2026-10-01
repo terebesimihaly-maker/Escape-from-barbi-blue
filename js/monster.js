@@ -16,12 +16,71 @@ function randomCellNear(pt, r) {
   return center((c.length ? c : CELLS)[Math.random() * (c.length || CELLS.length) | 0]);
 }
 
-// the tile you'd reach by carrying on in direction (dx, dy) for up to n tiles (stops at walls)
+// the tile you'd reach by carrying on in direction (dx, dy) for up to n tiles (stops at walls, and at furniture across the way)
 function aheadOf(pt, dx, dy, n) {
   let tx = Math.floor(pt.x / T), ty = Math.floor(pt.y / T);
   const sx = Math.abs(dx) > Math.abs(dy) ? Math.sign(dx) : 0, sy = sx ? 0 : Math.sign(dy);
-  for (let i = 0; i < n && (sx || sy) && !isWall(tx + sx, ty + sy); i++) { tx += sx; ty += sy; }
+  for (let i = 0; i < n && (sx || sy) && !isWall(tx + sx, ty + sy) && !cutAt(tx, ty, sx, sy); i++) { tx += sx; ty += sy; }
   return { x: tx * T + T / 2, y: ty * T + T / 2 };
+}
+// the way to a target, tile by tile (bfsPath goes round the furniture). One she can't reach as it is (a wall tile, the tile under a
+// table in the middle of a room): the open tile next to it nearest the target instead, else her own tile's centre. m.alt is where
+// the last stretch then goes, in place of the target.
+function pathToward(m, target) {
+  const tx = Math.floor(m.x / T), ty = Math.floor(m.y / T), gx = Math.floor(target.x / T), gy = Math.floor(target.y / T);
+  let p = bfsPath(tx, ty, gx, gy); m.alt = null;
+  if (p) return p;
+  const near = DIRS.map(([dx, dy]) => [gx + dx, gy + dy]).filter(([x, y]) => !isWall(x, y) && !(NAV && NAV.isl[idx(x, y)]))
+    .sort((a, b) => Math.hypot(a[0] * T + T / 2 - target.x, a[1] * T + T / 2 - target.y) - Math.hypot(b[0] * T + T / 2 - target.x, b[1] * T + T / 2 - target.y));
+  for (const c of near) if ((p = bfsPath(tx, ty, c[0], c[1]))) { m.alt = center(c); return p; }
+  m.alt = center([tx, ty]); return [];
+}
+// she walks a path: from tile centre to tile centre she goes freely, as those lines are proven clear of walls and furniture (13 u either
+// side, js/layout.js) and she's 12 u wide either side. Off them (after running straight at someone, or on the last stretch to a spot
+// inside a tile) she bumps into things like you do (radius 12): straight to the next centre if nothing is in the way, else back to the
+// middle of her own tile first. Stuck anyway (hardly moving for 1 s): she plans again; for 2.5 s: she's put back on her tile's centre,
+// or the nearest room centre within 3 tiles, wherever nobody can see it happen.
+function stepAlongPath(m, target, spd, dt) {
+  const x0 = m.x, y0 = m.y; let left = spd * dt, arrived = false;
+  m.repath -= dt;
+  if (m.repath <= 0 || !m.path.length) { m.path = pathToward(m, target); m.repath = m.state === 'wander' ? 1.5 : 0.3; }
+  for (let k = 0; k < 4 && left > 1e-6; k++) {
+    if (!m.path.length) {                                       // the last stretch, inside the target's tile
+      const g = m.alt || target, ex = g.x - m.x, ey = g.y - m.y, el = Math.hypot(ex, ey);
+      if (el > 0.5) { const st = Math.min(el, left); moveEntity(m, ex / el * st, ey / el * st, 12);
+        arrived = el < 12 && Math.hypot(g.x - m.x, g.y - m.y) > el - st * 0.05; }   // (a spot she doesn't quite fit: as close as she gets)
+      else arrived = true;
+      break;
+    }
+    const [px, py] = m.path[0], gx = px * T + T / 2, gy = py * T + T / 2, cx = Math.floor(m.x / T), cy = Math.floor(m.y / T);
+    // (the path is from the tile she was in when it was planned: she must be in its first tile or next to it, not across a cut)
+    if (!(cx === px && cy === py) && !(Math.abs(cx - px) + Math.abs(cy - py) === 1 && !cutAt(cx, cy, px - cx, py - cy))) { m.path = pathToward(m, target); continue; }
+    if (Math.abs(m.x - gx) < 0.05 || Math.abs(m.y - gy) < 0.05) {   // on the line between the two centres: free
+      const ex = gx - m.x, ey = gy - m.y, el = Math.hypot(ex, ey);
+      if (el <= left) { m.x = gx; m.y = gy; left -= el; m.path.shift(); } else { m.x += ex / el * left; m.y += ey / el * left; left = 0; }
+      continue;
+    }
+    const aim = clearLine(m.x, m.y, gx, gy, 12) ? { x: gx, y: gy } : center([cx, cy]), ex = aim.x - m.x, ey = aim.y - m.y, el = Math.hypot(ex, ey);
+    const bx = m.x, by = m.y, st = Math.min(el, left);
+    if (el > 1e-6) moveEntity(m, ex / el * st, ey / el * st, 12);
+    if (Math.hypot(aim.x - m.x, aim.y - m.y) < 1e-6) { m.x = aim.x; m.y = aim.y; left -= st; if (aim.x === gx && aim.y === gy) m.path.shift(); }
+    else { if (Math.hypot(m.x - bx, m.y - by) < st - 1e-6) break; left -= st; }   // (bumped into something: that's all for this frame)
+  }
+  const mx = m.x - x0, my = m.y - y0, mv = Math.hypot(mx, my);
+  if (mv > 1e-3) m.ang = lerpAngle(m.ang, Math.atan2(my, mx), Math.min(1, dt * 8));
+  // the stall guard
+  m.stall = arrived || mv >= 0.05 * spd * dt ? 0 : (m.stall || 0) + dt;
+  if (m.stall >= 1 && m.stall - dt < 1) { m.path = []; m.repath = 0; m.stalls = (m.stalls || 0) + 1; }
+  if (m.stall >= 2.5) { m.stall = 0; m.path = []; m.repath = 0; unstick(m); }
+}
+// put her back on the nav: her own tile's centre if no player can see it, else the nearest room centre within 3 tiles nobody can see
+function unstick(m) {
+  const tx = Math.floor(m.x / T), ty = Math.floor(m.y / T), eyes = allPlayers().filter(q => !q.dead);
+  const unseen = c => !eyes.some(q => losSight(q.x, q.y, c.x, c.y, false));
+  let c = center([tx, ty]);
+  if (!unseen(c)) { const d = bfsDist(tx, ty);
+    c = CELLS.filter(q => { const k = d[idx(q[0], q[1])]; return k >= 0 && k <= 3; }).sort((a, b) => d[idx(a[0], a[1])] - d[idx(b[0], b[1])]).map(center).find(unseen); }
+  if (c) { m.x = c.x; m.y = c.y; m.px = c.x; m.py = c.y; }
 }
 // she lost you: where to look, in order
 function planSearch(m) {
@@ -34,9 +93,9 @@ function planSearch(m) {
       if (sc > bs) { bs = sc; best = c; } }
     if (best) plan.push({ at: center(best) });
   }
-  // 2. the wardrobes close to where she lost you, nearest first
+  // 2. the wardrobes close to where she lost you, nearest first (-1: she can't get there from that tile)
   closets.map((c, i) => ({ c, i, k: d[idx(Math.floor(c.x / T), Math.floor(c.y / T))] }))
-    .filter(w => w.k <= 12 && !m.checked.has(w.i)).sort((a, b) => a.k - b.k).slice(0, 3)
+    .filter(w => w.k >= 0 && w.k <= 12 && !m.checked.has(w.i)).sort((a, b) => a.k - b.k).slice(0, 3)
     .forEach(w => plan.push({ at: { x: w.c.x + w.c.ox * 16, y: w.c.y + w.c.oy * 16 }, closet: w.i }));
   m.plan = plan; m.searchT = 8 + plan.length * 4; m.target = null;
 }
@@ -52,7 +111,8 @@ function checkWardrobe(m, k, alive) {
   if (Math.random() < Math.min(0.9, DF().check * 1.6)) downPlayer(q, 'She heard you breathing.');   // (in multiplayer the others can still revive you)
 }
 // she gives up the search with someone hiding close by: sometimes she only pretends to leave. She walks off (sounding further
-// and further away) to a spot around a corner, 3 to 5 tiles from their wardrobe and out of its sight, and waits there, silent
+// and further away) to a spot around a corner, 3 to 5 tiles from their wardrobe (the way round the furniture: never a tile under it)
+// and out of its sight, and waits there, silent
 function startFakeLeave(m, q) {
   const dq = bfsDist(Math.floor(q.x / T), Math.floor(q.y / T)), spots = [];
   for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) { const k = dq[idx(x, y)];
@@ -78,7 +138,8 @@ function updateMonster(dt) {
   const D = DF(), hearMul = (1 + 0.05 * (n - 1)) * D.hear, spdMul = (1 + 0.03 * (n - 1)) * D.speed;
   const dist = q => Math.hypot(q.x - m.x, q.y - m.y);
   let seen = null, sd = 1e9;
-  for (const q of alive) if (!q.hidden) { const d = dist(q); if (d < D.sight && d < sd && los(m.x, m.y, q.x, q.y)) { sd = d; seen = q; } }
+  // (furniture hides you too: tall pieces always, low ones while you crouch behind them)
+  for (const q of alive) if (!q.hidden) { const d = dist(q); if (d < D.sight && d < sd && losSight(m.x, m.y, q.x, q.y, q.crouching)) { sd = d; seen = q; } }
   // she remembers which way you were going (from where she last saw or heard you)
   const track = q => {
     if (m.ti === q.id && m.last) { const vx = q.x - m.last.x, vy = q.y - m.last.y, l = Math.hypot(vx, vy);
@@ -165,20 +226,12 @@ function updateMonster(dt) {
 
   const tq = seen || kq, tdx = tq ? tq.x - m.x : Math.cos(m.ang), tdy = tq ? tq.y - m.y : Math.sin(m.ang);
   if (m.screamT > 0) {                      // she stops to scream (the animation plays)
-    m.screamT -= dt; if (tq) m.ang = lerpAngle(m.ang, Math.atan2(tdy, tdx), Math.min(1, dt * 3));
-  } else if (seen && sd < T * 2.2) {
+    m.screamT -= dt; m.stall = 0; if (tq) m.ang = lerpAngle(m.ang, Math.atan2(tdy, tdx), Math.min(1, dt * 3));
+  } else if (seen && sd < T * 2.2 && clearLine(m.x, m.y, seen.x, seen.y, 12)) {   // close, nothing in the way: straight at you
     const a = Math.atan2(tdy, tdx); m.ang = lerpAngle(m.ang, a, Math.min(1, dt * 8));
-    moveEntity(m, Math.cos(a) * spd * dt, Math.sin(a) * spd * dt, 12); m.path = []; m.repath = 0;
-  } else if (spd > 0) {
-    m.repath -= dt;
-    const ttx = Math.floor(target.x / T), tty = Math.floor(target.y / T);
-    if (m.repath <= 0 || !m.path.length) { m.path = bfsPath(Math.floor(m.x / T), Math.floor(m.y / T), ttx, tty) || []; m.repath = m.state === 'wander' ? 1.5 : 0.3; }
-    let gx, gy;
-    if (m.path.length) { gx = m.path[0][0] * T + T / 2; gy = m.path[0][1] * T + T / 2; } else { gx = target.x; gy = target.y; }
-    const ex = gx - m.x, ey = gy - m.y, el = Math.hypot(ex, ey);
-    if (el < 3 && m.path.length) m.path.shift();
-    else if (el > 0.5) { const st = Math.min(el, spd * dt); m.x += ex / el * st; m.y += ey / el * st; m.ang = lerpAngle(m.ang, Math.atan2(ey, ex), Math.min(1, dt * 8)); }
-  }
+    moveEntity(m, Math.cos(a) * spd * dt, Math.sin(a) * spd * dt, 12); m.path = []; m.repath = 0; m.stall = 0;
+  } else if (spd > 0) stepAlongPath(m, target, spd, dt);   // (furniture between you: round it, along her path to where you are)
+  else m.stall = 0;
   m.anim += dt * spd * 0.05;
   const mv = Math.hypot(m.x - m.px, m.y - m.py); m.px = m.x; m.py = m.y;
   m.vel += ((mv < 20 ? mv / dt : 0) - m.vel) * Math.min(1, dt * 8);

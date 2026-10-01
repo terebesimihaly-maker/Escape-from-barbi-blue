@@ -41,14 +41,21 @@ const boards = await p.evaluate(() => {
   for (let i = 0; i < FLOORS.length; i++) for (const diff of ['easy', 'medium', 'hard']) for (let s = 0; s < 10; s++) {
     const d = generateFloor(i, 1, diff), rows = d.rows, wall = (x, y) => rows[y] === undefined || rows[y][x] !== '0';
     const taken = new Set([...d.closets.map(c => c[0] + ',' + c[1]), ...d.puzzles.map(z => z.cell.join()), d.exit.join(), ...d.notes.map(n => n[0] + ',' + n[1])]);
+    // (the furniture you bump into, in units, and the servant corridors' tiles)
+    const boxes = (d.solids || []).map(([k, x0, y0, x1, y1]) => [x0 / 2, y0 / 2, x1 / 2, y1 / 2]), runs = new Set();
+    for (const [, x0, y0, x1, y1] of d.runs || []) for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) runs.add(x + ',' + y);
+    const boxIn = (x0, y0, x1, y1) => boxes.some(b => b[0] < x1 && b[2] > x0 && b[1] < y1 && b[3] > y0);
     if (!d.creaks.length) bad.push('floor ' + (i + 1) + ' has none');
     for (const [x, y, along, len] of d.creaks) {
       const tx = Math.floor(x / T), ty = Math.floor(y / T);
       if (wall(tx, ty)) bad.push('a board in a wall'); if (taken.has(tx + ',' + ty)) bad.push('a board on a wardrobe, puzzle, note or the door');
       if (tx <= 3 && ty <= 3) bad.push('a board at the start');
-      // where a player (radius 11) can stand across the tile without stepping on it
+      if (boxIn(tx * T - 14, ty * T - 14, tx * T + T + 14, ty * T + T + 14)) bad.push('a board on a tile furniture comes within 14 units of');
+      if (runs.has(tx + ',' + ty)) bad.push('a board in a servant corridor');
+      // where a player (radius 11) can stand across the tile without stepping on it (and without standing in furniture)
       const off = along ? x - (tx * T + T / 2) : y - (ty * T + T / 2); let lane = 0;
-      for (let a = -(T / 2 - 11); a <= T / 2 - 11; a++) if (Math.abs(a - off) >= BOARD_ACROSS) lane++;
+      for (let a = -(T / 2 - 11); a <= T / 2 - 11; a++) { const px = along ? tx * T + T / 2 + a : x, py = along ? y : ty * T + T / 2 + a;
+        if (Math.abs(a - off) >= BOARD_ACROSS && !boxIn(px - 11, py - 11, px + 11, py + 11)) lane++; }
       if (len > BOARD_LEN) {                                   // one right across a corridor: from wall to wall, no way round
         mid++;
         const v = wall(tx - 1, ty) && wall(tx + 1, ty), h = wall(tx, ty - 1) && wall(tx, ty + 1);
@@ -98,9 +105,9 @@ const cr = await p.evaluate(async () => {
   const P = bb.player, m = bb.monster; notes.forEach(n => n.read = true); if (bb.state === 'note') { noteAt = 0; closeNote(); } bb.state = 'play';
   if (P.hidden) exitHide();
   m.active = false; m.spawnT = 1e9; m.state = 'wander'; m.x = -9999; m.y = -9999;   // (the board test left her hunting)
-  // (stand in the middle of the longest open corridor from here, facing along it)
+  // (stand in the middle of the longest open corridor from here, facing along it: no wall, and no furniture across it)
   const tx = Math.floor(P.x / bb.T), ty = Math.floor(P.y / bb.T); let best = [0, 0];
-  for (const [dx, dy] of DIRS) { let n = 0; while (!bb.isWall(tx + dx * (n + 1), ty + dy * (n + 1))) n++; if (n > best[0]) best = [n, Math.atan2(dy, dx)]; }
+  for (const [dx, dy] of DIRS) { let n = 0; while (!bb.isWall(tx + dx * (n + 1), ty + dy * (n + 1)) && !bb.cutAt(tx + dx * n, ty + dy * n, dx, dy)) n++; if (n > best[0]) best = [n, Math.atan2(dy, dx)]; }
   P.x = (tx + 0.5) * bb.T; P.y = (ty + 0.5) * bb.T; P.ang = best[1];
   const frames = n => new Promise(r => { let k = 0; const f = () => (++k >= n ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
   const eye0 = EYE;                                       // (standing height)

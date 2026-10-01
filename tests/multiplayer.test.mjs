@@ -2,6 +2,16 @@
 // Multiplayer: lobby (code, full, kick, nametags, ready), then the shared game (spawn, labyrinth boxes, blocking, down/revive, wardrobes, floors, game over, leaving).
 import { launch, player, check, summary, visible, text, until, openMp, OUT, click, fill, lobbyBuilt } from './lib.mjs';
 const b = await launch();
+// the layout each page was sent (d.v, d.kv, d.seed: kept as the floor arrives) and a hash of what it built from it (the nav, the
+// ceilings, the furniture): every client must have exactly the host's
+const keepFloor = P => P.evaluate(() => { if (window.__keepD) return; window.__keepD = true;
+  const o = applyFloor; applyFloor = (d, slot) => { window.__d = { v: d.v, kv: d.kv, seed: d.seed }; return o(d, slot); }; });
+const layoutOf = P => P.evaluate(() => { let h = 0x811c9dc5; const add = v => { h = Math.imul(h ^ (v & 0xffff), 16777619) >>> 0; h = Math.imul(h ^ (v >>> 16), 16777619) >>> 0; };
+  for (const a of [NAV.cut, NAV.isl, NAV.occ, new Uint8Array(CEIL.buffer)]) for (const v of a) add(v);
+  for (const q of NAV.bucket) { add(q ? q.length : 0); if (q) q.forEach(add); }
+  for (const s of SOLIDS) [s.k, s.x0 * 2, s.y0 * 2, s.x1 * 2, s.y1 * 2, s.rot, s.v].forEach(add);
+  return Object.assign({ want: [LAYOUT_VERSION, KIT.version], vseed: VSEED, solids: SOLIDS.length, nav: h }, window.__d); });
+const sameLayout = L => L.every(l => l.v === l.want[0] && l.kv === l.want[1] && l.seed === L[0].seed && l.vseed === (l.seed >>> 0) && l.nav === L[0].nav && l.solids === L[0].solids);
 console.log('== lobby');
 const A = await player(b, 'Alice', 800, 450), B = await player(b, 'Bob'), C = await player(b, 'Cara'), D = await player(b, 'Dan');
 await openMp(A); await click(A, '#mpCreate');
@@ -33,6 +43,7 @@ await fill(B, '#lbName', 'Bobby');
 check(await until(A, () => [...document.querySelectorAll('#lbList .nm')].some(e => e.textContent.includes('Bobby'))), 'host sees the new nametag "Bobby"');
 check(await until(C, () => [...document.querySelectorAll('#lbList .nm')].some(e => e.textContent.includes('Bobby'))), 'others see "Bobby" too');
 console.log('== ready up');
+for (const P of [A, B, C]) await keepFloor(P);
 await click(A, '#lbReady'); await click(B, '#lbReady');
 await A.waitForTimeout(4500);
 check(await A.evaluate(() => bb.state) === 'lobby', 'no start while Cara is not ready');
@@ -44,6 +55,8 @@ const started = await Promise.all([A, B, C].map(P => until(P, () => bb.state ===
 check(started.every(Boolean), 'the game starts for all 3 players', started);
 const grids = await Promise.all([A, B, C].map(P => P.evaluate(() => bb.grid.map(r => r.join('')).join('|'))));
 check(grids[0] === grids[1] && grids[1] === grids[2], 'everyone got the same house');
+const lay1 = await Promise.all([A, B, C].map(layoutOf));
+check(sameLayout(lay1), 'and the same layout: this version\'s (d.v, d.kv), the same seed, and the same furniture, nav and ceilings built from it (hash)', lay1);
 const pos = await Promise.all([A, B, C].map(P => P.evaluate(() => [bb.player.x, bb.player.y])));
 check(pos.every(([x, y]) => x > 50 && x < 200 && y > 50 && y < 200), 'everyone spawned in the start room', pos);
 const dmin = Math.min(...[[0, 1], [0, 2], [1, 2]].map(([i, j]) => Math.hypot(pos[i][0] - pos[j][0], pos[i][1] - pos[j][1])));
@@ -159,6 +172,8 @@ check((await Promise.all([A, B, C].map(P => until(P, () => bb.state === 'play' &
 check(!(await C.evaluate(() => bb.player.dead || bb.player.down)), 'Cara is back on the new floor');
 const g2 = await Promise.all([A, B, C].map(P => P.evaluate(() => bb.grid.map(r => r.join('')).join('|'))));
 check(g2[0] === g2[1] && g2[1] === g2[2], 'floor 2 is the same house for everyone');
+const lay2 = await Promise.all([A, B, C].map(layoutOf));
+check(sameLayout(lay2) && lay2[0].seed !== lay1[0].seed, 'with the same layout for everyone too (a new seed)', lay2);
 console.log('== game over');
 await freeze();
 for (const id of [ids.A, Bid, Cid]) { await A.evaluate(id => bb.downPlayer({ id }, 'test'), id); await A.waitForTimeout(300); }
@@ -172,5 +187,10 @@ await click(C, '#lbLeave');
 check(await until(A, () => document.querySelectorAll('#lbList li:not(.empty)').length === 2, null, 10000), 'Cara leaves: the host lists 2 players');
 await click(A, '#lbLeave');
 check(await until(B, () => /closed the lobby|Lost the connection/.test(document.getElementById('mpStatus').textContent), null, 20000), 'the host leaves: Bobby is told and back at the menu', await text(B, 'mpStatus'));
+console.log('== a house built by another version of the game');
+const vr = await B.evaluate(() => ['v', 'kv'].map(k => { const d = generateFloor(0, 2, 'medium'), g0 = grid; d.order = ['someone', 'else']; d.names = ['A', 'B']; d[k] += 1;
+  clientHandle({ t: 'floor', d }); return { k, state: bb.state, applied: grid !== g0, inGame: bb.MP.inGame, msg: document.getElementById('mpStatus').textContent }; }));
+check(vr.every(r => r.state !== 'play' && !r.applied && !r.inGame && /built by a different version of the game\. Update and rejoin/.test(r.msg)),
+  'a floor from another layout or kit version is refused: "This house was built by a different version of the game. Update and rejoin."', vr);
 process.exitCode = summary();
 await b.close();

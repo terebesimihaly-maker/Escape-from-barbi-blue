@@ -118,7 +118,7 @@ function render3D(t) {
     let eye = 0;
     if (show) { const d = Math.hypot(mx - p.x, my - p.y), toP = Math.atan2(p.y - my, p.x - mx);
       if (sc) eye = 0.95;
-      else if (d < 420 && los(p.x, p.y, mx, my)) eye = clamp(1 - d / 420, 0, 1) * (0.75 + Math.random() * 0.25) * clamp((Math.cos(angDiff(toP, ma)) + 0.3) * 1.6, 0, 1); }
+      else if (d < 420 && losSight(p.x, p.y, mx, my, false)) eye = clamp(1 - d / 420, 0, 1) * (0.75 + Math.random() * 0.25) * clamp((Math.cos(angDiff(toP, ma)) + 0.3) * 1.6, 0, 1); }
     setEyes(eye);
     // her face is right in front of yours when she leans in: the eye glow shrinks to fit
     const near = sc ? clamp((sc.t - SC.lean) / (SC.leanEnd - SC.lean), 0, 1) : 0;

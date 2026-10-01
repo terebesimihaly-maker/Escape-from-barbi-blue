@@ -5,7 +5,7 @@
  "axes": "three.js: y up, front +z; aabb [min, max] in metres in the node frame",
  "tiers": {
   "hi": {
-   "wood": 1160628,
+   "wood": 1168544,
    "tile": 77456,
    "concrete": 75384,
    "attic": 78760,
@@ -13,7 +13,7 @@
    "common": 6880
   },
   "md": {
-   "wood": 409696,
+   "wood": 426816,
    "tile": 77472,
    "concrete": 75372,
    "attic": 78764,
@@ -21,7 +21,7 @@
    "common": 6884
   },
   "lo": {
-   "wood": 220252,
+   "wood": 221316,
    "tile": 78052,
    "concrete": 75140,
    "attic": 78524,

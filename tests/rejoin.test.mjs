@@ -1,6 +1,16 @@
 // Rejoining: losing the connection mid-game, closing the page and rejoining, and a player who never comes back.
 import { launch, player, check, summary, until, openMp, click, fill, text, pageErrors } from './lib.mjs';
 const b = await launch();
+// the layout each page was sent (d.v, d.kv, d.seed: kept as the floor arrives) and a hash of what it built from it (the nav, the
+// ceilings, the furniture): a rejoining player must have exactly the host's
+const keepFloor = P => P.evaluate(() => { if (window.__keepD) return; window.__keepD = true;
+  const o = applyFloor; applyFloor = (d, slot) => { window.__d = { v: d.v, kv: d.kv, seed: d.seed }; return o(d, slot); }; });
+const layoutOf = P => P.evaluate(() => { let h = 0x811c9dc5; const add = v => { h = Math.imul(h ^ (v & 0xffff), 16777619) >>> 0; h = Math.imul(h ^ (v >>> 16), 16777619) >>> 0; };
+  for (const a of [NAV.cut, NAV.isl, NAV.occ, new Uint8Array(CEIL.buffer)]) for (const v of a) add(v);
+  for (const q of NAV.bucket) { add(q ? q.length : 0); if (q) q.forEach(add); }
+  for (const s of SOLIDS) [s.k, s.x0 * 2, s.y0 * 2, s.x1 * 2, s.y1 * 2, s.rot, s.v].forEach(add);
+  return Object.assign({ want: [LAYOUT_VERSION, KIT.version], vseed: VSEED, solids: SOLIDS.length, nav: h }, window.__d); });
+const sameLayout = L => L.every(l => l.v === l.want[0] && l.kv === l.want[1] && l.seed === L[0].seed && l.vseed === (l.seed >>> 0) && l.nav === L[0].nav && l.solids === L[0].solids);
 const A = await player(b, 'Anna'), B = await player(b, 'Ben');
 console.log('== a game for two');
 await openMp(A); await click(A, '#mpCreate');
@@ -14,8 +24,11 @@ check(await A.evaluate(() => document.querySelector('#lbLevel option[value="2"]'
 await A.evaluate(() => { progress.done = [true, true]; saveProgress(); renderLobby(); });
 await A.evaluate(() => { const s = document.getElementById('lbLevel'); s.value = 2; s.dispatchEvent(new Event('change')); document.querySelector('#lbDiff button[data-d="hard"]').click(); });
 check(await until(B, () => document.getElementById('lbLevel').value === '2' && document.querySelector('#lbDiff button.on').dataset.d === 'hard', null, 10000), 'Ben sees floor 3 and Hard');
+await keepFloor(A); await keepFloor(B);
 await click(A, '#lbReady'); await click(B, '#lbReady');
 check((await Promise.all([A, B].map(P => until(P, () => bb.state === 'play' && bb.MP.inGame, null, 30000)))).every(Boolean), 'the game started for both');
+const lay1 = await Promise.all([A, B].map(layoutOf));
+check(sameLayout(lay1), 'the same layout for both: this version\'s (d.v, d.kv), the same seed, the same furniture, nav and ceilings (hash)', lay1);
 check((await Promise.all([A, B].map(P => P.evaluate(() => bb.floorIdx === 2 && curDiff === 'hard')))).every(Boolean), 'on floor 3, on Hard, for both');
 await A.evaluate(() => { const m = bb.monster; m.active = false; m.spawnT = 1e9; });
 const benId = await B.evaluate(() => bb.MP.myId);
@@ -38,10 +51,13 @@ await B.waitForFunction(() => !document.getElementById('play').disabled, null, {
 check(await until(A, id => { const o = bb.MP.others.get(id); return o && o.away; }, benId, 30000), 'Anna sees Ben as away after he closed the page');
 check(await B.evaluate(() => !document.getElementById('rejoinBtn').classList.contains('hidden') && /Rejoin/.test(document.getElementById('rejoinBtn').textContent)),
   'the menu offers "Rejoin game"', await text(B, 'rejoinBtn'));
+await keepFloor(B);
 await click(B, '#rejoinBtn');
 check(await until(B, () => bb.state === 'play' && bb.MP.inGame, null, 90000), 'Ben is back in the game', await text(B, 'mpStatus'));
 const [ga, gb] = await Promise.all([A, B].map(P => P.evaluate(() => bb.grid.map(r => r.join('')).join('|'))));
 check(ga === gb, 'on the same floor as Anna');
+const lay2 = await Promise.all([A, B].map(layoutOf));
+check(sameLayout(lay2) && lay2[0].seed === lay1[0].seed, 'with the same layout as Anna, rebuilt from what the host kept (d.v, d.kv, d.seed, nav hash)', lay2);
 check(await B.evaluate(() => bb.fusesGot === 1 && bb.fuses[0].got), 'with that box already solved');
 const posAfter = await B.evaluate(() => [bb.player.x, bb.player.y]);
 check(Math.hypot(posAfter[0] - posBefore[0], posAfter[1] - posBefore[1]) < 30, 'where he was', { posBefore, posAfter });
