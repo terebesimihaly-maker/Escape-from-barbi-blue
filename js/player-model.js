@@ -354,24 +354,29 @@ function paintFace(THREE, head, sc, f, seed) {
   tex.flipY = o.flipY; tex.colorSpace = o.colorSpace; tex.wrapS = o.wrapS; tex.wrapT = o.wrapT; tex.anisotropy = 4; tex.needsUpdate = true;
   return tex;
 }
-// where facial hair grows, in the face texture's layout (1024: mouth 510,547, chin 510,602): alpha = how much hair, every
-// edge soft, the lips always clear. col: painted in that colour (the skin's shadow); without: white (the fur's density)
+// where facial hair grows, in the face texture's layout (1024: the nose's tip at row 490, the skin of the upper lip 497-517,
+// the lips 518-572 (the line between them is drawn at 547), the chin 575-620): alpha = how much hair, every edge soft, the
+// lips always clear (models/player.glb has no facial hair over them at all). col: painted in that colour (the skin's shadow);
+// without: white (the fur's density)
 const beardCache = {};
 function beardMask(style, col, size) {
   const key = style + ':' + (col === undefined ? 'd' : col) + ':' + (size || 512); if (beardCache[key]) return beardCache[key];
   const S = size || 512, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'), k = S / 1024;
-  g.scale(k, k); g.filter = 'blur(' + Math.round(9 * k * 2) / 2 + 'px)'; g.fillStyle = col === undefined ? '#fff' : rgba(col, 1);
+  g.scale(k, k); g.filter = 'blur(' + Math.round(7 * k * 2) / 2 + 'px)'; g.fillStyle = col === undefined ? '#fff' : rgba(col, 1);
   const ell = (x, y, rx, ry) => { g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 7); g.fill(); };
   if (style === 'beard' || style === 'stubble') {            // (cheeks, jaw, chin and under it; thinner high on the cheeks)
     const top = style === 'stubble' ? 492 : 476;
-    g.beginPath(); g.moveTo(414, top); g.quadraticCurveTo(440, 498, 470, 508); g.quadraticCurveTo(510, 516, 550, 508); g.quadraticCurveTo(580, 498, 606, top);
+    g.beginPath(); g.moveTo(414, top); g.quadraticCurveTo(440, 498, 470, 506); g.quadraticCurveTo(510, 494, 550, 506); g.quadraticCurveTo(580, 498, 606, top);
     g.lineTo(612, 560); g.quadraticCurveTo(600, 650, 510, 680); g.quadraticCurveTo(420, 650, 408, 560); g.closePath(); g.fill();
   }
-  if (style === 'moustache' || style === 'goatee') ell(510, 528, 33, 10);
-  if (style === 'goatee') { ell(510, 588, 27, 30); g.fillRect(492, 560, 36, 24); }
+  if (style === 'moustache' || style === 'goatee') {        // (between the nose and the lip, the ends turning down beside the mouth)
+    ell(510, 508, 34, 8); ell(478, 516, 8, 9); ell(542, 516, 8, 9);
+    if (style === 'moustache') { ell(472, 528, 5, 9); ell(548, 528, 5, 9); }
+  }
+  if (style === 'goatee') ell(510, 600, 25, 21);            // (the chin, under the lower lip)
   g.filter = 'none'; g.globalCompositeOperation = 'destination-out';
-  g.filter = 'blur(' + Math.round(3 * k * 2) / 2 + 'px)'; ell(510, 549, 31, 9);                    // (the lips)
-  if (style !== 'stubble') { g.fillStyle = 'rgba(0,0,0,0.5)'; ell(510, 508, 16, 6); }              // (under the nose: thinner)
+  g.filter = 'blur(' + Math.round(5 * k * 2) / 2 + 'px)'; ell(510, 545, 38, 28);                    // (the lips, both of them, and a little more)
+  g.fillStyle = 'rgba(0,0,0,0.6)'; ell(510, 494, 18, 5); g.fillStyle = '#000'; ell(510, 478, 30, 14);   // (under the nose thinner; none on it)
   beardCache[key] = c; return c;
 }
 // a ring (a torus), for the glasses' rims (the game's three.js build has no TorusGeometry). arc: how much of the circle
@@ -541,7 +546,7 @@ function furMaterial(THREE, src, color, fill, many) {
       .replace('#include <map_fragment>', [
         '#ifdef USE_MAP', 'float dens = texture2D( map, vMapUv ).a;', '#else', 'float dens = 1.0;', '#endif',
         'vec4 fr = texture2D( furMap, mix( vFurRoot, vFurTip, vLayer ) );',
-        'float hh = fr.a * step( fract( fr.r * 17.0 ), dens * furMany ) * ( 0.45 + 0.55 * smoothstep( 0.2, 0.9, dens ) );',   // (fewer and shorter hairs at the hairline)
+        'float hh = fr.a * step( 0.06, dens ) * step( fract( fr.r * 17.0 ), dens * furMany ) * ( 0.45 + 0.55 * smoothstep( 0.2, 0.9, dens ) );',   // (fewer and shorter hairs at the hairline)
         'if ( vLayer < 0.001 ) { if ( hh < 0.04 && ( dens < 0.92 || furFill < 0.5 ) ) discard; }',   // (the scalp: the hairs\' roots; covered between them too where the hair is thick)
         'else if ( hh < vLayer * 0.97 + 0.02 || vLayer > furTop ) discard;',
         'diffuseColor.rgb *= ( 1.0 - furVar * 0.75 + furVar * fr.r ) * mix( 0.5, 1.05, vLayer );'].join('\n'))   // (darker down among the roots)

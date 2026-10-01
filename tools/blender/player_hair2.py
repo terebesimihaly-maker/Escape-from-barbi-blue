@@ -77,7 +77,10 @@ def build_hair(arm):
     styles['FurCurly'] = player_fur.build_fur(arm, 'FurCurly', 0.006, 0.002, from_crown, mat=fur_m)
     # facial hair: the lower face, the jaw, the upper lip and under the chin; which of it grows hair (stubble, a beard, a
     # moustache, a goatee) is painted in the game in the face texture's layout (UV0), the hairs leaning down
-    face_region = lambda p: 1.33 < p.z < 1.468 and p.y < 0.012 and not (p.z > 1.44 and abs(p.x) < 0.045 and p.y < -0.1)
+    # (never any hair on the lips or the nose; the gaps a little smaller than the painted ones, so the hair thins out before them)
+    lips = lambda p: abs(p.x) < 0.024 and 1.398 < p.z < 1.413 and p.y < -0.112
+    nose = lambda p: abs(p.x) < 0.03 and p.z > 1.426 and p.y < -0.118
+    face_region = lambda p: 1.33 < p.z < 1.468 and p.y < 0.012 and not (p.z > 1.44 and abs(p.x) < 0.045 and p.y < -0.1) and not lips(p) and not nose(p)
     styles['FurFace'] = player_fur.build_fur(arm, 'FurFace', 0.006, 0.004, lambda p: Vector((p.x * 2.5, -0.35, -1)), tile=0.009,
                                              region=face_region, head_uv=True, mat=fur_m)
 
