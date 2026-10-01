@@ -48,9 +48,23 @@ def transfer_weights(dst, src):
         bpy.ops.object.vertex_group_limit_total(group_select_mode='ALL', limit=4)
         bpy.ops.object.vertex_group_normalize_all(group_select_mode='ALL', lock_active=False)
 
+def use_best_device(scene=None):
+    """Cycles on the graphics card when this machine has one (NVIDIA: OptiX, then CUDA; AMD: HIP; Intel: oneAPI; Mac: Metal),
+       otherwise on the processor. Returns what it picked, e.g. 'OPTIX' or 'CPU'."""
+    sc = scene or bpy.context.scene; sc.render.engine = 'CYCLES'
+    prefs = bpy.context.preferences.addons['cycles'].preferences
+    for kind in ('OPTIX', 'CUDA', 'HIP', 'ONEAPI', 'METAL'):
+        try: prefs.compute_device_type = kind; prefs.refresh_devices()
+        except Exception: continue
+        gpus = [d for d in prefs.devices if d.type == kind]
+        if not gpus: continue
+        for d in prefs.devices: d.use = d.type == kind
+        sc.cycles.device = 'GPU'; return kind
+    prefs.compute_device_type = 'NONE'; sc.cycles.device = 'CPU'; return 'CPU'
+
 def setup_render(samples=12):
     sc = bpy.context.scene
-    sc.render.engine = 'CYCLES'; sc.cycles.samples = samples; sc.cycles.device = 'CPU'
+    sc.render.engine = 'CYCLES'; sc.cycles.samples = samples; use_best_device(sc)
     sc.cycles.use_denoising = True
     sc.world = bpy.data.worlds.get('w') or bpy.data.worlds.new('w'); sc.world.color = (0.06, 0.065, 0.09)
     if not bpy.data.objects.get('key'):
