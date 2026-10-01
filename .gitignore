@@ -1,3 +1,4 @@
 tools/.mocap-cache/
 node_modules
 tests/out/
+__pycache__/

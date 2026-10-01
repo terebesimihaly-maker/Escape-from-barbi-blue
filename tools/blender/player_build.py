@@ -1,19 +1,25 @@
 # Escape from Barbi Blue: builds models/player.glb (the players' model) in Blender, from models/barbi.glb:
 #   python tools/blender/player_clothes.py && python tools/blender/player_build.py      (Blender's Python module: pip install bpy)
-# The body and face stay the model's own; added: real clothes (tools/blender/player_clothes.py), six hairstyles
-# (tools/blender/player_hair.py) and skin where the body had none. Her model (models/character_mobile.glb) isn't touched.
+# The body and face stay the model's own; added: real clothes (tools/blender/player_clothes.py), seven hairstyles
+# (tools/blender/player_hair2.py: real hairs close to the head, strand cards for longer hair) and skin where the body had none. Her model (models/character_mobile.glb) isn't touched.
 import sys, os, math; HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 from common import *
 import numpy as np
-import hair_texture, cloth_textures, player_hair
+import hair_textures2, cloth_textures, player_hair2, player_glasses, player_drape
+from mathutils.bvhtree import BVHTree
 from PIL import Image
 OUT = '/tmp/efbb-player'; REPO = os.path.dirname(os.path.dirname(HERE))
 bpy.ops.wm.open_mainfile(filepath=OUT + '/clothes.blend')
 arm = [o for o in bpy.data.objects if o.type == 'ARMATURE'][0]
-hair_texture.make(OUT + '/hair_strands.png')
-for name, fn in (('knit', cloth_textures.knit), ('twill', cloth_textures.twill)):
+for fn, name in ((hair_textures2.cards, 'hair_cards'), (hair_textures2.curls, 'hair_curls'), (hair_textures2.fur, 'hair_fur'), (hair_textures2.scalp, 'hair_scalp')): fn(f'{OUT}/{name}.png')
+# (the hairs of the fur: loaded by the game itself, js/world3d.js; colour = lightness, alpha = height)
+Image.open(f'{OUT}/hair_fur.png').save(os.path.join(REPO, 'textures', 'hair_fur.webp'), 'WEBP', lossless=True)
+for name, fn in (('knit', cloth_textures.knit), ('fleece', cloth_textures.fleece), ('twill', cloth_textures.twill)):
     alb, nor = fn(); Image.fromarray((np.clip(alb, 0, 1) * 255).astype(np.uint8), 'L').convert('RGB').save(f'{OUT}/cloth_{name}.png'); Image.fromarray(nor, 'RGB').save(f'{OUT}/cloth_{name}_n.png')
-styles = player_hair.build_hair(arm)
+# the clothes made to hang like real ones (straight down from the chest and the hips, with folds), kept outside the body
+player_drape.drape_all([bpy.data.objects[n] for n in ('Body', 'BodyFill')])
+styles = player_hair2.build_hair(arm)
+glasses = player_glasses.build_glasses(arm)
 
 # ---- the clothes' material: the cloth texture (tinted in the game) times the baked shade (vertex colours), the weave's normal map
 def cloth_mat(name, kind):
@@ -27,8 +33,8 @@ def cloth_mat(name, kind):
     nt.links.new(tn.outputs['Color'], nm.inputs['Color']); nt.links.new(nm.outputs['Normal'], b.inputs['Normal'])
     b.inputs['Roughness'].default_value = 0.88
     return mat
-knit, twill = cloth_mat('ClothKnit', 'knit'), cloth_mat('ClothTwill', 'twill')
-CLOTHES = {'Tee': knit, 'LongTop': knit, 'Hoodie': knit, 'Skirt': knit, 'Sneakers': knit, 'Trousers': twill, 'ShortPants': twill}
+knit, fleece, twill = cloth_mat('ClothKnit', 'knit'), cloth_mat('ClothFleece', 'fleece'), cloth_mat('ClothTwill', 'twill')
+CLOTHES = {'Tee': knit, 'LongTop': knit, 'Hoodie': fleece, 'Skirt': knit, 'Sneakers': knit, 'Trousers': twill, 'ShortPants': twill}
 def area3d(o): return sum(p.area for p in o.data.polygons)
 def area_uv(o):
     uv = o.data.uv_layers.active.data; s = 0
@@ -45,7 +51,7 @@ for n, mat in CLOTHES.items():
 # ---- baked shade (ambient occlusion) into the clothes' vertex colours: darker under the arms, inside the collar, between the legs
 sc = bpy.context.scene; sc.render.engine = 'CYCLES'; sc.cycles.device = 'CPU'; sc.cycles.samples = 48
 sc.world = sc.world or bpy.data.worlds.new('w'); sc.world.light_settings.distance = 0.12
-occluders = [bpy.data.objects[n] for n in ('Body', 'Head', 'BodyFill')]
+occluders = [bpy.data.objects['Head']]          # (not the body: where it came near the cloth it left dark patches)
 for n in CLOTHES:
     o = bpy.data.objects[n]
     if 'AO' not in o.data.color_attributes: o.data.color_attributes.new('AO', 'BYTE_COLOR', 'POINT')
@@ -71,6 +77,7 @@ for n in ('Top', 'Hair', 'Icosphere'):
     if bpy.data.objects.get(n): bpy.data.objects.remove(bpy.data.objects[n])
 path = os.path.join(REPO, 'models', 'player.glb')
 bpy.ops.export_scene.gltf(filepath=path, export_format='GLB', export_skins=True, export_animations=False, export_apply=False, export_yup=True,
-    export_image_format='WEBP', export_image_quality=86, export_vertex_color='MATERIAL', export_texcoords=True, export_normals=True)
+    export_image_format='WEBP', export_image_quality=86, export_vertex_color='MATERIAL', export_texcoords=True, export_normals=True, export_attributes=True)
 meshes = {o.name: len(o.data.vertices) for o in bpy.data.objects if o.type == 'MESH'}
 print('wrote', path, round(os.path.getsize(path) / 1e6, 2), 'MB', meshes, 'total verts', sum(meshes.values()))
+bpy.ops.wm.save_as_mainfile(filepath=OUT + '/built.blend')

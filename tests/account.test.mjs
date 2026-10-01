@@ -32,8 +32,9 @@ check(['Top', 'Top colour', 'Bottoms', 'Bottoms colour', 'Shoes', 'Hair', 'Hair 
 // the real clothes and hair (models/player.glb, made in Blender): what you pick is what the character wears
 await p.evaluate(() => { document.querySelector('#pfCtl .ch[data-k=top][data-v=hoodie]').click(); document.querySelector('#pfCtl .ch[data-k=bottom][data-v=skirt]').click(); document.querySelector('#pfCtl .ch[data-k=hairStyle][data-v=ponytail]').click(); });
 const worn = await until(p, () => { const f = pv.fig, v = n => { const o = f && f.obj.getObjectByName(n); return !!(o && o.visible); };
-  return f && f.look.top === 'hoodie' && v('Hoodie') && !v('Tee') && !v('LongTop') && v('Skirt') && !v('Trousers') && v('HairPony') && !v('HairLong') && v('Sneakers'); }, null, 30000);
-check(worn, 'a hoodie, a skirt and a ponytail: the character wears exactly those', await p.evaluate(() => { const r = {}; pv.fig && pv.fig.obj.traverse(o => { if (o.isMesh && /^(Tee|LongTop|Hoodie|Trousers|ShortPants|Skirt|Hair|Sneakers)/.test(o.name)) r[o.name] = o.visible; }); return r; }));
+  return f && f.look.top === 'hoodie' && v('Hoodie') && !v('Tee') && !v('LongTop') && v('Skirt') && !v('Trousers') && v('HairPony') && !v('HairLong') && v('Sneakers')
+    && v('FurPony') && v('HairTie') && !v('FurBuzz'); }, null, 30000);
+check(worn, 'a hoodie, a skirt and a ponytail (real hairs combed back to its tie): the character wears exactly those', await p.evaluate(() => { const r = {}; pv.fig && pv.fig.obj.traverse(o => { if (o.isMesh && /^(Tee|LongTop|Hoodie|Trousers|ShortPants|Skirt|Hair|Fur|Sneakers)/.test(o.name)) r[o.name] = o.visible; }); return r; }));
 const hairs = await p.evaluate(async () => { const seen = []; for (const h of PlayerModel.LOOK_OPTIONS.hairStyle) { setLook(Object.assign({}, account.look, { hairStyle: h })); await new Promise(r => setTimeout(r, 50)); seen.push(h); } return seen; });
 check(hairs.length === 7, 'seven hairstyles to choose from: ' + hairs.join(', '));
 const pick = await p.evaluate(() => { const b = [...document.querySelectorAll('#pfCtl .sw[data-k=shirt]')].find(b => +b.dataset.v !== account.look.shirt); b.click(); return +b.dataset.v; });
@@ -42,6 +43,10 @@ check(await until(p, v => pv.fig && pv.fig.look.jacket === v, pick, 20000), 'the
 await p.evaluate(() => { document.querySelector('#pfCtl .ch[data-k=hairStyle][data-v=long]').click(); document.querySelector('#pfCtl .ch[data-k=glasses][data-v=round]').click();
   document.querySelector('#pfCtl .ch[data-k=beard][data-v=goatee]').click(); });
 check(await until(p, () => pv.fig && pv.fig.look.long && pv.fig.face.glasses && pv.fig.face.glasses.round && pv.fig.face.beard === 'goatee', null, 20000), 'long hair, round glasses and a goatee: all on the character');
+// (made in Blender: the glasses a real pair on the nose, the goatee real hairs on the chin, stacked a fraction of a millimetre apart)
+check(await until(p, () => { const v = n => { const o = pv.fig.obj.getObjectByName(n); return !!(o && o.visible); }, fur = pv.fig.obj.getObjectByName('FurFace');
+  return v('GlassesRound') && v('GlassesLensRound') && !v('GlassesSquare') && v('FurFace') && fur.geometry.attributes._layer && fur.geometry.attributes._layer.array.at(-1) === 1 && fur.geometry.attributes._layer.array[0] === 0; }, null, 20000),
+  'the round glasses are the real pair, and the goatee is real hairs');
 check(await until(p, () => pv.zoomT === 1 && pv.zoom > 0.9, null, 20000), 'choosing something for the face: the camera goes close to the face');
 await p.evaluate(() => document.querySelector('#pfCtl .sw[data-k=shoes]').click());
 check(await p.evaluate(() => pv.zoomT === 0), 'choosing shoes: back out to see all of you');

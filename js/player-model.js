@@ -308,21 +308,9 @@ function paintFace(THREE, head, sc, f, seed) {
       soft(510 + s * 49, 466, 18, 6, 0x6a4a40, a * 0.35); } }
   // 3. facial hair
   const browCol = darker(mix(f.hair, 0x1a120e, 0.5), 0.55);   // (clearly darker than the hair, and than the skin)
-  if (f.beard !== 'none') {
-    // every edge fades: along the top of the cheeks and under the nose, a full beard or stubble thins out over ~24 px
-    const col = darker(mix(f.hair, 0x1a120e, 0.45), 0.6), stub = f.beard === 'stubble';
-    const topY = x => 518 - 30 * sm(36, 92, Math.abs(x - 510)), botY = x => 560 + 64 * Math.max(0, 1 - ((x - 510) / 90) ** 2);
-    const inBeard = (x, y) => f.beard === 'moustache' ? ((x - 510) / 31) ** 2 + ((y - 528) / 8) ** 2 < 1
-      : f.beard === 'goatee' ? ((x - 510) / 30) ** 2 + ((y - 528) / 8) ** 2 < 1 || ((x - 510) / 26) ** 2 + ((y - 585) / 30) ** 2 < 1
-      : Math.abs(x - 510) < 94 && y > topY(x) && y < botY(x);
-    const fade = (x, y) => f.beard === 'beard' || stub ? Math.min(1, (y - topY(x)) / 24) : 1;
-    if (f.beard === 'beard') for (let x = 414; x < 606; x += 2) {                          // (the full beard: column by column, soft at the top)
-      const t = topY(x), gr = g.createLinearGradient(0, t, 0, t + 24); gr.addColorStop(0, rgba(col, 0)); gr.addColorStop(1, rgba(col, 0.6));
-      g.fillStyle = gr; g.fillRect(x, t, 2.2, botY(x) - t); }
-    if (f.beard === 'moustache' || f.beard === 'goatee') { soft(510, 528, 31, 8, col, 0.6, 0.45); if (f.beard === 'goatee') soft(510, 585, 26, 30, col, 0.6, 0.5); }
-    for (let i = 0, n = stub ? 2600 : 2000; i < n; i++) { const x = 400 + r() * 220, y = 480 + r() * 160; if (!inBeard(x, y)) continue;
-      g.fillStyle = rgba(col, (stub ? 0.2 + r() * 0.25 : 0.35 + r() * 0.45) * fade(x, y)); g.fillRect(x, y, stub ? 1 : 1.4, stub ? 1 : 2.2); }
-  }
+  // (the hairs themselves are real: the face's fur, beardMask below; on the skin only the faint shadow of the roots)
+  if (f.beard !== 'none') { g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = f.beard === 'stubble' ? 0.16 : 0.22;
+    g.globalCompositeOperation = 'multiply'; g.drawImage(beardMask(f.beard, mix(darker(f.hair, 0.8), 0x7f8a9a, 0.35), W), 0, 0, W, H); g.restore(); }
   // 4. a closed mouth: the upper lip with its bow, the fuller lower lip, the line between, a little light on the lower lip
   const cx = 510, y0 = 547 - f.smile * 1.5, w = f.mouthW, fl = f.lipFull, lip = shade(f.lipCol), up = f.smile * 3;
   g.fillStyle = rgba(mix(lip, 0x000000, 0.18), 0.92);
@@ -363,6 +351,26 @@ function paintFace(THREE, head, sc, f, seed) {
   tex.flipY = o.flipY; tex.colorSpace = o.colorSpace; tex.wrapS = o.wrapS; tex.wrapT = o.wrapT; tex.anisotropy = 4; tex.needsUpdate = true;
   return tex;
 }
+// where facial hair grows, in the face texture's layout (1024: mouth 510,547, chin 510,602): alpha = how much hair, every
+// edge soft, the lips always clear. col: painted in that colour (the skin's shadow); without: white (the fur's density)
+const beardCache = {};
+function beardMask(style, col, size) {
+  const key = style + ':' + (col === undefined ? 'd' : col) + ':' + (size || 512); if (beardCache[key]) return beardCache[key];
+  const S = size || 512, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'), k = S / 1024;
+  g.scale(k, k); g.filter = 'blur(' + Math.round(9 * k * 2) / 2 + 'px)'; g.fillStyle = col === undefined ? '#fff' : rgba(col, 1);
+  const ell = (x, y, rx, ry) => { g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 7); g.fill(); };
+  if (style === 'beard' || style === 'stubble') {            // (cheeks, jaw, chin and under it; thinner high on the cheeks)
+    const top = style === 'stubble' ? 492 : 476;
+    g.beginPath(); g.moveTo(414, top); g.quadraticCurveTo(440, 498, 470, 508); g.quadraticCurveTo(510, 516, 550, 508); g.quadraticCurveTo(580, 498, 606, top);
+    g.lineTo(612, 560); g.quadraticCurveTo(600, 650, 510, 680); g.quadraticCurveTo(420, 650, 408, 560); g.closePath(); g.fill();
+  }
+  if (style === 'moustache' || style === 'goatee') ell(510, 528, 33, 10);
+  if (style === 'goatee') { ell(510, 588, 27, 30); g.fillRect(492, 560, 36, 24); }
+  g.filter = 'none'; g.globalCompositeOperation = 'destination-out';
+  g.filter = 'blur(' + Math.round(3 * k * 2) / 2 + 'px)'; ell(510, 549, 31, 9);                    // (the lips)
+  if (style !== 'stubble') { g.fillStyle = 'rgba(0,0,0,0.5)'; ell(510, 508, 16, 6); }              // (under the nose: thinner)
+  beardCache[key] = c; return c;
+}
 // a ring (a torus), for the glasses' rims (the game's three.js build has no TorusGeometry). arc: how much of the circle
 function ringGeo(THREE, R, r, seg, tube, arc) {
   const pos = [], nor = [], ind = [], A = arc || Math.PI * 2, closed = !arc;
@@ -398,6 +406,34 @@ function makeGlasses(THREE, f, head, bone) {
   bone.add(G); G.traverse(o => { if (o.isMesh) { o.castShadow = false; o.frustumCulled = false; } });
   return G;
 }
+// facial hair: the face's fur, shaped like this face (shapeHead), as long as the style (stubble: a fraction of a millimetre)
+const BEARD = { stubble: [0.0009, 4, 0, 0.32], moustache: [0.0055, 10, 0, 1], goatee: [0.0065, 10, 0, 1], beard: [0.009, 12, 0, 1] };   // (length, layers, scalp fill, how many hairs)
+function faceFur(THREE, mesh, f, look) {
+  const B = BEARD[f.beard]; if (!B) { mesh.visible = false; return null; }
+  const g = mesh.geometry.clone(); shapeHead(g, f);
+  const stack = furGeometry(THREE, g, B[0], B[1]); furStacks.delete(g); g.dispose(); stack.userData.shared = false;
+  const tex = new THREE.CanvasTexture(beardMask(f.beard)); tex.flipY = false; tex.anisotropy = 4;
+  const col = new THREE.Color(f.hair).multiplyScalar(f.beard === 'stubble' ? 0.8 : 1.15);
+  mesh.geometry = stack; mesh.material = furMaterial(THREE, { map: tex }, col, B[2], B[3]); mesh.castShadow = false; mesh.visible = true;
+  return { geo: stack, tex };
+}
+// glasses (made in Blender, tools/blender/player_glasses.py): the pair chosen, in its colour, moved with the face's shape
+// (where this face's nose bridge ended up)
+function wearGlasses(THREE, meshes, f) {
+  const kind = f.glasses ? (f.glasses.round ? 'Round' : 'Square') : null, out = [];
+  for (const k of ['Round', 'Square']) for (const n of ['Glasses' + k, 'GlassesLens' + k]) if (meshes[n]) meshes[n].visible = k === kind;
+  if (!kind) return null;
+  const probe = new THREE.BufferGeometry(); probe.setAttribute('position', new THREE.Float32BufferAttribute([0, 1.469, 0.134, 0.035, 1.469, 0.117], 3));
+  shapeHead(probe, f); const P = probe.attributes.position, dz = Math.max(P.getZ(0) - 0.134, P.getZ(1) - 0.117), dy = P.getY(0) - 1.469; probe.dispose();
+  for (const n of ['Glasses' + kind, 'GlassesLens' + kind]) {
+    const m = meshes[n], g = m.geometry.clone(); g.translate(0, dy, dz); m.geometry = g; out.push(g);
+    if (n.startsWith('GlassesLens')) m.material = new THREE.MeshStandardMaterial({ color: 0xeef3ff, roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.14,
+      depthWrite: false, side: THREE.DoubleSide });
+    else { m.material.color.set(f.glasses.col); m.material.roughness = kind === 'Round' ? 0.28 : 0.35; m.material.metalness = kind === 'Round' ? 0.85 : 0; }
+    m.castShadow = false;
+  }
+  return out;
+}
 // give a figure its own face (meshes: its parts by name, seed: the player's id)
 function makeFace(THREE, meshes, bone, f, seed) {
   const head = meshes.Head, sc = meshes.HairCap ? scalpVerts(head.geometry, meshes.HairCap) : null;
@@ -406,7 +442,7 @@ function makeFace(THREE, meshes, bone, f, seed) {
   head.material.color.set(0xffffff);                                                   // (the skin tone is in the picture now)
   if (head.material.normalScale) head.material.normalScale.set(0.45, 0.45);           // (her own skin detail, only a little)
   head.material.needsUpdate = true;
-  const glasses = f.glasses && bone ? makeGlasses(THREE, f, head, bone) : null;
+  const glasses = f.glasses && bone && !meshes.GlassesRound ? makeGlasses(THREE, f, head, bone) : null;   // (the old model: glasses built here)
   return { glasses, geo: head.geometry, tex: head.material.map };
 }
 
@@ -422,9 +458,89 @@ const LOOK_OPTIONS = {
   hairStyle: ['buzz', 'short', 'bob', 'long', 'ponytail', 'bun', 'curly'], beard: ['none', 'stubble', 'beard', 'moustache', 'goatee'], glasses: ['none', 'round', 'square'],
   top: ['tee', 'long', 'hoodie'], bottom: ['trousers', 'shorts', 'skirt'],
   body: ['a', 'b'], height: [1.02, 1.18] };
-// (the meshes in models/player.glb for each choice; buzz is the scalp cap alone)
+// (the meshes in models/player.glb for each choice: the hair close to the head (Fur*), the longer strands, a hair tie)
 const TOP_MESH = { tee: 'Tee', long: 'LongTop', hoodie: 'Hoodie' }, BOTTOM_MESH = { trousers: 'Trousers', shorts: 'ShortPants', skirt: 'Skirt' };
-const HAIR_MESH = { buzz: null, short: 'HairShort', bob: 'HairBob', long: 'HairLong', ponytail: 'HairPony', bun: 'HairBun', curly: 'HairCurly' };
+const HAIR_MESH = { buzz: ['FurBuzz'], short: ['FurShort', 'HairShort'], bob: ['FurPart', 'HairBob'], long: ['FurPart', 'HairLong'],
+  ponytail: ['FurPony', 'HairPony', 'HairTie'], bun: ['FurBun', 'HairBun', 'HairTieBun'], curly: ['FurCurly', 'HairCurly'] };
+const HAIR_PARTS = [...new Set(Object.values(HAIR_MESH).flat())];
+/* ---------- short hair as real hairs (tools/blender/player_fur.py): the scalp in the file, stacked here into layers a
+   fraction of a millimetre apart; every hair a column through them that thins to its tip (textures/hair_fur.webp: colour =
+   how light the hair is, alpha = how far it stands out), leaning the way it grows (UV1 at the root, UV2 at the tip).
+   The scalp texture's alpha (UV0) says how much hair there is: full inside, thinning out at the hairline. */
+// (how long, how many layers, how much the scalp between the hairs is covered: a buzz cut shows the skin)
+const FUR = { FurBuzz: [0.0035, 12, 0, 0.78], FurShort: [0.008, 14, 0.6], FurPony: [0.003, 12, 1], FurBun: [0.003, 12, 1], FurPart: [0.003, 10, 1], FurCurly: [0.006, 12, 1] };
+const furStacks = new WeakMap();
+function furGeometry(THREE, g, h, n, fill) {
+  if (furStacks.has(g)) return furStacks.get(g);
+  const out = new THREE.BufferGeometry(), cnt = g.attributes.position.count, N = g.attributes.normal;
+  for (const [name, a] of Object.entries(g.attributes)) {
+    const k = a.itemSize, arr = new Float32Array(cnt * k * n);
+    for (let L = 0; L < n; L++) for (let i = 0; i < cnt; i++) for (let c = 0; c < k; c++) arr[(L * cnt + i) * k + c] = a.getComponent(i, c);
+    if (name === 'position') for (let L = 0; L < n; L++) { const d = h * L / (n - 1);
+      for (let i = 0; i < cnt; i++) { const o = (L * cnt + i) * 3; arr[o] += N.getX(i) * d; arr[o + 1] += N.getY(i) * d; arr[o + 2] += N.getZ(i) * d; } }
+    out.setAttribute(name, new THREE.BufferAttribute(arr, k));
+  }
+  const lay = new Float32Array(cnt * n); for (let L = 0; L < n; L++) lay.fill(L / (n - 1), L * cnt, (L + 1) * cnt);
+  out.setAttribute('_layer', new THREE.BufferAttribute(lay, 1));
+  const idx = g.index.array, ind = new Uint32Array(idx.length * n);
+  for (let L = 0; L < n; L++) for (let i = 0; i < idx.length; i++) ind[L * idx.length + i] = idx[i] + L * cnt;
+  out.setIndex(new THREE.BufferAttribute(ind, 1)); out.userData.shared = true;
+  furStacks.set(g, out); return out;
+}
+let furTex = null;
+const furUniform = { value: null };
+function furTexture(THREE) {
+  if (furTex) return furUniform;
+  const c = document.createElement('canvas'); c.width = c.height = 1;            // (until the picture loads: no hairs)
+  furTex = new THREE.CanvasTexture(c); furUniform.value = furTex;
+  const img = new Image();
+  img.onload = () => { const t = new THREE.CanvasTexture(img); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = '';
+    t.premultiplyAlpha = false; t.anisotropy = 4; furUniform.value = t; };
+  img.src = 'textures/hair_fur.webp';
+  return furUniform;
+}
+// hair cards: a neutral strand texture, cut out with soft edges (no sorting), lit like hair: besides the usual light, the
+// highlight that runs across the strands (Kajiya-Kay: from the strand's direction, the cards' UV v, worked out per pixel), a
+// bright one and a second one in the hair's own colour a little lower, only as strong as the light that actually reaches it
+function hairCardMaterial(THREE, src, hair) {
+  const col = new THREE.Color(hair), m = new THREE.MeshStandardMaterial({ map: src.map, vertexColors: src.vertexColors, color: col.clone().multiplyScalar(1.1),
+    alphaTest: 0.35, alphaToCoverage: true, side: THREE.DoubleSide, roughness: 0.62, metalness: 0 });
+  m.onBeforeCompile = sh => {
+    sh.uniforms.sheenTint = { value: col.clone().lerp(new THREE.Color(0xffffff), 0.18) };
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 sheenTint;')
+      .replace('#include <opaque_fragment>', [
+        'vec3 hq0 = dFdx( -vViewPosition ), hq1 = dFdy( -vViewPosition );',
+        '#ifdef USE_MAP', 'vec2 hs0 = dFdx( vMapUv ), hs1 = dFdy( vMapUv );', '#else', 'vec2 hs0 = vec2( 0.0, 1.0 ), hs1 = vec2( 1.0, 0.0 );', '#endif',
+        'vec3 hN = normalize( normal ), hB = normalize( cross( hq1, hN ) * hs0.y + cross( hN, hq0 ) * hs1.y + 1e-6 );',   // (along the strand)
+        'vec3 hV = normalize( vViewPosition ), hL = normalize( vec3( 0.25, 0.75, 0.6 ) );',
+        'float hT1 = dot( hB, normalize( hL + hV ) ), hT2 = dot( hB, normalize( hL + hV + hN * 0.35 ) );',
+        'float hS = pow( max( 0.0, sqrt( max( 0.0, 1.0 - hT1 * hT1 ) ) ), 80.0 ) * 0.16 + pow( max( 0.0, sqrt( max( 0.0, 1.0 - hT2 * hT2 ) ) ), 20.0 ) * 0.1;',
+        'float hLit = dot( reflectedLight.directDiffuse + reflectedLight.indirectDiffuse, vec3( 0.3, 0.59, 0.11 ) ) / max( 0.05, dot( diffuseColor.rgb, vec3( 0.3, 0.59, 0.11 ) ) );',
+        'outgoingLight += sheenTint * hS * clamp( hLit, 0.0, 2.0 ) * diffuseColor.a;',
+        '#include <opaque_fragment>'].join('\n'));
+  };
+  m.customProgramCacheKey = () => 'haircard';
+  return m;
+}
+function furMaterial(THREE, src, color, fill, many) {
+  const m = new THREE.MeshStandardMaterial({ map: src.map, color, roughness: 0.72, metalness: 0 });
+  const fu = furTexture(THREE);
+  m.onBeforeCompile = sh => {
+    sh.uniforms.furMap = fu; sh.uniforms.furFill = { value: fill }; sh.uniforms.furMany = { value: many === undefined ? 1 : many }; sh.uniforms.furVar = { value: many === undefined ? 0.65 : many < 0.5 ? 0.35 : 0.7 };   // (scalp hair; stubble; beards and a buzz cut)
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float _layer;\nvarying float vLayer;\nvarying vec2 vFurRoot;\nvarying vec2 vFurTip;\n#ifndef USE_UV1\nattribute vec2 uv1;\n#endif\n#ifndef USE_UV2\nattribute vec2 uv2;\n#endif')
+      .replace('#include <uv_vertex>', '#include <uv_vertex>\nvLayer = _layer; vFurRoot = uv1; vFurTip = uv2;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D furMap;\nuniform float furFill;\nuniform float furMany;\nuniform float furVar;\nvarying float vLayer;\nvarying vec2 vFurRoot;\nvarying vec2 vFurTip;')
+      .replace('#include <map_fragment>', [
+        '#ifdef USE_MAP', 'float dens = texture2D( map, vMapUv ).a;', '#else', 'float dens = 1.0;', '#endif',
+        'vec4 fr = texture2D( furMap, mix( vFurRoot, vFurTip, vLayer ) );',
+        'float hh = fr.a * step( fract( fr.r * 17.0 ), dens * furMany ) * ( 0.45 + 0.55 * smoothstep( 0.2, 0.9, dens ) );',   // (fewer and shorter hairs at the hairline)
+        'if ( vLayer < 0.001 ) { if ( hh < 0.04 && ( dens < 0.92 || furFill < 0.5 ) ) discard; }',   // (the scalp: the hairs\' roots; covered between them too where the hair is thick)
+        'else if ( hh < vLayer * 0.97 + 0.02 ) discard;',
+        'diffuseColor.rgb *= ( 1.0 - furVar * 0.75 + furVar * fr.r ) * mix( 0.5, 1.05, vLayer );'].join('\n'));   // (darker down among the roots)
+  };
+  m.customProgramCacheKey = () => 'fur';
+  return m;
+}
 // a random look (a new guest, "Randomize"): the face from the seed, and clothes to go with it
 function randomLook(seed) {
   const f = faceSpec(seed), r = rng(seed + ':clothes'), pick = a => a[r() * a.length | 0], O = LOOK_OPTIONS;
@@ -475,20 +591,28 @@ function createHuman(THREE, opts) {
   if (meshes.Body) { zoneBody(THREE, meshes.Body); dressBody(THREE, meshes.Body.material, look, dressed); meshes.Body.material.color.set(look.skin); }
   if (meshes.Head) meshes.Head.material.color.set(look.skin);
   if (dressed) {
-    const top = TOP_MESH[look.top] || 'Tee', bottom = BOTTOM_MESH[look.bottom] || 'Trousers', hair = HAIR_MESH[look.hairStyle];
+    const top = TOP_MESH[look.top] || 'Tee', bottom = BOTTOM_MESH[look.bottom] || 'Trousers', hair = HAIR_MESH[look.hairStyle] || HAIR_MESH.short;
     for (const n of [...Object.values(TOP_MESH), ...Object.values(BOTTOM_MESH)]) if (meshes[n]) meshes[n].visible = n === top || n === bottom;
-    for (const n of Object.values(HAIR_MESH)) if (n && meshes[n]) meshes[n].visible = n === hair;
+    for (const n of HAIR_PARTS) if (meshes[n]) meshes[n].visible = hair.includes(n);
     if (meshes.Hair) meshes.Hair.visible = false;
     if (meshes.Top) meshes.Top.visible = false;
-    if (meshes.Shorts) { meshes.Shorts.visible = bottom === 'Skirt'; recolor(THREE, meshes.Shorts.material, 0x1c1c1e, 1); }   // (under a skirt)
-    if (meshes.BodyFill) meshes.BodyFill.material.color.set(look.skin).multiply(new THREE.Color().setRGB(0.345, 0.259, 0.235, THREE.SRGBColorSpace));   // (the body texture's average skin, tinted like the body)
+    if (meshes.Shorts) meshes.Shorts.visible = false;   // (her old shorts: not worn any more, not even under a skirt)
+    if (meshes.BodyFill) { const m = meshes.BodyFill.material;   // (the body texture's average skin, tinted like the body; never drawn under the clothes)
+      m.color.set(look.skin).multiply(new THREE.Color().setRGB(0.345, 0.259, 0.235, THREE.SRGBColorSpace));
+      const legTo = look.bottom === 'trousers' ? 0.13 : look.bottom === 'shorts' ? 0.6 : 9;
+      m.onBeforeCompile = sh => { sh.uniforms.uLegTo = { value: legTo };
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vRest;').replace('#include <begin_vertex>', '#include <begin_vertex>\n  vRest = position;');
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vRest;\nuniform float uLegTo;')
+          .replace('#include <map_fragment>', '#include <map_fragment>\n  if (vRest.y > 0.86 && vRest.y < 1.215 && abs(vRest.x) < 0.17) discard;\n  if (vRest.y < 0.96 && vRest.y > uLegTo && abs(vRest.x) < 0.2) discard;'); };
+      m.customProgramCacheKey = () => 'fill' + legTo; }
     const cloth = (m, c) => { if (!m) return; m.material.color.set(c); m.material.side = THREE.DoubleSide; };   // (both sides: you can see into a sleeve)
     cloth(meshes[top], look.jacket); cloth(meshes[bottom], look.pants); cloth(meshes.Sneakers, look.shoe);
-    for (const n of [...Object.values(HAIR_MESH), 'HairCap']) if (n && meshes[n]) {
-      const m = meshes[n].material;
-      if (n === 'HairCap') recolor(THREE, m, look.hair, 2);
-      else { m.color.set(look.hair).multiplyScalar(1.2); m.alphaTest = 0.45; m.transparent = false; m.depthWrite = true; m.side = THREE.DoubleSide; }   // (hair cards: a neutral strand texture, cut out, no sorting)
+    for (const n of HAIR_PARTS) { const o = meshes[n]; if (!o || !o.visible) continue;
+      if (FUR[n]) { o.geometry = furGeometry(THREE, o.geometry, FUR[n][0], FUR[n][1]); o.material = furMaterial(THREE, o.material, new THREE.Color(look.hair), FUR[n][2], FUR[n][3]); o.castShadow = false; }
+      else if (n.startsWith('HairTie')) o.material.color.set(0x0c0c0e);
+      else { const g = o.material; o.material = hairCardMaterial(THREE, g, look.hair); g.dispose(); }
     }
+    if (meshes.HairCap) meshes.HairCap.visible = false;
   } else {
     if (meshes.Top) recolor(THREE, meshes.Top.material, look.jacket, 1);
     if (meshes.Shorts) recolor(THREE, meshes.Shorts.material, look.pants, 1);
@@ -498,6 +622,8 @@ function createHuman(THREE, opts) {
   const bone = n => model.getObjectByName(n);
   for (const n of ['breastL', 'breastR']) { const b = bone(n); if (b) b.scale.setScalar(look.flat); }
   const own = meshes.Head ? makeFace(THREE, meshes, bone('head'), face, seed) : null;
+  const beardFur = meshes.FurFace ? faceFur(THREE, meshes.FurFace, face, look) : null;
+  const specs = meshes.GlassesRound ? wearGlasses(THREE, meshes, face) : null;
   model.updateMatrixWorld(true);
   for (const n of ['footL', 'footR', 'toe1-1L', 'toe1-1R', 'toe3-1L', 'toe3-1R', 'toe5-1L', 'toe5-1R']) { const b = bone(n); if (b) b.userData.restY = b.getWorldPosition(new THREE.Vector3()).y; }
   const anim = window.BarbiAnim.build(THREE, model, { mocap: opts.mocap, scale: look.scale, set: 'player', maxTime: 2.2 });
@@ -592,9 +718,11 @@ function createHuman(THREE, opts) {
     root.traverse(o => { if (o.material) { if (o.isSprite && o.material.map) o.material.map.dispose(); o.material.dispose(); } });
     tube.geometry.dispose(); lens.geometry.dispose();
     if (own) { own.geo.dispose(); own.tex.dispose(); if (own.glasses) own.glasses.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
+    if (beardFur) { beardFur.geo.dispose(); beardFur.tex.dispose(); }
+    if (specs) specs.forEach(g => g.dispose());
   }
   return { obj: root, setName, update, light, dispose, anim, human: true, face, look };
 }
 
-window.PlayerModel = { create, createHuman, TAGS, faceSpec, LOOK_OPTIONS, sanitizeLook, randomLook };
+window.PlayerModel = { create, createHuman, TAGS, faceSpec, LOOK_OPTIONS, sanitizeLook, randomLook, furUniform };
 })();
