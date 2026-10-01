@@ -148,8 +148,11 @@ await A.evaluate(() => bb.fuses.forEach((f, k) => { if (!f.got) bb.hostEmit({ t:
 check((await Promise.all([A, B, C].map(P => until(P, () => bb.powerOn, null, 10000)))).every(Boolean), 'all solved: the door unlocks for everyone');
 await freeze();
 const ex = await A.evaluate(() => ({ x: bb.exit.x, y: bb.exit.y, ang: 0 }));
+// (the next floor screen only lasts a moment, and a slow page can be busy building the new floor right through a 200 ms poll:
+// each page notes, every frame, whether it showed it)
+for (const P of [A, B, C]) await P.evaluate(() => { window.__sawTrans = false; const f = () => { if (bb.state === 'trans') window.__sawTrans = true; else requestAnimationFrame(f); }; requestAnimationFrame(f); });
 await goTo(B, ex);
-check((await Promise.all([A, B, C].map(P => until(P, () => bb.state === 'trans', null, 10000)))).every(Boolean), 'Bobby reaches the door: everyone sees the next floor screen');
+check((await Promise.all([A, B, C].map(P => until(P, () => window.__sawTrans, null, 30000)))).every(Boolean), 'Bobby reaches the door: everyone sees the next floor screen');
 check((await Promise.all([A, B, C].map(P => until(P, () => bb.state === 'play' && bb.floorIdx === 1, null, 30000)))).every(Boolean), 'everyone is on floor 2');
 check(!(await C.evaluate(() => bb.player.dead || bb.player.down)), 'Cara is back on the new floor');
 const g2 = await Promise.all([A, B, C].map(P => P.evaluate(() => bb.grid.map(r => r.join('')).join('|'))));
