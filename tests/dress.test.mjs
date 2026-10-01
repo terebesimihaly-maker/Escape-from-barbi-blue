@@ -185,12 +185,14 @@ for (let i = 0; i < 5; i++) for (const n of [1, 4]) for (let s = 0; s < SEEDS; s
   P.band.forEach((e, k) => P.band.forEach((o, j) => { if (j <= k || o.face !== e.face || e.mount === 'corner' || o.mount === 'corner') return;
     const uo = e.u0 < o.u1 - 1e-6 && e.u1 > o.u0 + 1e-6, yo = e.z0 < o.z0 + o.h - 1e-6 && e.z0 + e.h > o.z0 + 1e-6; ok('bandoverlap', !(uo && yo), [tag, e.id, o.id]); }));
   // ... nor do pieces on two walls of one tile meet in its inside corner: furniture, floor dolls, cobweb cards (their 0.44 m square in
-  // the corner) and a servant run's 0.30 m side insets, as boxes on the floor plan with their heights
+  // the corner), a servant run's 0.30 m side insets and a fireplace's breast (the kit's whole-face envelope, D deep), as boxes on the floor
+  // plan with their heights
   { const rectOf = (f, u0, u1, d0, d1) => { const a = fpt(f, u0, d0), c = fpt(f, u1, d1); return [Math.min(a[0], c[0]), Math.min(a[1], c[1]), Math.max(a[0], c[0]), Math.max(a[1], c[1])]; };
     const it = P.band.map(e => { const f = F[e.face], w = e.depth / L;
       return { id: e.id, face: e.face, t: f.x + ',' + f.y, y0: e.z0, y1: e.z0 + e.h, r: e.mount === 'corner' ? rectOf(f, e.end ? 1 - w : 0, e.end ? 1 : w, 0, e.depth) : rectOf(f, e.u0, e.u1, e.inset || 0, e.depth) }; });
     for (const q of P.dolls) if (q.y < 0.5) { const f = F[q.face], du = 0.18 / L; it.push({ id: 'doll', face: q.face, t: f.x + ',' + f.y, y0: 0, y1: 0.5, r: rectOf(f, q.u - du, q.u + du, 0, 0.3) }); }
     F.forEach((f, k) => { if (f.inset) it.push({ id: 'inset', face: k, t: f.x + ',' + f.y, y0: 0, y1: 9, r: rectOf(f, 0, 1, 0, f.inset), inset: true }); });
+    for (const m of P.modules) if (m.kind === 'fireplace') { const f = F[m.face]; it.push({ id: 'fireplace', face: m.face, t: f.x + ',' + f.y, y0: 0, y1: 9, r: rectOf(f, 0, 1, 0, ARCH[m.node].D), inset: true }); }
     const ov = (a0, a1, b0, b1) => Math.min(a1, b1) - Math.max(a0, b0);
     for (let a = 0; a < it.length; a++) for (let c = a + 1; c < it.length; c++) { const A = it[a], B = it[c];
       if (A.face === B.face || A.t !== B.t || (A.inset && B.inset)) continue;
@@ -294,7 +296,7 @@ check(none('banddepth') && none('bandu') && none('corner') && none('underwin') &
   show('banddepth').concat(show('bandu'), show('corner'), show('underwin'), show('bandtop'), show('runband')));
 check(none('bandoverlap'), 'furniture pieces on one face never overlap', show('bandoverlap'));
 check(none('bandboard'), 'no furniture or floor doll reaches over a loose board', show('bandboard'));
-check(none('bandcorner'), "pieces on two walls of a tile never meet in its corner (furniture, floor dolls, cobweb cards, servant-run insets)", show('bandcorner'));
+check(none('bandcorner'), "pieces on two walls of a tile never meet in its corner (furniture, floor dolls, cobweb cards, servant-run insets, fireplace breasts)", show('bandcorner'));
 check(none('dolls') && none('dollspot'), 'doll spots: some in the nursery, at most 10 a floor, against a wall', show('dolls').concat(show('dollspot')));
 check(none('fixnode') && none('fixshape') && none('fixopen') && none('fixcount'), 'lamps: KIT nodes, LightBaker shape, on open tiles, plausible counts and dead share',
   show('fixnode').concat(show('fixshape'), show('fixopen'), show('fixcount')));
