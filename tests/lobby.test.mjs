@@ -21,7 +21,7 @@ console.log('== chat');
 await fill(B, '#chatIn', 'hello <b>anna</b>'); await B.evaluate(() => sendChat());
 check(await until(A, () => /Ben: hello <b>anna<\/b>/.test(document.getElementById('chatLog').textContent), null, 20000), 'Ben says hello: Anna reads it (as plain text: no HTML gets in)');
 check(await A.evaluate(() => !document.querySelector('#chatLog b b')), 'the <b> stays text');
-check(await until(A, () => [...LOB.bubbles.values()].some(e => e.style.display !== 'none' && /hello/.test(e.textContent)), null, 20000), 'and it shows over his character\'s head');
+check(await A.evaluate(() => !document.querySelector('.bubble, #bubbles')), 'only in the chat: nothing over his character\'s head');
 await A.evaluate(() => { document.getElementById('chatIn').value = 'x'.repeat(300); sendChat(); });
 check(await until(B, () => [...document.querySelectorAll('#chatLog li')].some(li => /Anna: x{120}$/.test(li.textContent)), null, 20000), 'a long message is cut to 120 characters');
 const n0 = await B.evaluate(() => document.querySelectorAll('#chatLog li').length);

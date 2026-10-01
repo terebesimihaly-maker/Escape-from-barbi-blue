@@ -1,11 +1,11 @@
 /* Escape from Barbi Blue: the lobby, like Dead by Daylight: everyone's character stands side by side in a dim room lit by a
    lantern, as they made themselves (js/account.js), with their nametag (and "ready"). Dance from the lobby's dance bar,
-   and talk in the chat: what you say also shows over your character's head for a few seconds.
+   and talk in the chat (only in the chat box: nothing over anyone's head).
    Chat and dances go through the lobby's owner like everything else (js/multiplayer.js), cleaned and rate limited there.
    (The game is split over several plain scripts that share one scope; index.html loads them in order.) */
 'use strict';
 
-const LOB = { scene: null, cam: null, figs: new Map(), dance: new Map(), bubbles: new Map(), lamp: null, throwL: null, t: 0, acc: 1, slow: 0, drew: false, stage: null, prep: 0, roomReady: false };
+const LOB = { scene: null, cam: null, figs: new Map(), dance: new Map(), lamp: null, throwL: null, t: 0, acc: 1, slow: 0, drew: false, stage: null, prep: 0, roomReady: false };
 const CHAT_MAX = 120, CHAT_KEEP = 40;
 const cleanChat = t => String(t || '').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, CHAT_MAX);
 
@@ -49,7 +49,7 @@ function syncLobbyFigures() {
     }
     seen.add(pl.id); f.av.setName(pl.name + (pl.ready ? '  ✓' : ''), false);
   });
-  for (const [id, f] of LOB.figs) if (!seen.has(id)) { f.av.obj.removeFromParent(); f.av.dispose(); LOB.figs.delete(id); removeBubble(id); }
+  for (const [id, f] of LOB.figs) if (!seen.has(id)) { f.av.obj.removeFromParent(); f.av.dispose(); LOB.figs.delete(id); }
   return added;
 }
 // a new character waits off stage while its shaders build in the background, then steps in: compiling them in the middle of
@@ -83,11 +83,10 @@ function renderLobby3D(dt) {
   LOB.cam.position.z = w < h ? 7.2 : 4.6; LOB.cam.lookAt(0, 1.0, 0);
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, w, h);
   draw(LOB.scene, LOB.cam);
-  placeBubbles(now);
 }
 function leaveLobby3D() {
   for (const f of LOB.figs.values()) { f.av.obj.removeFromParent(); f.av.dispose(); }
-  LOB.figs.clear(); LOB.dance.clear(); for (const id of [...LOB.bubbles.keys()]) removeBubble(id);
+  LOB.figs.clear(); LOB.dance.clear();
   $('chatLog').textContent = '';
 }
 
@@ -122,19 +121,6 @@ function gotChat(m) {
   li.append(b, document.createTextNode(text)); log.appendChild(li);
   while (log.children.length > CHAT_KEEP) log.firstChild.remove();
   log.scrollTop = log.scrollHeight;
-  let el = LOB.bubbles.get(m.id);
-  if (!el) { el = document.createElement('div'); el.className = 'bubble'; $('bubbles').appendChild(el); LOB.bubbles.set(m.id, el); }
-  el.textContent = text; el.dataset.until = performance.now() + 5000 + text.length * 40;
-}
-function removeBubble(id) { const el = LOB.bubbles.get(id); if (el) { el.remove(); LOB.bubbles.delete(id); } }
-const _bv = new THREE.Vector3();
-function placeBubbles(now) {
-  for (const [id, el] of LOB.bubbles) {
-    const f = LOB.figs.get(id);
-    if (!f || now > +el.dataset.until) { el.style.display = 'none'; continue; }
-    _bv.set(f.av.obj.position.x, 2.25, f.av.obj.position.z).project(LOB.cam);
-    el.style.display = ''; el.style.left = ((_bv.x * 0.5 + 0.5) * innerWidth) + 'px'; el.style.top = ((-_bv.y * 0.5 + 0.5) * innerHeight) + 'px';
-  }
 }
 $('chatIn').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); sendChat(); } });
 $('chatIn').addEventListener('keyup', e => e.stopPropagation());
