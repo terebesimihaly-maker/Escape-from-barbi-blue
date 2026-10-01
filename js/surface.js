@@ -363,7 +363,9 @@ function build(lv) {
   if (g) {
     g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
     g.setTransform(ppmX, 0, 0, ppmY, 0, 0);
-    for (const q of (P.decalSources && P.decalSources.floor) || []) floorDecal(g, q, rngOf(hash(Math.round(q.x * 100), Math.round(q.z * 100), 1250 ^ P.seed)));
+    const stampOf = floorStamps(style);                     // (Blender's floor decals, multiplied in, when its atlas is loaded)
+    for (const q of (P.decalSources && P.decalSources.floor) || []) { const rng = rngOf(hash(Math.round(q.x * 100), Math.round(q.z * 100), 1250 ^ P.seed));
+      if (!stampOf || !stampOf(g, q, (rng() * 64) | 0)) floorDecal(g, q, rng); }
     for (const r of P.rugs || []) {                        // (a rug's edge throws a soft line of shade just outside it)
       g.save(); g.translate(r.x, r.z); g.rotate(-(r.rot || 0)); const hw = r.w / 2, hl = r.l / 2;
       for (const [grow, a] of [[0.06, 0.16], [0.03, 0.2], [0.012, 0.26]]) { g.fillStyle = 'rgba(20,14,10,' + a + ')'; g.fillRect(-hw - grow, -hl - grow, 2 * (hw + grow), 2 * (hl + grow)); }
@@ -442,6 +444,20 @@ function floorDecal(g, q, rng) {
     for (let k = 0; k < (q.kind === 'rubble' ? 26 : 12); k++) { const x = (rng() - 0.5) * r * 1.6, y = (rng() - 0.5) * r * 1.6, s = 0.015 + rng() * 0.05;
       g.beginPath(); g.moveTo(x - s, y); g.lineTo(x, y - s * 0.8); g.lineTo(x + s, y + s * 0.3); g.lineTo(x - s * 0.2, y + s); g.fill(); } }
   g.restore();
+}
+// Blender's floor decals (B11: puddle masks, water and rust rings, scorch, paint, dust clumps) stamped from its atlas, multiplied over
+// the floor: -> stamp(g, q, pick) (false when the atlas has none of that kind), or null until Surface.load has the atlas
+function floorStamps(style) {
+  const A = assets.decals; if (!A || !A.albedo || !A.entries) return null;
+  const by = {};
+  for (const e of A.entries) for (const k of e.kinds || []) if (!e.styles || e.styles.includes(style)) (by[k] || (by[k] = [])).push(e);
+  return (g, q, pick) => {
+    const l = by['floor_' + q.kind] || (by.floor && by[q.kind] && by[q.kind].filter(e => by.floor.includes(e))); if (!l || !l.length) return false;
+    const [rx, ry, rw, rh] = l[pick % l.length].rect, s = q.size, asp = rw / rh;
+    g.save(); g.translate(q.x, q.z); g.rotate(q.rot || 0); g.globalCompositeOperation = 'multiply';
+    g.drawImage(A.albedo, rx, ry, rw, rh, -s / 2 * Math.min(1, asp), -s / 2 / Math.max(1, asp), s * Math.min(1, asp), s / Math.max(1, asp));
+    g.restore(); return true;
+  };
 }
 function ceilDecal(g, q, rng) {
   const r = q.size / 2; g.save(); g.translate(q.x, q.z); g.rotate(q.rot || 0);

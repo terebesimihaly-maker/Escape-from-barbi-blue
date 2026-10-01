@@ -158,6 +158,21 @@ const others = Object.keys(bad).filter(k => !['size', 'tileInfo', 'ceil', 'alpha
 check(!others.length, 'no other failures', others);
 console.log('  build ms (low / medium / high): ' + timing.map(t => t[0] + ' ' + t.slice(2).join('/')).join(', '));
 
+// Blender's decal atlas (B11), once it exists: faked here with a canvas (a dark disc in each of two cells) to check the file path:
+// wall decals take their rects from decals.json, the floor decals are stamped (multiplied) from it, and the result is still pure
+const fileAtlas = await p.evaluate(() => {
+  const A = Surface.assets(), c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d');
+  g.fillStyle = 'rgba(40,30,20,0.9)'; g.beginPath(); g.arc(64, 64, 50, 0, 7); g.arc(192, 64, 50, 0, 7); g.fill();
+  const kinds = Surface.KINDS.slice();
+  A.decals = { albedo: c, normal: null, entries: [{ id: 'w', rect: [0, 0, 128, 128], kinds }, { id: 'f', rect: [128, 0, 128, 128], kinds: ['floor_puddle', 'floor_ring', 'floor_rust', 'floor_scorch', 'floor_drain'] }] };
+  const d = generateFloor(2, 1, 'medium', 99), run = () => { const S = Surface.build(Surface.lvFromData(d, { tier: 'low' })); const r = { src: S.decals.atlas && S.decals.atlas.source, q: S.decals.quads.length,
+    sum: S.ovAlbedo.data.reduce((s, v) => s + v, 0) }; S.dispose(); return r; };
+  const a = run(), b2 = run(); A.decals = null; const c0 = run();
+  return { a, b2, c0 };
+});
+check(fileAtlas.a.src === 'file' && fileAtlas.a.q > 0 && fileAtlas.a.sum === fileAtlas.b2.sum && fileAtlas.a.sum < fileAtlas.c0.sum && fileAtlas.c0.src === 'procedural',
+  'with a Blender decal atlas loaded: wall decals use its rects, floor decals are stamped from it (darker albedo), still the same bytes twice', fileAtlas);
+
 /* ---------- pictures: the floor with these overlays through MatLib.floorMaterial, the walls and their decals, lit by the bake ---------- */
 const TEX = { wood: ['wall_paper1', 'floor_wood1', 'floor_wood'], tile: ['wall_tile2', 'floor_tile2', 'floor_tile'], concrete: ['wall_brick3', 'floor_concrete3', 'floor_concrete'],
   attic: ['wall_attic4', 'floor_wood4', 'floor_wood'], workshop: ['wall_shop5', 'floor_tile5', 'floor_tile'] };

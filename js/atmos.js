@@ -487,7 +487,9 @@ function build(lv, plan, opts) {
     g.setIndex(idx); g.computeBoundingSphere();
     const sm = new THREE.ShaderMaterial({ name: 'AtmosShafts', vertexShader: SHAFT_V, fragmentShader: SHAFT_F, fog: false, transparent: true, depthWrite: false,
       side: BACK, blending: THREE.AdditiveBlending, defines: Object.assign({ STEPS: tier === 'hi' ? 8 : 4 }, useCookie ? { USE_COOKIE: '' } : {}),
-      uniforms: { uTime: A.uTime, uMoonCol: U.uMoonCol, uMoonK: U.uMoonK, uDensity: { value: o.shaftDensity || 0.09 }, uCookie: { value: atlas } } });
+      uniforms: { uTime: A.uTime, uMoonCol: U.uMoonCol, uMoonK: U.uMoonK, uDensity: { value: (o.shaftDensity || 0.09) * (useCookie ? 1.6 : 1) }, uCookie: { value: atlas } } });
+    // (x 1.6 with the cookie: mullions and curtains pass about 55% where medium's soft-edged opening passes 90%, so both tiers' beams
+    //  come out equally bright on average)
     sm.userData.disposables = atlas ? [atlas] : [];
     const mesh = new THREE.Mesh(g, sm); mesh.name = 'atmos_shafts'; mesh.renderOrder = 2; mesh.frustumCulled = true;
     group.add(mesh); R.shafts = mesh;
