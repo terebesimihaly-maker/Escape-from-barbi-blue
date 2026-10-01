@@ -5,28 +5,28 @@
  "axes": "three.js: y up, front +z; aabb [min, max] in metres in the node frame",
  "tiers": {
   "hi": {
-   "wood": 1103804,
-   "tile": 77456,
-   "concrete": 75384,
-   "attic": 78760,
-   "workshop": 81644,
-   "common": 6880
+   "wood": 297880,
+   "tile": 77356,
+   "concrete": 75288,
+   "attic": 78668,
+   "workshop": 81532,
+   "common": 6844
   },
   "md": {
-   "wood": 413140,
-   "tile": 77472,
-   "concrete": 75372,
-   "attic": 78764,
-   "workshop": 81644,
-   "common": 6884
+   "wood": 229408,
+   "tile": 77364,
+   "concrete": 75296,
+   "attic": 78672,
+   "workshop": 81536,
+   "common": 6844
   },
   "lo": {
-   "wood": 216916,
-   "tile": 78052,
-   "concrete": 75140,
-   "attic": 78524,
-   "workshop": 82228,
-   "common": 6880
+   "wood": 154956,
+   "tile": 77960,
+   "concrete": 75060,
+   "attic": 78468,
+   "workshop": 82144,
+   "common": 6844
   }
  },
  "nodes": {

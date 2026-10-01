@@ -58,7 +58,7 @@ def seat(mats):
 # ---------------------------------------------------------------- rockers
 def rocker(side, mats):
     """a bentwood rocker: its bottom on the R arc (centre straight above the middle), tapering and rounding off at the tips"""
-    S = YT * 1.02; best = None
+    S = YT * 1.02
     for _ in range(6):                                      # (find the arc length that puts the rounded tips at YT)
         path, secs = [], []; ks = [math.sin(math.pi / 2 * (2 * i / 33 - 1)) for i in range(34)]
         for k, f in enumerate(ks):
@@ -66,7 +66,7 @@ def rocker(side, mats):
             pt = Vector((side * XR, R * math.sin(ph), R - R * math.cos(ph))); up = Vector((0, -math.sin(ph), math.cos(ph)))
             h = (0.050 - 0.011 * (abs(s) / S) ** 2.5) * math.sqrt(max(0.0, 1 - tip ** 2.2)) if tip < 1 else 0.0
             w = 0.026 * (math.sqrt(max(0.0, 1 - tip ** 3)) * 0.6 + 0.4)
-            hh = max(0.004, h); path.append((pt + up * 0.0, Vector((1, 0, 0)), up)); secs.append((w, hh))
+            path.append((pt, Vector((1, 0, 0)), up)); secs.append((w, max(0.004, h)))
         ymax = max(abs(p[0].y) + 0.002 for p in path)
         S *= YT / ymax
     def sec(k):
@@ -74,7 +74,6 @@ def rocker(side, mats):
     wear = lambda k, j, p: 0.85 if p.z < 0.012 + R - math.sqrt(max(0, R * R - p.y * p.y)) else 0.08
     return kitlib.sweep(f'rocker{side:+d}', path, sec, wear, caps=(True, True), mats=mats)
 
-def arc_z(y): return R - math.sqrt(R * R - y * y)
 
 # ---------------------------------------------------------------- turnings (profiles: t 0..1 along, radius m)
 FRONT_LEG = [(0, .0105), (.058, .0105), (.064, .0152), (.085, .0168), (.105, .0152), (.118, .0176), (.132, .0150), (.20, .0162), (.33, .0190), (.45, .0203),
@@ -84,15 +83,15 @@ BACK_LEG = [(0, .0105), (.058, .0105), (.065, .0150), (.09, .0160), (.11, .0145)
             (.80, .0172), (.83, .0148), (.94, .0135), (.955, .0112), (1, .0112)]
 STILE = [(0, .0118), (.06, .0118), (.068, .0165), (.09, .0182), (.105, .0170), (.12, .0186), (.14, .0166), (.19, .0172), (.30, .0186), (.45, .0175),
          (.60, .0160), (.72, .0150), (.80, .0142), (.84, .0158), (.855, .0164), (.87, .0150), (.90, .0140), (.93, .0152), (.945, .0154), (.96, .0140),
-         (.975, .0120), (1, .0112), (1.0, .0112)]
+         (.975, .0120), (1, .0112)]
 SPINDLE = [(0, .0072), (.05, .0072), (.07, .0088), (.10, .0098), (.12, .0094), (.14, .0102), (.16, .0094), (.30, .0108), (.48, .0104), (.70, .0092),
            (.90, .0080), (.95, .0074), (1, .0072)]
 ARM_POST = [(0, .0095), (.06, .0095), (.075, .0130), (.10, .0136), (.13, .0122), (.30, .0152), (.42, .0158), (.55, .0140), (.66, .0108), (.71, .0100),
-            (.76, .0128), (.79, .0132), (.83, .0110), (.93, .0098), (1, .0092), (1.0, .0092)]
-ARM_SPINDLE = [(0, .0068), (.08, .0068), (.12, .0082), (.40, .0092), (.70, .0084), (.90, .0072), (1, .0068), (1.0, .0068)]
+            (.76, .0128), (.79, .0132), (.83, .0110), (.93, .0098), (1, .0092)]
+ARM_SPINDLE = [(0, .0068), (.08, .0068), (.12, .0082), (.40, .0092), (.70, .0084), (.90, .0072), (1, .0068)]
 FRONT_STRETCHER = [(0, .0078), (.05, .0078), (.10, .0098), (.22, .0110), (.30, .0100), (.33, .0124), (.36, .0102), (.42, .0130), (.50, .0150),
                    (.58, .0130), (.64, .0102), (.67, .0124), (.70, .0100), (.78, .0110), (.90, .0098), (.95, .0078), (1, .0078)]
-SIDE_STRETCHER = [(0, .0074), (.06, .0074), (.12, .0092), (.30, .0108), (.50, .0120), (.70, .0108), (.88, .0092), (.94, .0074), (1, .0074), (1.0, .0074)]
+SIDE_STRETCHER = [(0, .0074), (.06, .0074), (.12, .0092), (.30, .0108), (.50, .0120), (.70, .0108), (.88, .0092), (.94, .0074), (1, .0074)]
 
 def on_line(p0, p1, z):
     p0, p1 = Vector(p0), Vector(p1); t = (z - p0.z) / (p1.z - p0.z); return p0.lerp(p1, t)
@@ -271,7 +270,7 @@ def ties(mats):
         for k, (dx, ln) in enumerate(((0.006, 0.085), (-0.004, 0.065))):
             tp = []
             for i in range(6):
-                f = i / 5; pt = knot + Vector((s * dx * f * 1.5, -0.006 - 0.012 * f * f, -ln * f)) + Vector((0, 0, 0.0))
+                f = i / 5; pt = knot + Vector((s * dx * f * 1.5, -0.006 - 0.012 * f * f, -ln * f))
                 tp.append((pt, Vector((1, 0, 0)), Vector((0, -1, 0.15)).normalized()))
             objs.append(kitlib.sweep(f'tietail{s:+d}{k}', tp, lambda i: kitlib.rounded_rect(0.010 - 0.002 * i / 5, 0.0016, 0.0007, 1), caps=(True, True), mats=mats))
         cx, cy = cush_outline(0.25 - s * 0.13)[0] * 0.97, 0.075; cz = seat_top(cx, cy) + 0.035   # (this side's back corner)
@@ -284,7 +283,7 @@ def ties(mats):
 
 # ---------------------------------------------------------------- assembly
 def geometry():
-    t0 = time.time(); sc = kitlib.reset()
+    t0 = time.time(); kitlib.reset()
     WOOD = kitlib.wood('rc_wood', 'beech', 'varnish', stain='#6b5038', age=1.0)
     VEL = kitlib.fabric('rc_velvet', '#7e4650', weave=1.0, fade=0.35, velvet=True, age=1.0)
     W = [WOOD]; F = [VEL]; parts = []
@@ -304,7 +303,7 @@ def geometry():
     parts.append(kitlib.lathe('fstr', FRONT_STRETCHER, on_line(*FL(-1), 0.235), on_line(*FL(1), 0.235), 8, (0, 1, 0),
                               lambda t, ang, p: 0.75 * smooth((math.sin(ang) * -1 + 0.2) / 0.6) * smooth(1 - abs(t - 0.5) / 0.45), mats=W))
     for i, xt in enumerate((-0.13, -0.065, 0.0, 0.065, 0.13)):
-        top = crest_point(xt, CREST_T / 2, 0.0) + D_UP * 0.012 - D_UP * 0.0
+        top = crest_point(xt, CREST_T / 2, 0.0) + D_UP * 0.012          # (the tenon into the crest's underside)
         parts.append(kitlib.lathe(f'spindle{i}', SPINDLE, (0.88 * xt, 0.112, 0.415), (top.x, top.y, top.z + 0.008), 8, (0, 1, 0),
                                   lambda t, ang, p: 0.08 + 0.15 * smooth((t - 0.75) / 0.2), mats=W))
     coff = (random.uniform(-3, 3), random.uniform(0.15, 0.3), random.uniform(-3, 3))

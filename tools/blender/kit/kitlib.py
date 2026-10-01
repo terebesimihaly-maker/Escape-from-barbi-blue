@@ -381,7 +381,7 @@ def aged(m, col, rough, h, up_dust=0.5, grime=0.7, edge_wear=0.0, wear_col=None,
     col = m.mix(g, col, (0.018, 0.013, 0.009)); rough = m.mixf(g, rough, 0.82)
     # dust: on faces that look up, thicker in the corners of them, never where hands go
     nz = m.n('ShaderNodeSeparateXYZ'); m.l(m.geo('Normal'), nz.inputs[0])
-    up = m.remap(nz.outputs['Z'], 0.35, 0.95, smooth=True)
+    up = m.remap(nz.outputs['Z'], 0.6, 0.97, smooth=True)            # (dust settles on what is nearly level, not on a leaning face)
     dn = m.noise(pos, 60, 5, 0.65); dn2 = m.noise(pos, 5, 3, 0.5)
     d = m.math('MULTIPLY', up, m.remap(m.math('ADD', dn, m.math('MULTIPLY', dn2, 0.5)), 0.55, 1.05, 0.25, 1.0))
     d = m.math('MULTIPLY', d, m.math('ADD', 0.55, m.math('MULTIPLY', m.remap(cav, 1.0, 0.6), 0.6)))
@@ -481,7 +481,7 @@ def fabric(name, color='#9b6e6a', weave=1.0, fade=0.5, stripes=None, velvet=Fals
     stain = m.math('MULTIPLY', m.math('MAXIMUM', ring, blot), m.remap(m.noise(pos, 1.7, 2), 0.5, 0.62, 0.0, age))
     col = m.mix(stain, col, m.mix(1.0, col, (0.55, 0.42, 0.28), 'MULTIPLY'))
     col, rough, h, worn = aged(m, col, rough, h, up_dust=0.45 * age, grime=0.9, edge_wear=0.4 if velvet else 0.0,
-                               wear_col=m.hsv(col, 0.5, 0.5, 1.3) if velvet else None, wear_rough=0.95)
+                               wear_col=m.hsv(col, 0.5, 0.6, 1.08) if velvet else None, wear_rough=0.95)   # (bald pile: the duller backing)
     return m.out(col, rough, m.bump(h, 0.25, 0.0006))
 
 def metal(name, kind='iron', color=None, rust=0.4, age=1.0):
