@@ -11,7 +11,7 @@ await openMp(B); await fill(B, '#mpCode', code); await click(B, '#mpJoin');
 check(await until(B, () => !document.getElementById('lobby').classList.contains('hidden'), null, 60000), 'Ben joins the lobby');
 
 console.log('== standing together');
-const both = P => until(P, () => LOB.figs.size === 2 && [...LOB.figs.values()].every(f => f.av.human), null, 90000);
+const both = P => until(P, () => LOB.figs.size === 2 && [...LOB.figs.values()].every(f => f.av.human && f.av.obj.parent === LOB.scene), null, 90000);
 check((await Promise.all([A, B].map(both))).every(Boolean), 'both see two characters standing in the lobby');
 const looks = await A.evaluate(() => [...LOB.figs.entries()].map(([id, f]) => [id === bb.MP.myId ? 'me' : 'other', f.av.look.jacket, f.av.look.top]));
 check(looks.some(([w, j, t]) => w === 'me' && j === 0x11ee22 && t === 'hoodie') && looks.some(([w, j, t]) => w === 'other' && j === 0xee2211 && t === 'tee'), 'each as they made themselves (Anna in her green hoodie, Ben in his red T-shirt)', looks);

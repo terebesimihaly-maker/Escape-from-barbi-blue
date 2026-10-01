@@ -5,7 +5,7 @@
    (The game is split over several plain scripts that share one scope; index.html loads them in order.) */
 'use strict';
 
-const LOB = { scene: null, cam: null, figs: new Map(), dance: new Map(), bubbles: new Map(), lamp: null, throwL: null, t: 0, acc: 1 };
+const LOB = { scene: null, cam: null, figs: new Map(), dance: new Map(), bubbles: new Map(), lamp: null, throwL: null, t: 0, acc: 1, slow: 0, drew: false, stage: null, prep: 0 };
 const CHAT_MAX = 120, CHAT_KEEP = 40;
 const cleanChat = t => String(t || '').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, CHAT_MAX);
 
@@ -32,35 +32,47 @@ function lobbyScene() {
   sc.add(new THREE.HemisphereLight(0x4a5a90, 0x100808, 0.5));
   const key = new THREE.DirectionalLight(0x8fa0ff, 0.7); key.position.set(-2, 3, 4); sc.add(key);
   const cam = new THREE.PerspectiveCamera(36, 1, 0.05, 30); cam.position.set(0, 1.35, 4.6); cam.lookAt(0, 1.0, 0);
-  Object.assign(LOB, { scene: sc, cam, lamp: light, throwL });
+  Object.assign(LOB, { scene: sc, stage: new THREE.Scene(), cam, lamp: light, throwL });
 }
 // where each of the (up to) four stands: side by side, the owner in the middle left
 const LOBBY_SPOTS = [[-0.45, 0], [0.45, 0], [-1.35, -0.25], [1.35, -0.25]];
 function syncLobbyFigures() {
-  const L = MP.lobby, seen = new Set();
+  const L = MP.lobby, seen = new Set(); let added = false;
   L.players.forEach((pl, i) => {
     const key = (pl.look ? JSON.stringify(pl.look) : pl.id) + '|' + i;
     let f = LOB.figs.get(pl.id);
     if (!f || f.key !== key) {
-      if (f) { LOB.scene.remove(f.av.obj); f.av.dispose(); }
+      if (f) { f.av.obj.removeFromParent(); f.av.dispose(); }
       const av = PlayerModel.createHuman(THREE, { slot: i, name: pl.name, template: playerTemplate, mocap: mocapData, face: pl.id, look: pl.look || (pl.id === MP.myId ? myLook() : null) });
       const [x, z] = LOBBY_SPOTS[i % 4]; av.obj.position.set(x, 0, z); av.obj.rotation.y = -x * 0.18;
-      LOB.scene.add(av.obj); f = { av, key, i }; LOB.figs.set(pl.id, f);
+      LOB.stage.add(av.obj); f = { av, key, i }; LOB.figs.set(pl.id, f); added = true;
     }
     seen.add(pl.id); f.av.setName(pl.name + (pl.ready ? '  ✓' : ''), false);
   });
-  for (const [id, f] of LOB.figs) if (!seen.has(id)) { LOB.scene.remove(f.av.obj); f.av.dispose(); LOB.figs.delete(id); removeBubble(id); }
+  for (const [id, f] of LOB.figs) if (!seen.has(id)) { f.av.obj.removeFromParent(); f.av.dispose(); LOB.figs.delete(id); removeBubble(id); }
+  return added;
+}
+// a new character waits off stage while its shaders build in the background, then steps in: compiling them in the middle of
+// a frame can hold a slow device for seconds, and with it the connection (someone joining would wait)
+function prepLobby() {
+  const n = ++LOB.prep, come = () => { if (n !== LOB.prep) return; while (LOB.stage.children.length) LOB.scene.add(LOB.stage.children[0]); };
+  if (!renderer.compileAsync) { come(); return; }
+  renderer.compileAsync(LOB.stage, LOB.cam, LOB.scene).catch(() => {}).then(come); setTimeout(come, 10000);   // (never wait for ever)
 }
 function renderLobby3D(dt) {
   if (!renderer || !playerTemplate || !MP.lobby) { renderTitle(dt); return; }
-  // (a lobby only needs 30 frames a second: the rest of the time goes to the connection and the page)
-  LOB.acc += dt; if (LOB.acc < 1 / 31) return; dt = LOB.acc; LOB.acc = 0;
-  lobbyScene(); syncLobbyFigures(); LOB.t += dt;
+  // (a lobby only needs 30 frames a second: the rest of the time goes to the connection and the page. On a device that can't
+  // keep up, below about 8 a second, it draws twice a second instead: they're mostly standing still, and joining stays quick)
+  if (LOB.drew) { LOB.slow += (realDt - LOB.slow) * 0.25; LOB.drew = false; }   // (how long the last drawn frame took)
+  LOB.acc += realDt; if (LOB.acc < (LOB.slow > 0.12 ? 0.5 : 1 / 31)) return;
+  dt = Math.min(0.1, LOB.acc); LOB.acc = 0; LOB.drew = true;
+  lobbyScene(); if (syncLobbyFigures()) prepLobby(); LOB.t += dt;
   const now = performance.now();
   for (const [id, f] of LOB.figs) {
     const d = LOB.dance.get(id), dancing = d && now < d.until && DANCES[d.k];
     f.av.update(dt, { speed: 0, stand: true, dance: dancing ? DANCES[d.k][2] : null, lightOn: false });
   }
+  LOB.throwL.castShadow = settings.quality !== 'low';
   const fl = calm() ? 1 : 0.85 + 0.15 * Math.sin(LOB.t * 9) * Math.sin(LOB.t * 3.1); LOB.lamp.intensity = 7 * fl; LOB.throwL.intensity = 5 * fl;
   const w = cvs.width, h = cvs.height; if (LOB.cam.aspect !== w / h) { LOB.cam.aspect = w / h; LOB.cam.updateProjectionMatrix(); }
   // (a narrow screen: step back so all four fit)
@@ -70,7 +82,7 @@ function renderLobby3D(dt) {
   placeBubbles(now);
 }
 function leaveLobby3D() {
-  for (const f of LOB.figs.values()) { LOB.scene.remove(f.av.obj); f.av.dispose(); }
+  for (const f of LOB.figs.values()) { f.av.obj.removeFromParent(); f.av.dispose(); }
   LOB.figs.clear(); LOB.dance.clear(); for (const id of [...LOB.bubbles.keys()]) removeBubble(id);
   $('chatLog').textContent = '';
 }
