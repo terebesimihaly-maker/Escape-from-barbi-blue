@@ -9,7 +9,7 @@ import { launch, solo, check, summary, pageErrors, OUT } from './lib.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const SEEDS = +process.env.SURFACE_SEEDS || 2, L = 2.25;
+const SEEDS = process.env.SURFACE_SEEDS !== undefined ? +process.env.SURFACE_SEEDS : 2, L = 2.25;   // (SURFACE_SEEDS=0: only the pictures)
 const seedOf = (i, s) => (i * 7919 + s * 15485863 + 424242) >>> 0;
 const fnv = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16); };
 
@@ -34,10 +34,13 @@ for (let i = 0; i < 5; i++) for (let s = 0; s < SEEDS; s++) {
       out.sizes[tier] = { a: [S.ovAlbedo.width, S.ovAlbedo.height], s: [S.ovSurf.width, S.ovSurf.height], t: [S.tileInfo.width, S.tileInfo.height], c: [S.ovCeil.width, S.ovCeil.height],
         alpha: (() => { const a = S.ovAlbedo.data; for (let k = 3; k < a.length; k += 4) if (a[k] !== 255) return false; return true; })(), ms: S.stats.ms, T: S.stats.T };
       S.dispose(); }
-    // the medium build, checked in detail; Math.random never used
-    const real = Math.random; let used = 0; Math.random = () => { used++; return real(); };
-    let S, lv; try { lv = Surface.lvFromData(d, { tier: 'medium' }); S = Surface.build(lv); } finally { Math.random = real; }
-    out.used = used;
+    // the medium build, checked in detail. Math.random may be called (three.js names every object it makes with one), but nothing
+    // may depend on it: with Math.random stuck at 0.1, then at 0.9, the bytes must come out the same
+    const real = Math.random, mapsHash = X => [H(X.ovAlbedo.data), H(X.ovSurf.data), H(X.tileInfo.data), H(X.ovCeil.data)].join('|');
+    let S, lv, hr;
+    try { Math.random = () => 0.9; const S9 = Surface.build(Surface.lvFromData(d, { tier: 'medium' })); hr = mapsHash(S9); S9.dispose();
+      Math.random = () => 0.1; lv = Surface.lvFromData(d, { tier: 'medium' }); S = Surface.build(lv); } finally { Math.random = real; }
+    out.randomSame = hr === mapsHash(S);
     const geo = S.decals.meshes.map(m => H(new Uint8Array(m.geometry.attributes.position.array.buffer)) + H(new Uint8Array(m.geometry.attributes.uv.array.buffer)) + H(new Uint8Array(m.geometry.attributes.uv1.array.buffer))).join();
     out.hash = [H(S.ovAlbedo.data), H(S.ovSurf.data), H(S.tileInfo.data), H(S.ovCeil.data), geo].join('|');
     const q0 = settings.quality; settings.quality = 'high'; const S2 = Surface.build(Surface.lvFromData(d, { tier: 'medium' })); settings.quality = q0;
@@ -48,7 +51,7 @@ for (let i = 0; i < 5; i++) for (let s = 0; s < SEEDS; s++) {
     out.noteWet = 0; out.notes = d.notes.length;
     for (const [tx, ty] of d.notes) for (let j = Math.floor(ty * L * ppy); j < Math.ceil((ty + 1) * L * ppy) && j < h; j++) for (let k = Math.floor(tx * L * ppx); k < Math.ceil((tx + 1) * L * ppx) && k < w; k++) {
       const cz = (j + 0.5) / ppy, cx = (k + 0.5) / ppx; if (Math.floor(cz / L) === ty && Math.floor(cx / L) === tx) out.noteWet = Math.max(out.noteWet, sf[(j * w + k) * 4]); }
-    let wetPx = 0; for (let k = 0; k < sf.length; k += 4) if (sf[k] > 40) wetPx++; out.wetShare = wetPx / (w * h);
+    let wetPx = 0, open = 0; for (let k = 0; k < sf.length; k += 4) { const j = (k / 4 / w) | 0, q = (k / 4) % w; if (d.rows[Math.floor((j + 0.5) / ppy / L)][Math.floor((q + 0.5) / ppx / L)] === '1') continue; open++; if (sf[k] > 40) wetPx++; } out.wetShare = wetPx / open;
     // the game's own bfsPath (after applyFloor: its NAV cuts), spawn -> exit and spawn -> each puzzle: B along it
     const st = state; applyFloor(d, 0); const sp = [Math.floor(d.spawns[0][0] / T), Math.floor(d.spawns[0][1] / T)];
     const paths = [bfsPath(sp[0], sp[1], d.exit[0], d.exit[1])].concat(d.puzzles.map(q => bfsPath(sp[0], sp[1], q.cell[0], q.cell[1]))).filter(Boolean).map(pp => [sp].concat(pp));
@@ -97,7 +100,7 @@ for (let i = 0; i < 5; i++) for (let s = 0; s < SEEDS; s++) {
     ok('tileInfo', z.t[0] === R.GW && z.t[1] === R.GH, [tag, tier, z.t]);
     ok('ceil', Math.abs(z.c[0] - z.a[0] / 2) <= 1 && Math.abs(z.c[1] - z.a[1] / 2) <= 1, [tag, tier, z.c]);
     ok('alpha', z.alpha, [tag, tier]); }
-  ok('random', R.used === 0, [tag, R.used]);
+  ok('random', R.randomSame, tag);
   ok('quality', R.hash.split('|').slice(0, 4).join('|') === R.hashQ, tag);
   // the same floor on another page (d through JSON, as the host sends it)
   const h2 = await p2.evaluate(([d, PH]) => { const H = eval(PH), S = Surface.build(Surface.lvFromData(d, { tier: 'medium' }));
@@ -140,10 +143,10 @@ const none = k => !bad[k], show = k => bad[k] && bad[k].slice(0, 3);
 check(none('size'), 'ovAlbedo and ovSurf: 512 / 1024 / 2048 px on the long side (low / medium / high), the plan\'s aspect', show('size'));
 check(none('tileInfo') && none('ceil'), 'tileInfo is GW x GH; ovCeil is half the floor size', show('tileInfo') || show('ceil'));
 check(none('alpha'), 'ovAlbedo is opaque (alpha 255 everywhere)', show('alpha'));
-check(none('random') && none('quality'), 'pure: no Math.random, the quality setting changes nothing at a given tier', show('random') || show('quality'));
+check(none('random') && none('quality'), 'pure: nothing depends on Math.random, the quality setting changes nothing at a given tier', show('random') || show('quality'));
 check(none('page2'), 'the same d gives identical bytes on another page (all four maps and the decal meshes)', show('page2'));
 check(none('noteWet'), 'no wet texel on any note tile', show('noteWet'));
-check(none('wetSome'), 'the basement is wet (>= 3% of its texels)', show('wetSome'));
+check(none('wetSome'), 'the basement is wet (>= 3% of its open floor)', show('wetSome'));
 check(none('pathB') && none('route'), 'clean paths follow the game\'s bfsPath (spawn -> exit, spawn -> puzzles): B > 0.5 at >= 97% of tile centres and steps', show('pathB') || show('route'));
 check(none('dustWall'), 'dust is higher by the walls than at the path centres (G and G(1 - B))', show('dustWall'));
 check(none('decalFree') && none('decalIn') && none('decalProud'), 'wall decals: on free faces, every corner inside its face and under the ceiling line, 3 mm proud', show('decalFree') || show('decalIn') || show('decalProud'));
@@ -184,8 +187,12 @@ for (let i = 0; i < 5; i++) {
     const out = [];
     // 1: from above, the stretch of the spawn -> exit path with the most going on (decals, wet, prints), tilted 30 degrees
     const route = S.routes[0] || [[2, 2]], pick = route[Math.min(route.length - 1, 6)], cx = (pick[0] + 0.5) * L, cz = (pick[1] + 0.5) * L;
-    const top = new THREE.PerspectiveCamera(55, 640 / 400, 0.05, 60); top.position.set(cx, 9, cz + 5); top.lookAt(cx, 0, cz);
+    const top = new THREE.PerspectiveCamera(13, 640 / 400, 30, 50); top.position.set(cx, 40, cz + 0.01); top.lookAt(cx, 0, cz);   // (nearly straight down: no orthographic camera in this build)
+    // (an even light for this one, E about 1.5 everywhere, so the overlays themselves show: dust, wet, paths, prints, shade, decals)
+    const even = v => ({ data: new Uint8ClampedArray(64).fill(v).map((c, k) => k % 4 === 3 ? 0 : c), w: 4, h: 4 });
+    MatLib.setLevelMaps({ floorLM: even(163), wallLM: even(163) });
     flash.intensity = 0; R.render(scene, top); out.push(R.domElement.toDataURL('image/png'));
+    MatLib.setLevelMaps({ floorLM: maps.floorLM, wallLM: maps.wallLM });
     // 2: eye level, looking at a wall with decals, the flashlight on
     scene.add(ceil.group);
     const q = S.decals.quads.find(q => q.kind !== 'soot') || S.decals.quads[0], f = q ? plan.faces[q.face] : f0;

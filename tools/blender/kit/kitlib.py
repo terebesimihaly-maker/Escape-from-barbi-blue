@@ -450,7 +450,7 @@ def wood(name, species='beech', finish='varnish', stain=None, age=1.0, paint=Non
         vc = m.mix(m.math('MULTIPLY', sc, 0.35), vc, m.hsv(bare, 0.5, 0.7, 0.85)); vr = m.mixf(sc, vr, 0.55)
         h = m.math('SUBTRACT', m.math('MULTIPLY', h, 0.35), m.math('ADD', m.math('MULTIPLY', crack, 0.25), m.math('MULTIPLY', sc, 0.3)))
         # half worn: thinned varnish lighter and more orange, then bare (and hand-darkened) wood
-        col, rough, h, worn = aged(m, vc, vr, h, up_dust=0.55 * age, grime=0.75, edge_wear=0.7, wear_col=m.mix(0.3, m.hsv(col, 0.5, 1.05, 0.95), (0.05, 0.032, 0.02)), wear_rough=0.45)   # (honey-coloured bare wood, hand-greyed a little)
+        col, rough, h, worn = aged(m, vc, vr, h, up_dust=0.55 * age, grime=0.75, edge_wear=0.7, wear_col=m.mix(0.42, m.hsv(col, 0.5, 0.62, 0.8), (0.06, 0.04, 0.026)), wear_rough=0.45)   # (bare wood, a little lighter than the varnish, greyed and darkened by hands)
     elif finish == 'paint':
         pc = lin(paint or '#e8dcc8')
         pn = m.noise(pos, 14, 4); pcol = m.mix(m.remap(pn, 0.3, 0.7, 0.0, 0.25), pc, (pc[0] * 0.82, pc[1] * 0.8, pc[2] * 0.74))   # (yellowed unevenly)

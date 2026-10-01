@@ -194,16 +194,20 @@ const ctx2d = c => c && c.getContext('2d', { willReadFrequently: true });
 // a tile path as a polyline of centres (m) with a seeded meander of +-0.15 m across the way, its corners rounded
 function polyOf(E, tiles, key) {
   const { vh } = E, pts = tiles.map(([x, y]) => [(x + 0.5) * L, (y + 0.5) * L]);
-  for (let k = 0; k < pts.length; k++) {
-    const a = tiles[Math.max(0, k - 1)], b = tiles[Math.min(tiles.length - 1, k + 1)], dx = b[0] - a[0], dy = b[1] - a[1], ll = Math.hypot(dx, dy) || 1;
-    const m = (vh(tiles[k][0], tiles[k][1], 1210 + key) - 0.5) * 0.3;
+  for (let k = 1; k < pts.length - 1; k++) {               // (the meander on straight runs; a turn stays on its tile centre)
+    const a = tiles[k - 1], b = tiles[k + 1], dx = b[0] - a[0], dy = b[1] - a[1];
+    if (dx && dy) continue;
+    const ll = Math.hypot(dx, dy) || 1, m = (vh(tiles[k][0], tiles[k][1], 1210 + key) - 0.5) * 0.3;
     pts[k][0] += -dy / ll * m; pts[k][1] += dx / ll * m;
   }
-  let p = pts;                                             // (Chaikin, twice: a walker cuts corners in a curve)
-  for (let it = 0; it < 2 && p.length > 2; it++) { const q = [p[0]];
-    for (let k = 0; k < p.length - 1; k++) { const a = p[k], b = p[k + 1]; q.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25], [a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]); }
-    q.push(p[p.length - 1]); p = q; }
-  return p;
+  // corners rounded the way a walker cuts them, but only 0.3 m in from each turn: the path still crosses every tile's middle
+  if (pts.length < 3) return pts;
+  const q = [pts[0]];
+  for (let k = 1; k < pts.length - 1; k++) { const p = pts[k], a = pts[k - 1], b = pts[k + 1], la = Math.hypot(p[0] - a[0], p[1] - a[1]), lb = Math.hypot(b[0] - p[0], b[1] - p[1]);
+    const ta = Math.min(0.3, la / 2) / la, tb = Math.min(0.3, lb / 2) / lb, s0 = [p[0] + (a[0] - p[0]) * ta, p[1] + (a[1] - p[1]) * ta], s1 = [p[0] + (b[0] - p[0]) * tb, p[1] + (b[1] - p[1]) * tb];
+    q.push(s0, [0.25 * s0[0] + 0.5 * p[0] + 0.25 * s1[0], 0.25 * s0[1] + 0.5 * p[1] + 0.25 * s1[1]], s1); }
+  q.push(pts[pts.length - 1]);
+  return q;
 }
 // points every `step` m along a polyline, with the direction there: [x, z, dirX, dirZ]
 function along(poly, step, start) {
