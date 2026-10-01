@@ -111,7 +111,7 @@ The paintings: some portraits have real glass eyes that turn to follow you. Othe
 
 Menu → **Play together** → **Create lobby** shows a 6 digit code; the others enter it and press **Join**. Everyone picks a nametag and presses **Ready**; the game starts when everyone is ready. The lobby owner can kick players.
 
-The lobby is a room where everyone's character stands side by side, as they made themselves, lit by a lantern (like Dead by Daylight). Dance from the dance bar (🕺🤖🪩…, ✋ to stop) and talk in the chat: what you say also floats over your character's head. Chat goes through the lobby owner, who keeps it to 120 characters of plain text and drops floods (`js/lobby3d.js`).
+The lobby is a room where everyone's character stands side by side, as they made themselves, lit by a lantern (like Dead by Daylight). Dance from the dance bar (the last button stops) and talk in the chat (messages stay in the chat box). Chat goes through the lobby owner, who keeps it to 120 characters of plain text and drops floods (`js/lobby3d.js`).
 
 - Everyone starts in the same room, in the same house. Teammates are solid (no walking through each other).
 - It's a bit harder together, but fair: she hears a little further and is a little faster (never faster than a sprinting player), she screams a bit more often, and there's one more wardrobe per extra player. She gives the group a few extra seconds at the start, and after catching someone she walks away so the others can revive them.
