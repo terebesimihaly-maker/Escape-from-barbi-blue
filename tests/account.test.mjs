@@ -3,7 +3,7 @@
 // signing out, wrong passwords, the server unreachable, and in multiplayer everyone seeing your character.
 import { launch, check, summary, until, click, fill, text, pageErrors, OUT, BASE, player, openMp } from './lib.mjs';
 const b = await launch();
-const API = 'http://127.0.0.1:8766/fake', AURL = BASE + '?auth=1&api=' + encodeURIComponent(API);
+const API = new URL(BASE).origin + '/fake', AURL = BASE + '?auth=1&api=' + encodeURIComponent(API);
 const ctx = await b.newContext({ viewport: { width: 760, height: 520 } });
 await ctx.addInitScript(() => { try { if (!localStorage.getItem('bb_settings')) localStorage.setItem('bb_settings', JSON.stringify({ sens: 1, vol: 0.5, quality: 'low' })); } catch (e) {} });
 const p = await ctx.newPage();

@@ -1,6 +1,6 @@
 // Joining a lobby when things go wrong: a wrong code, an owner whose game doesn't answer, a first attempt that fails
 // (tried again by itself), the relay (TURN) setting, the countdown, and four players joining.
-import { launch, player, check, summary, until, openMp, click, fill, text, pageErrors, lobbyBuilt, URL as GAME } from './lib.mjs';
+import { launch, player, check, summary, until, openMp, click, fill, text, pageErrors, lobbyBuilt, URL as GAME, BASE } from './lib.mjs';
 const b = await launch();
 const A = await player(b, 'Anna'), B = await player(b, 'Ben'), C = await player(b, 'Cara'), D = await player(b, 'Dan');
 await openMp(A); await click(A, '#mpCreate');
@@ -36,7 +36,7 @@ check(await until(E, () => /lobby owner's computer answered, but their game didn
 
 console.log('== the relay (TURN) setting');
 const ctx = await b.newContext(); const R = await ctx.newPage();
-await R.goto(GAME + '&turn=' + encodeURIComponent('http://127.0.0.1:8766/tests/fake-turn.json'), { waitUntil: 'domcontentloaded', timeout: 120000 });
+await R.goto(GAME + '&turn=' + encodeURIComponent(new URL(BASE).origin + '/tests/fake-turn.json'), { waitUntil: 'domcontentloaded', timeout: 120000 });
 await R.waitForFunction(() => typeof iceReady === 'function', null, { timeout: 60000 });
 const ice = await R.evaluate(async () => { await iceReady(); return { relay: hasRelay(), n: iceList.length }; });
 check(ice.relay && ice.n === 4, 'a relay link is fetched and added to the STUN servers', ice);
