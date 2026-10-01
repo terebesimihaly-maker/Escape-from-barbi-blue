@@ -90,7 +90,10 @@ function create(THREE, opts) {
   let shown = true;
   function showParts(v) { if (v === shown) return; shown = v;
     root.traverse(o => { if (o.isMesh || o.isSprite) { if (o.userData.vis0 === undefined) o.userData.vis0 = o.visible; o.visible = v && o.userData.vis0; } }); }
+  // (detail by distance: someone more than 4 m away keeps only the lower layers of their short hair and beard)
+  const furMats = []; root.traverse(o => { if (o.material && o.material.userData && o.material.userData.furTop) furMats.push(o.material.userData.furTop); });
   function update(dt, s) {
+    if (s.camDist !== undefined) { const top = s.camDist > 4 ? 0.4 : 1; for (const u of furMats) u.value = top; }
     showParts(!(s.hidden || s.away));
     breath += dt;
     const lying = s.down || s.dead;
@@ -527,19 +530,20 @@ function hairCardMaterial(THREE, src, hair) {
 }
 function furMaterial(THREE, src, color, fill, many) {
   const m = new THREE.MeshStandardMaterial({ map: src.map, color, roughness: 0.72, metalness: 0 });
+  m.userData.furTop = { value: 1 };                 // (the highest layer drawn: lower for someone far away, where it can't be seen)
   const fu = furTexture(THREE);
   m.onBeforeCompile = sh => {
     sh.uniforms.sheenTint = { value: color.clone().lerp(new THREE.Color(0xffffff), 0.25) };
-    sh.uniforms.furMap = fu; sh.uniforms.furFill = { value: fill }; sh.uniforms.furMany = { value: many === undefined ? 1 : many }; sh.uniforms.furVar = { value: many === undefined ? 0.65 : many < 0.5 ? 0.35 : 0.7 };   // (scalp hair; stubble; beards and a buzz cut)
+    sh.uniforms.furMap = fu; sh.uniforms.furFill = { value: fill }; sh.uniforms.furTop = m.userData.furTop; sh.uniforms.furMany = { value: many === undefined ? 1 : many }; sh.uniforms.furVar = { value: many === undefined ? 0.65 : many < 0.5 ? 0.35 : 0.7 };   // (scalp hair; stubble; beards and a buzz cut)
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float _layer;\nvarying float vLayer;\nvarying vec2 vFurRoot;\nvarying vec2 vFurTip;\n#ifndef USE_UV1\nattribute vec2 uv1;\n#endif\n#ifndef USE_UV2\nattribute vec2 uv2;\n#endif')
       .replace('#include <uv_vertex>', '#include <uv_vertex>\nvLayer = _layer; vFurRoot = uv1; vFurTip = uv2;');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 sheenTint;\nuniform sampler2D furMap;\nuniform float furFill;\nuniform float furMany;\nuniform float furVar;\nvarying float vLayer;\nvarying vec2 vFurRoot;\nvarying vec2 vFurTip;')
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 sheenTint;\nuniform sampler2D furMap;\nuniform float furFill;\nuniform float furTop;\nuniform float furMany;\nuniform float furVar;\nvarying float vLayer;\nvarying vec2 vFurRoot;\nvarying vec2 vFurTip;')
       .replace('#include <map_fragment>', [
         '#ifdef USE_MAP', 'float dens = texture2D( map, vMapUv ).a;', '#else', 'float dens = 1.0;', '#endif',
         'vec4 fr = texture2D( furMap, mix( vFurRoot, vFurTip, vLayer ) );',
         'float hh = fr.a * step( fract( fr.r * 17.0 ), dens * furMany ) * ( 0.45 + 0.55 * smoothstep( 0.2, 0.9, dens ) );',   // (fewer and shorter hairs at the hairline)
         'if ( vLayer < 0.001 ) { if ( hh < 0.04 && ( dens < 0.92 || furFill < 0.5 ) ) discard; }',   // (the scalp: the hairs\' roots; covered between them too where the hair is thick)
-        'else if ( hh < vLayer * 0.97 + 0.02 ) discard;',
+        'else if ( hh < vLayer * 0.97 + 0.02 || vLayer > furTop ) discard;',
         'diffuseColor.rgb *= ( 1.0 - furVar * 0.75 + furVar * fr.r ) * mix( 0.5, 1.05, vLayer );'].join('\n'))   // (darker down among the roots)
       .replace('#include <opaque_fragment>', HAIR_SHEEN('vFurRoot', 'normalize( vFurTip - vFurRoot + vec2( 0.0, 1e-5 ) )', '( 0.4 + 0.6 * vLayer )') + '\n#include <opaque_fragment>');
   };
@@ -679,7 +683,10 @@ function createHuman(THREE, opts) {
   let shown = true;
   function showParts(v) { if (v === shown) return; shown = v;
     root.traverse(o => { if (o.isMesh || o.isSprite) { if (o.userData.vis0 === undefined) o.userData.vis0 = o.visible; o.visible = v && o.userData.vis0; } }); }
+  // (detail by distance: someone more than 4 m away keeps only the lower layers of their short hair and beard)
+  const furMats = []; root.traverse(o => { if (o.material && o.material.userData && o.material.userData.furTop) furMats.push(o.material.userData.furTop); });
   function update(dt, s) {
+    if (s.camDist !== undefined) { const top = s.camDist > 4 ? 0.4 : 1; for (const u of furMats) u.value = top; }
     showParts(!(s.hidden || s.away));
     light.intensity = s.dead || s.hidden || s.away || s.lightOn === false ? 0 : 14;
     const v = s.speed || 0, lying = s.down || s.dead;

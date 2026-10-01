@@ -213,7 +213,7 @@ function joinLobby(r) {
   mpStatus(r ? 'Rejoining…' : 'Connecting…'); MP.kicked = false; MP.rejected = ''; MP.hostLeft = false;
   // your player id in this lobby (the same one when you rejoin, so the owner knows it's you)
   const pid = r ? r.pid : newPid(), t0 = performance.now(), wait = r ? RECONNECT_FOR * 1000 : JOIN_WAIT;
-  let joined = false, peer = null, stage = 'server', conn = null, tries = 0;
+  let joined = false, peer = null, stage = 'server', conn = null, tries = 0, serverTries = 0;
   const fail = t => { if (joined) return; clearTimeout(timer); clearInterval(tick); leaveMP(true); if (r) clearRejoin(); mpStatus(t); MP.joinFail = t; };
   // why it didn't work, as far as we can tell: the matchmaking server, the connection between the two computers, or the owner's game
   const why = () => stage === 'server' ? "Couldn't reach the matchmaking server. Check your internet connection and try again." :
@@ -241,6 +241,9 @@ function joinLobby(r) {
     peer.on('error', err => {
       // rejoining right after dropping out: the server may still hold your old id for a minute. Try again.
       if (err.type === 'unavailable-id' && !joined && performance.now() - t0 < wait - 3000) { try { peer.destroy(); } catch (e) {} setTimeout(() => { if (MP.peer === peer) start(); }, 3000); return; }
+      // the matchmaking server's line dropped while joining (a busy or shaky connection): try it again, twice, before giving up
+      if (/^(network|server-error|socket-error|socket-closed)$/.test(err.type) && !joined && serverTries < 2 && performance.now() - t0 < wait - 4000) {
+        serverTries++; try { peer.destroy(); } catch (e) {} setTimeout(() => { if (MP.peer === peer) start(); }, 1500); return; }
       if (!joined) fail(err.type === 'peer-unavailable' && r ? "Couldn't rejoin. The game is over." : netError(err));
       else if (err.type !== 'peer-unavailable') clientLost();
     });

@@ -80,10 +80,11 @@ await B.evaluate(() => { bb.player.x = 175; bb.player.y = 125; });
 await C.evaluate(() => { bb.player.x = 75; bb.player.y = 181; });
 await A.evaluate(() => { bb.player.x = 75; bb.player.y = 125; bb.player.ang = 0; bb.player.pitch = 0; });
 await A.waitForTimeout(1500);
-await A.keyboard.down('KeyW'); await A.waitForTimeout(4000); await A.keyboard.up('KeyW');
+// (walking until she gets there, however slow this machine draws: up to 30 s)
+await A.keyboard.down('KeyW'); await until(A, () => bb.player.x > 120, null, 30000); await A.waitForTimeout(1500); await A.keyboard.up('KeyW');
 const blk = await A.evaluate(() => { const o = [...bb.MP.others.values()].find(q => q.name.startsWith('Bob')); return [bb.player.x, bb.player.y, o.x, o.y]; });
 const dBlk = Math.hypot(blk[0] - blk[2], blk[1] - blk[3]);
-check(blk[0] > 95, 'Alice walked towards Bobby', blk);   // (from x = 75; on a slow test machine she covers less ground in 4 s)
+check(blk[0] > 95, 'Alice walked towards Bobby', blk);
 check(dBlk >= 20, 'Alice stopped at Bobby instead of walking through him (distance ' + dBlk.toFixed(1) + ')', blk);
 console.log('== one person per wardrobe');
 const cl = await A.evaluate(() => { const c = bb.closets[0]; return { x: c.x + c.ox * 10, y: c.y + c.oy * 10, ang: Math.atan2(-c.oy, -c.ox) }; });
@@ -149,8 +150,9 @@ check((await Promise.all([A, B, C].map(P => until(P, () => bb.powerOn, null, 100
 await freeze();
 const ex = await A.evaluate(() => ({ x: bb.exit.x, y: bb.exit.y, ang: 0 }));
 // (the next floor screen only lasts a moment, and a slow page can be busy building the new floor right through a 200 ms poll:
-// each page notes, every frame, whether it showed it)
-for (const P of [A, B, C]) await P.evaluate(() => { window.__sawTrans = false; const f = () => { if (bb.state === 'trans') window.__sawTrans = true; else requestAnimationFrame(f); }; requestAnimationFrame(f); });
+// each page notes when the screen is shown)
+for (const P of [A, B, C]) await P.evaluate(() => { window.__sawTrans = false; const el = document.getElementById('trans');
+  new MutationObserver(() => { if (!el.classList.contains('hidden')) window.__sawTrans = true; }).observe(el, { attributes: true, attributeFilter: ['class'] }); });
 await goTo(B, ex);
 check((await Promise.all([A, B, C].map(P => until(P, () => window.__sawTrans, null, 30000)))).every(Boolean), 'Bobby reaches the door: everyone sees the next floor screen');
 check((await Promise.all([A, B, C].map(P => until(P, () => bb.state === 'play' && bb.floorIdx === 1, null, 30000)))).every(Boolean), 'everyone is on floor 2');

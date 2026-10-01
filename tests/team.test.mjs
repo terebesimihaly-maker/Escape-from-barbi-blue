@@ -145,7 +145,8 @@ check(await B.evaluate(() => bb.MP.spec === 1 && watched() && watched().name ===
 await B.keyboard.press('KeyG');
 check(await until(B, () => /She isn't anywhere/.test(document.getElementById('msg').textContent), null, 5000), 'while she isn\'t in the house, there\'s nothing to show');
 await A.evaluate(() => { const m = bb.monster; m.active = true; m.state = 'lurk'; m.fakeT = 1e9; m.fakeFor = null; m.screamT = 1e9; const c = center(CELLS[CELLS.length - 1]); m.x = c.x; m.y = c.y; });
-await B.waitForTimeout(700);
+// (Ben's game has to know she's in the house first: until then his G truthfully says she isn't anywhere)
+await until(B, () => bb.monster.active, null, 30000);
 await B.keyboard.press('KeyG');
 check(await until(A, id => team.pings.some(q => q.by === id && q.k === 'ghost'), benId, 15000), 'G: Anna sees where she is ("👻 She\'s here", from Ben\'s ghost)');
 const gp = await A.evaluate(id => { const q = team.pings.find(q => q.by === id), m = bb.monster; return Math.hypot(q.x - m.x, q.y - m.y); }, benId);

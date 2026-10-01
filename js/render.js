@@ -160,7 +160,7 @@ function render3D(t) {
     }
     if (!o.av) continue;
     o.av.obj.position.set(o.x * S, 0, o.y * S); o.av.obj.rotation.y = Math.PI / 2 - o.ang;
-    o.av.update(lastDt, { speed: o.spd * S, sprinting: o.sprinting, crouching: o.crouching, down: o.down, dead: o.dead, hidden: o.hidden, away: o.away, pitch: o.pitch, lightOn: settings.quality !== 'low',
+    o.av.update(lastDt, { camDist: o.av.obj.position.distanceTo(camera.position), speed: o.spd * S, sprinting: o.sprinting, crouching: o.crouching, down: o.down, dead: o.dead, hidden: o.hidden, away: o.away, pitch: o.pitch, lightOn: settings.quality !== 'low',
       dance: o.dance >= 0 && DANCES[o.dance] ? DANCES[o.dance][2] : null });
     o.av.setName(o.dead ? o.name + ' ✝' : o.down ? o.name + ' · ' + Math.ceil(o.downLeft) + 's' : o.name, o.down || o.dead); }
   // things on the floor, and on the walls
