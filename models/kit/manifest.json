@@ -1,0 +1,7688 @@
+{
+ "version": 1,
+ "kit": 1,
+ "u": 0.045,
+ "axes": "three.js: y up, front +z; aabb [min, max] in metres in the node frame",
+ "tiers": {
+  "hi": {
+   "wood": 1160628,
+   "tile": 77456,
+   "concrete": 75384,
+   "attic": 78760,
+   "workshop": 81644,
+   "common": 6880
+  },
+  "md": {
+   "wood": 409696,
+   "tile": 77472,
+   "concrete": 75372,
+   "attic": 78764,
+   "workshop": 81644,
+   "common": 6884
+  },
+  "lo": {
+   "wood": 220252,
+   "tile": 78052,
+   "concrete": 75140,
+   "attic": 78524,
+   "workshop": 82228,
+   "common": 6880
+  }
+ },
+ "nodes": {
+  "Band_attic_ladder": {
+   "file": "attic",
+   "group": "arch",
+   "id": "Band_attic_ladder",
+   "mount": "ceiling",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.35,
+     -0.12,
+     -0.6
+    ],
+    [
+     0.35,
+     0.0,
+     0.6
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_barrel": {
+   "file": "concrete",
+   "group": "band",
+   "id": "barrel",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.21,
+     0.0,
+     0.0
+    ],
+    [
+     0.21,
+     0.62,
+     0.42
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_bell_board": {
+   "file": "common",
+   "group": "band",
+   "id": "bell_board",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.45,
+     1.9,
+     0.0
+    ],
+    [
+     0.45,
+     2.5,
+     0.12
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_bookshelf_low": {
+   "file": "wood",
+   "group": "band",
+   "id": "bookshelf_low",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.45,
+     0.0,
+     0.0
+    ],
+    [
+     0.45,
+     1.1,
+     0.32
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_box_stack": {
+   "file": "attic",
+   "group": "band",
+   "id": "box_stack",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.45,
+     0.0,
+     0.0
+    ],
+    [
+     0.45,
+     1.2,
+     0.44
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_ceilingrose": {
+   "file": "wood",
+   "group": "arch",
+   "id": "Band_ceilingrose",
+   "mount": "ceiling",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.3,
+     -0.08,
+     -0.3
+    ],
+    [
+     0.3,
+     0.0,
+     0.3
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_changing_table": {
+   "file": "wood",
+   "group": "band",
+   "id": "changing_table",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.45,
+     0.0,
+     0.0
+    ],
+    [
+     0.45,
+     0.95,
+     0.44
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_china_cabinet": {
+   "file": "tile",
+   "group": "band",
+   "id": "china_cabinet",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.55,
+     0.0,
+     0.0
+    ],
+    [
+     0.55,
+     2.0,
+     0.42
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_coal_bin": {
+   "file": "concrete",
+   "group": "band",
+   "id": "coal_bin",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.45,
+     0.0,
+     0.0
+    ],
+    [
+     0.45,
+     0.8,
+     0.44
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_coat_hooks": {
+   "file": "wood",
+   "group": "band",
+   "id": "coat_hooks",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.45,
+     0.75,
+     0.0
+    ],
+    [
+     0.45,
+     1.75,
+     0.3
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_cobweb_card": {
+   "file": "attic",
+   "group": "band",
+   "id": "cobweb_card",
+   "mount": "corner",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     0.0,
+     2.2,
+     0.0
+    ],
+    [
+     0.44,
+     2.7,
+     0.44
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_coffer_rose": {
+   "file": "tile",
+   "group": "arch",
+   "id": "Band_coffer_rose",
+   "mount": "ceiling",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.7,
+     -0.15,
+     -0.7
+    ],
+    [
+     0.7,
+     0.0,
+     0.7
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_conduit": {
+   "file": "common",
+   "group": "band",
+   "id": "conduit",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -1.0,
+     2.1,
+     0.0
+    ],
+    [
+     1.0,
+     2.5,
+     0.06
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_console": {
+   "file": "tile",
+   "group": "band",
+   "id": "console",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.5,
+     0.0,
+     0.0
+    ],
+    [
+     0.5,
+     0.85,
+     0.4
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_console_mirror": {
+   "file": "tile",
+   "group": "band",
+   "id": "console_mirror",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.4,
+     1.0,
+     0.0
+    ],
+    [
+     0.4,
+     1.95,
+     0.06
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_doll_cabinet": {
+   "file": "tile",
+   "group": "band",
+   "id": "doll_cabinet",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.0,
+     0.0
+    ],
+    [
+     0.6,
+     2.0,
+     0.42
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_doll_shelf": {
+   "file": "wood",
+   "group": "band",
+   "id": "doll_shelf",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     1.27,
+     0.0
+    ],
+    [
+     0.6,
+     1.47,
+     0.22
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_dresser": {
+   "file": "wood",
+   "group": "band",
+   "id": "dresser",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [
+    "Band_dresser_fix"
+   ],
+   "aabb": [
+    [
+     -0.5,
+     0.0,
+     0.0
+    ],
+    [
+     0.5,
+     0.95,
+     0.44
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_eye_shelf": {
+   "file": "workshop",
+   "group": "band",
+   "id": "eye_shelf",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.65,
+     0.0,
+     0.0
+    ],
+    [
+     0.65,
+     1.9,
+     0.3
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_filing_cabinet": {
+   "file": "workshop",
+   "group": "band",
+   "id": "filing_cabinet",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.225,
+     0.0,
+     0.0
+    ],
+    [
+     0.225,
+     1.3,
+     0.44
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_frames_leaning": {
+   "file": "attic",
+   "group": "band",
+   "id": "frames_leaning",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.55,
+     0.0,
+     0.0
+    ],
+    [
+     0.55,
+     0.95,
+     0.22
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_fuse_box": {
+   "file": "concrete",
+   "group": "band",
+   "id": "fuse_box",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.225,
+     1.45,
+     0.0
+    ],
+    [
+     0.225,
+     2.0,
+     0.18
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_gilt_mirror": {
+   "file": "tile",
+   "group": "band",
+   "id": "gilt_mirror",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.35,
+     1.0,
+     0.0
+    ],
+    [
+     0.35,
+     2.0,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_grandfather_clock": {
+   "file": "tile",
+   "group": "band",
+   "id": "grandfather_clock",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [
+    "Band_grandfather_clock_Pendulum"
+   ],
+   "aabb": [
+    [
+     -0.25,
+     0.0,
+     0.0
+    ],
+    [
+     0.25,
+     2.1,
+     0.3
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_hall_bench": {
+   "file": "tile",
+   "group": "band",
+   "id": "hall_bench",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.0,
+     0.0
+    ],
+    [
+     0.6,
+     0.48,
+     0.42
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_head_shelf": {
+   "file": "workshop",
+   "group": "band",
+   "id": "head_shelf",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.8,
+     1.22,
+     0.0
+    ],
+    [
+     0.8,
+     1.97,
+     0.26
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_kids_frames_v0": {
+   "file": "wood",
+   "group": "band",
+   "id": "kids_frames",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.225,
+     1.25,
+     0.0
+    ],
+    [
+     0.225,
+     1.8,
+     0.05
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_kids_frames_v1": {
+   "file": "wood",
+   "group": "band",
+   "id": "kids_frames",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.225,
+     1.25,
+     0.0
+    ],
+    [
+     0.225,
+     1.8,
+     0.05
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_kids_frames_v2": {
+   "file": "wood",
+   "group": "band",
+   "id": "kids_frames",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.225,
+     1.25,
+     0.0
+    ],
+    [
+     0.225,
+     1.8,
+     0.05
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_leaning_mirror": {
+   "file": "attic",
+   "group": "band",
+   "id": "leaning_mirror",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.35,
+     0.0,
+     0.0
+    ],
+    [
+     0.35,
+     1.6,
+     0.3
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_limb_hooks": {
+   "file": "workshop",
+   "group": "band",
+   "id": "limb_hooks",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     1.0,
+     0.0
+    ],
+    [
+     0.6,
+     2.0,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_mannequin": {
+   "file": "attic",
+   "group": "band",
+   "id": "mannequin",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.21,
+     0.0,
+     0.0
+    ],
+    [
+     0.21,
+     1.75,
+     0.42
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_metal_shelf": {
+   "file": "concrete",
+   "group": "band",
+   "id": "metal_shelf",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.0,
+     0.0
+    ],
+    [
+     0.6,
+     1.9,
+     0.4
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_night_stand": {
+   "file": "wood",
+   "group": "band",
+   "id": "night_stand",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.225,
+     0.0,
+     0.0
+    ],
+    [
+     0.225,
+     0.6,
+     0.4
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_paint_shelf": {
+   "file": "workshop",
+   "group": "band",
+   "id": "paint_shelf",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.0,
+     0.0
+    ],
+    [
+     0.6,
+     1.8,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_parts_drawers": {
+   "file": "workshop",
+   "group": "band",
+   "id": "parts_drawers",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.5,
+     0.0,
+     0.0
+    ],
+    [
+     0.5,
+     1.3,
+     0.44
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_peel_A_attic": {
+   "file": "attic",
+   "group": "arch",
+   "id": "Band_peel_A_attic",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_peel_A_concrete": {
+   "file": "concrete",
+   "group": "arch",
+   "id": "Band_peel_A_concrete",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_peel_A_tile": {
+   "file": "tile",
+   "group": "arch",
+   "id": "Band_peel_A_tile",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_peel_A_wood": {
+   "file": "wood",
+   "group": "arch",
+   "id": "Band_peel_A_wood",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_peel_A_workshop": {
+   "file": "workshop",
+   "group": "arch",
+   "id": "Band_peel_A_workshop",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_peel_B_attic": {
+   "file": "attic",
+   "group": "arch",
+   "id": "Band_peel_B_attic",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_peel_B_concrete": {
+   "file": "concrete",
+   "group": "arch",
+   "id": "Band_peel_B_concrete",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_peel_B_tile": {
+   "file": "tile",
+   "group": "arch",
+   "id": "Band_peel_B_tile",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_peel_B_wood": {
+   "file": "wood",
+   "group": "arch",
+   "id": "Band_peel_B_wood",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_peel_B_workshop": {
+   "file": "workshop",
+   "group": "arch",
+   "id": "Band_peel_B_workshop",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_peel_C_attic": {
+   "file": "attic",
+   "group": "arch",
+   "id": "Band_peel_C_attic",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_peel_C_concrete": {
+   "file": "concrete",
+   "group": "arch",
+   "id": "Band_peel_C_concrete",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_peel_C_tile": {
+   "file": "tile",
+   "group": "arch",
+   "id": "Band_peel_C_tile",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_peel_C_wood": {
+   "file": "wood",
+   "group": "arch",
+   "id": "Band_peel_C_wood",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_peel_C_workshop": {
+   "file": "workshop",
+   "group": "arch",
+   "id": "Band_peel_C_workshop",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_peel_D_attic": {
+   "file": "attic",
+   "group": "arch",
+   "id": "Band_peel_D_attic",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_peel_D_concrete": {
+   "file": "concrete",
+   "group": "arch",
+   "id": "Band_peel_D_concrete",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_peel_D_tile": {
+   "file": "tile",
+   "group": "arch",
+   "id": "Band_peel_D_tile",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_peel_D_wood": {
+   "file": "wood",
+   "group": "arch",
+   "id": "Band_peel_D_wood",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_peel_D_workshop": {
+   "file": "workshop",
+   "group": "arch",
+   "id": "Band_peel_D_workshop",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.4,
+     0.002
+    ],
+    [
+     0.6,
+     1.6,
+     0.08
+    ]
+   ],
+   "tris": {
+    "hi": 4,
+    "md": 4,
+    "lo": 4
+   }
+  },
+  "Band_pegboard": {
+   "file": "concrete",
+   "group": "band",
+   "id": "pegboard",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.95,
+     0.0
+    ],
+    [
+     0.6,
+     1.85,
+     0.15
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_puppet_theatre": {
+   "file": "wood",
+   "group": "band",
+   "id": "puppet_theatre",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.0,
+     0.0
+    ],
+    [
+     0.6,
+     1.6,
+     0.4
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_radiator": {
+   "file": "wood",
+   "group": "band",
+   "id": "radiator",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.4,
+     0.0,
+     0.0
+    ],
+    [
+     0.4,
+     0.65,
+     0.12
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_rolled_rug": {
+   "file": "attic",
+   "group": "band",
+   "id": "rolled_rug",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.2,
+     0.0,
+     0.0
+    ],
+    [
+     0.2,
+     1.7,
+     0.4
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_service_shelf": {
+   "file": "common",
+   "group": "band",
+   "id": "service_shelf",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.7,
+     0.0,
+     0.0
+    ],
+    [
+     0.7,
+     1.8,
+     0.25
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_sideboard": {
+   "file": "tile",
+   "group": "band",
+   "id": "sideboard",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.8,
+     0.0,
+     0.0
+    ],
+    [
+     0.8,
+     0.95,
+     0.44
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_suitcase_pile": {
+   "file": "attic",
+   "group": "band",
+   "id": "suitcase_pile",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.4,
+     0.0,
+     0.0
+    ],
+    [
+     0.4,
+     0.9,
+     0.44
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_tool_wall": {
+   "file": "workshop",
+   "group": "band",
+   "id": "tool_wall",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.8,
+     0.8,
+     0.0
+    ],
+    [
+     0.8,
+     2.0,
+     0.2
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_toy_shelf": {
+   "file": "wood",
+   "group": "band",
+   "id": "toy_shelf",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.6,
+     0.0,
+     0.0
+    ],
+    [
+     0.6,
+     1.6,
+     0.3
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_umbrella_stand": {
+   "file": "tile",
+   "group": "band",
+   "id": "umbrella_stand",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.175,
+     0.0,
+     0.0
+    ],
+    [
+     0.175,
+     0.95,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_utility_sink": {
+   "file": "concrete",
+   "group": "band",
+   "id": "utility_sink",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.3,
+     0.0,
+     0.0
+    ],
+    [
+     0.3,
+     1.1,
+     0.44
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_wall_clock": {
+   "file": "wood",
+   "group": "band",
+   "id": "wall_clock",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.175,
+     1.75,
+     0.0
+    ],
+    [
+     0.175,
+     2.25,
+     0.12
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_washstand": {
+   "file": "wood",
+   "group": "band",
+   "id": "washstand",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.425,
+     0.0,
+     0.0
+    ],
+    [
+     0.425,
+     0.8,
+     0.44
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Band_water_heater": {
+   "file": "concrete",
+   "group": "band",
+   "id": "water_heater",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.21,
+     0.0,
+     0.0
+    ],
+    [
+     0.21,
+     1.6,
+     0.42
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Col_brick_pier_H270": {
+   "file": "concrete",
+   "group": "col",
+   "id": "brick_pier",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.35,
+     0.0,
+     -0.35
+    ],
+    [
+     0.35,
+     2.7,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.7,
+    0.7
+   ],
+   "footU": [
+    16,
+    16
+   ]
+  },
+  "Col_brick_pier_H300": {
+   "file": "concrete",
+   "group": "col",
+   "id": "brick_pier",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.35,
+     0.0,
+     -0.35
+    ],
+    [
+     0.35,
+     3.0,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.7,
+    0.7
+   ],
+   "footU": [
+    16,
+    16
+   ]
+  },
+  "Col_brick_pier_H330": {
+   "file": "concrete",
+   "group": "col",
+   "id": "brick_pier",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.35,
+     0.0,
+     -0.35
+    ],
+    [
+     0.35,
+     3.3,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.7,
+    0.7
+   ],
+   "footU": [
+    16,
+    16
+   ]
+  },
+  "Col_chimney_breast_H400": {
+   "file": "attic",
+   "group": "col",
+   "id": "chimney_breast",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.495,
+     0.0,
+     -0.495
+    ],
+    [
+     0.495,
+     4.0,
+     0.495
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.99,
+    0.99
+   ],
+   "footU": [
+    22,
+    22
+   ]
+  },
+  "Col_column_tile_H350": {
+   "file": "tile",
+   "group": "col",
+   "id": "column_tile",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.33,
+     0.0,
+     -0.33
+    ],
+    [
+     0.33,
+     3.5,
+     0.33
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.66,
+    0.66
+   ],
+   "footU": [
+    15,
+    15
+   ]
+  },
+  "Col_column_tile_H400": {
+   "file": "tile",
+   "group": "col",
+   "id": "column_tile",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.33,
+     0.0,
+     -0.33
+    ],
+    [
+     0.33,
+     4.0,
+     0.33
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.66,
+    0.66
+   ],
+   "footU": [
+    15,
+    15
+   ]
+  },
+  "Col_column_tile_H450": {
+   "file": "tile",
+   "group": "col",
+   "id": "column_tile",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.33,
+     0.0,
+     -0.33
+    ],
+    [
+     0.33,
+     4.5,
+     0.33
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.66,
+    0.66
+   ],
+   "footU": [
+    15,
+    15
+   ]
+  },
+  "Col_stanchion_H300": {
+   "file": "concrete",
+   "group": "col",
+   "id": "stanchion",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.15,
+     0.0,
+     -0.15
+    ],
+    [
+     0.15,
+     3.0,
+     0.15
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.3,
+    0.3
+   ],
+   "footU": [
+    7,
+    7
+   ]
+  },
+  "Col_stanchion_H330": {
+   "file": "concrete",
+   "group": "col",
+   "id": "stanchion",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.15,
+     0.0,
+     -0.15
+    ],
+    [
+     0.15,
+     3.3,
+     0.15
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.3,
+    0.3
+   ],
+   "footU": [
+    7,
+    7
+   ]
+  },
+  "Col_steel_column_H360": {
+   "file": "workshop",
+   "group": "col",
+   "id": "steel_column",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.15,
+     0.0,
+     -0.15
+    ],
+    [
+     0.15,
+     3.6,
+     0.15
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.3,
+    0.3
+   ],
+   "footU": [
+    7,
+    7
+   ]
+  },
+  "Col_steel_column_H420": {
+   "file": "workshop",
+   "group": "col",
+   "id": "steel_column",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.15,
+     0.0,
+     -0.15
+    ],
+    [
+     0.15,
+     4.2,
+     0.15
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.3,
+    0.3
+   ],
+   "footU": [
+    7,
+    7
+   ]
+  },
+  "Col_steel_column_H450": {
+   "file": "workshop",
+   "group": "col",
+   "id": "steel_column",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.15,
+     0.0,
+     -0.15
+    ],
+    [
+     0.15,
+     4.5,
+     0.15
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.3,
+    0.3
+   ],
+   "footU": [
+    7,
+    7
+   ]
+  },
+  "Door_closed_attic": {
+   "file": "attic",
+   "group": "arch",
+   "id": "Door_closed_attic",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.1
+    ],
+    [
+     1.125,
+     3.0,
+     0.05
+    ]
+   ],
+   "tris": {
+    "hi": 60,
+    "md": 60,
+    "lo": 60
+   }
+  },
+  "Door_closed_concrete": {
+   "file": "concrete",
+   "group": "arch",
+   "id": "Door_closed_concrete",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.1
+    ],
+    [
+     1.125,
+     3.0,
+     0.05
+    ]
+   ],
+   "tris": {
+    "hi": 60,
+    "md": 60,
+    "lo": 60
+   }
+  },
+  "Door_closed_tile": {
+   "file": "tile",
+   "group": "arch",
+   "id": "Door_closed_tile",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.1
+    ],
+    [
+     1.125,
+     3.0,
+     0.05
+    ]
+   ],
+   "tris": {
+    "hi": 60,
+    "md": 60,
+    "lo": 60
+   }
+  },
+  "Door_closed_wood": {
+   "file": "wood",
+   "group": "arch",
+   "id": "Door_closed_wood",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.1
+    ],
+    [
+     1.125,
+     3.0,
+     0.05
+    ]
+   ],
+   "tris": {
+    "hi": 60,
+    "md": 60,
+    "lo": 60
+   }
+  },
+  "Door_closed_workshop": {
+   "file": "workshop",
+   "group": "arch",
+   "id": "Door_closed_workshop",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.1
+    ],
+    [
+     1.125,
+     3.0,
+     0.05
+    ]
+   ],
+   "tris": {
+    "hi": 60,
+    "md": 60,
+    "lo": 60
+   }
+  },
+  "Door_frame_attic": {
+   "file": "attic",
+   "group": "arch",
+   "id": "Door_frame_attic",
+   "mount": "doorway",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.2
+    ],
+    [
+     1.125,
+     2.66,
+     0.2
+    ]
+   ],
+   "tris": {
+    "hi": 36,
+    "md": 36,
+    "lo": 36
+   }
+  },
+  "Door_frame_concrete": {
+   "file": "concrete",
+   "group": "arch",
+   "id": "Door_frame_concrete",
+   "mount": "doorway",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.2
+    ],
+    [
+     1.125,
+     2.66,
+     0.2
+    ]
+   ],
+   "tris": {
+    "hi": 36,
+    "md": 36,
+    "lo": 36
+   }
+  },
+  "Door_frame_tile": {
+   "file": "tile",
+   "group": "arch",
+   "id": "Door_frame_tile",
+   "mount": "doorway",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.2
+    ],
+    [
+     1.125,
+     2.66,
+     0.2
+    ]
+   ],
+   "tris": {
+    "hi": 36,
+    "md": 36,
+    "lo": 36
+   }
+  },
+  "Door_frame_wood": {
+   "file": "wood",
+   "group": "arch",
+   "id": "Door_frame_wood",
+   "mount": "doorway",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.2
+    ],
+    [
+     1.125,
+     2.66,
+     0.2
+    ]
+   ],
+   "tris": {
+    "hi": 36,
+    "md": 36,
+    "lo": 36
+   }
+  },
+  "Door_frame_workshop": {
+   "file": "workshop",
+   "group": "arch",
+   "id": "Door_frame_workshop",
+   "mount": "doorway",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.2
+    ],
+    [
+     1.125,
+     2.66,
+     0.2
+    ]
+   ],
+   "tris": {
+    "hi": 36,
+    "md": 36,
+    "lo": 36
+   }
+  },
+  "Door_leaf_attic": {
+   "file": "attic",
+   "group": "arch",
+   "id": "Door_leaf_attic",
+   "mount": "hinge",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     0.0,
+     0.0,
+     -0.0225
+    ],
+    [
+     1.0,
+     2.55,
+     0.0225
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Door_leaf_concrete": {
+   "file": "concrete",
+   "group": "arch",
+   "id": "Door_leaf_concrete",
+   "mount": "hinge",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     0.0,
+     0.0,
+     -0.0225
+    ],
+    [
+     1.0,
+     2.55,
+     0.0225
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Door_leaf_tile": {
+   "file": "tile",
+   "group": "arch",
+   "id": "Door_leaf_tile",
+   "mount": "hinge",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     0.0,
+     0.0,
+     -0.0225
+    ],
+    [
+     1.0,
+     2.55,
+     0.0225
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Door_leaf_wood": {
+   "file": "wood",
+   "group": "arch",
+   "id": "Door_leaf_wood",
+   "mount": "hinge",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     0.0,
+     0.0,
+     -0.0225
+    ],
+    [
+     1.0,
+     2.55,
+     0.0225
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Door_leaf_workshop": {
+   "file": "workshop",
+   "group": "arch",
+   "id": "Door_leaf_workshop",
+   "mount": "hinge",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     0.0,
+     0.0,
+     -0.0225
+    ],
+    [
+     1.0,
+     2.55,
+     0.0225
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   }
+  },
+  "Exit_attic": {
+   "file": "attic",
+   "group": "arch",
+   "id": "Exit_attic",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "SkyPlane",
+    "Kit_grey",
+    "Emit"
+   ],
+   "uv1": true,
+   "children": [
+    "Exit_attic_p0",
+    "Exit_attic_p1",
+    "Exit_boards_attic",
+    "Exit_lamp_attic",
+    "Exit_leaf_attic"
+   ],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -1.2
+    ],
+    [
+     1.125,
+     3.0,
+     0.1
+    ]
+   ],
+   "tris": {
+    "hi": 140,
+    "md": 140,
+    "lo": 140
+   }
+  },
+  "Exit_concrete": {
+   "file": "concrete",
+   "group": "arch",
+   "id": "Exit_concrete",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "WallSurface",
+    "SkyPlane",
+    "Emit"
+   ],
+   "uv1": true,
+   "children": [
+    "Exit_boards_concrete",
+    "Exit_concrete_p0",
+    "Exit_concrete_p1",
+    "Exit_lamp_concrete",
+    "Exit_leaf_concrete"
+   ],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -1.2
+    ],
+    [
+     1.125,
+     3.0,
+     0.1
+    ]
+   ],
+   "tris": {
+    "hi": 140,
+    "md": 140,
+    "lo": 140
+   }
+  },
+  "Exit_tile": {
+   "file": "tile",
+   "group": "arch",
+   "id": "Exit_tile",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit",
+    "WallSurface",
+    "SkyPlane"
+   ],
+   "uv1": true,
+   "children": [
+    "Exit_boards_tile",
+    "Exit_lamp_tile",
+    "Exit_leaf_tile",
+    "Exit_tile_p0",
+    "Exit_tile_p1"
+   ],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -1.2
+    ],
+    [
+     1.125,
+     3.0,
+     0.1
+    ]
+   ],
+   "tris": {
+    "hi": 140,
+    "md": 140,
+    "lo": 140
+   }
+  },
+  "Exit_wood": {
+   "file": "wood",
+   "group": "arch",
+   "id": "Exit_wood",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit",
+    "WallSurface",
+    "SkyPlane"
+   ],
+   "uv1": true,
+   "children": [
+    "Exit_boards_wood",
+    "Exit_lamp_wood",
+    "Exit_leaf_wood",
+    "Exit_wood_p0",
+    "Exit_wood_p1"
+   ],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -1.2
+    ],
+    [
+     1.125,
+     3.0,
+     0.1
+    ]
+   ],
+   "tris": {
+    "hi": 140,
+    "md": 140,
+    "lo": 140
+   }
+  },
+  "Exit_workshop": {
+   "file": "workshop",
+   "group": "arch",
+   "id": "Exit_workshop",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit",
+    "WallSurface",
+    "SkyPlane"
+   ],
+   "uv1": true,
+   "children": [
+    "Exit_boards_workshop",
+    "Exit_lamp_workshop",
+    "Exit_leaf_workshop",
+    "Exit_workshop_p0",
+    "Exit_workshop_p1"
+   ],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -1.2
+    ],
+    [
+     1.125,
+     3.0,
+     0.1
+    ]
+   ],
+   "tris": {
+    "hi": 140,
+    "md": 140,
+    "lo": 140
+   }
+  },
+  "Fix_anglepoise": {
+   "file": "workshop",
+   "group": "fix",
+   "id": "anglepoise",
+   "mount": "surface",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit"
+   ],
+   "uv1": false,
+   "children": [
+    "Fix_anglepoise_emit"
+   ],
+   "aabb": [
+    [
+     -0.15,
+     0.0,
+     -0.275
+    ],
+    [
+     0.15,
+     0.7,
+     0.275
+    ]
+   ],
+   "tris": {
+    "hi": 24,
+    "md": 24,
+    "lo": 24
+   }
+  },
+  "Fix_bare_bulb": {
+   "file": "concrete",
+   "group": "fix",
+   "id": "bare_bulb",
+   "mount": "ceiling",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit"
+   ],
+   "uv1": false,
+   "children": [
+    "Fix_bare_bulb_emit"
+   ],
+   "aabb": [
+    [
+     -0.04,
+     -0.16,
+     -0.04
+    ],
+    [
+     0.04,
+     0.0,
+     0.04
+    ]
+   ],
+   "tris": {
+    "hi": 24,
+    "md": 24,
+    "lo": 24
+   }
+  },
+  "Fix_batten_light": {
+   "file": "common",
+   "group": "fix",
+   "id": "batten_light",
+   "mount": "ceiling",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit"
+   ],
+   "uv1": false,
+   "children": [
+    "Fix_batten_light_emit"
+   ],
+   "aabb": [
+    [
+     -0.3,
+     -0.08,
+     -0.05
+    ],
+    [
+     0.3,
+     0.0,
+     0.05
+    ]
+   ],
+   "tris": {
+    "hi": 24,
+    "md": 24,
+    "lo": 24
+   }
+  },
+  "Fix_boiler_glow": {
+   "file": "concrete",
+   "group": "fix",
+   "id": "boiler_glow",
+   "mount": "practical",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit"
+   ],
+   "uv1": false,
+   "children": [
+    "Fix_boiler_glow_emit"
+   ],
+   "aabb": [
+    [
+     -0.175,
+     0.0,
+     -0.05
+    ],
+    [
+     0.175,
+     0.25,
+     0.05
+    ]
+   ],
+   "tris": {
+    "hi": 24,
+    "md": 24,
+    "lo": 24
+   }
+  },
+  "Fix_bulb_batten": {
+   "file": "attic",
+   "group": "fix",
+   "id": "bulb_batten",
+   "mount": "ceiling",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit"
+   ],
+   "uv1": false,
+   "children": [
+    "Fix_bulb_batten_emit"
+   ],
+   "aabb": [
+    [
+     -0.06,
+     -0.18,
+     -0.06
+    ],
+    [
+     0.06,
+     0.0,
+     0.06
+    ]
+   ],
+   "tris": {
+    "hi": 24,
+    "md": 24,
+    "lo": 24
+   }
+  },
+  "Fix_bulkhead": {
+   "file": "concrete",
+   "group": "fix",
+   "id": "bulkhead",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit"
+   ],
+   "uv1": false,
+   "children": [
+    "Fix_bulkhead_emit"
+   ],
+   "aabb": [
+    [
+     -0.11,
+     1.95,
+     0.0
+    ],
+    [
+     0.11,
+     2.25,
+     0.15
+    ]
+   ],
+   "tris": {
+    "hi": 24,
+    "md": 24,
+    "lo": 24
+   }
+  },
+  "Fix_candelabrum": {
+   "file": "tile",
+   "group": "fix",
+   "id": "candelabrum",
+   "mount": "surface",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit"
+   ],
+   "uv1": false,
+   "children": [
+    "Fix_candelabrum_emit"
+   ],
+   "aabb": [
+    [
+     -0.175,
+     0.0,
+     -0.075
+    ],
+    [
+     0.175,
+     0.45,
+     0.075
+    ]
+   ],
+   "tris": {
+    "hi": 24,
+    "md": 24,
+    "lo": 24
+   }
+  },
+  "Fix_chandelier": {
+   "file": "tile",
+   "group": "fix",
+   "id": "chandelier",
+   "mount": "ceiling",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit"
+   ],
+   "uv1": false,
+   "children": [
+    "Fix_chandelier_emit"
+   ],
+   "aabb": [
+    [
+     -0.45,
+     -0.8,
+     -0.45
+    ],
+    [
+     0.45,
+     0.0,
+     0.45
+    ]
+   ],
+   "tris": {
+    "hi": 24,
+    "md": 24,
+    "lo": 24
+   }
+  },
+  "Fix_fire_embers": {
+   "file": "common",
+   "group": "fix",
+   "id": "fire_embers",
+   "mount": "practical",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit"
+   ],
+   "uv1": false,
+   "children": [
+    "Fix_fire_embers_emit"
+   ],
+   "aabb": [
+    [
+     -0.275,
+     0.0,
+     -0.15
+    ],
+    [
+     0.275,
+     0.15,
+     0.15
+    ]
+   ],
+   "tris": {
+    "hi": 24,
+    "md": 24,
+    "lo": 24
+   }
+  },
+  "Fix_green_shade": {
+   "file": "workshop",
+   "group": "fix",
+   "id": "green_shade",
+   "mount": "ceiling",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit"
+   ],
+   "uv1": false,
+   "children": [
+    "Fix_green_shade_emit"
+   ],
+   "aabb": [
+    [
+     -0.225,
+     -0.3,
+     -0.225
+    ],
+    [
+     0.225,
+     0.0,
+     0.225
+    ]
+   ],
+   "tris": {
+    "hi": 24,
+    "md": 24,
+    "lo": 24
+   }
+  },
+  "Fix_hurricane_lantern": {
+   "file": "attic",
+   "group": "fix",
+   "id": "hurricane_lantern",
+   "mount": "surface",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit"
+   ],
+   "uv1": false,
+   "children": [
+    "Fix_hurricane_lantern_emit"
+   ],
+   "aabb": [
+    [
+     -0.1,
+     0.0,
+     -0.1
+    ],
+    [
+     0.1,
+     0.35,
+     0.1
+    ]
+   ],
+   "tris": {
+    "hi": 24,
+    "md": 24,
+    "lo": 24
+   }
+  },
+  "Fix_kiln_glow": {
+   "file": "workshop",
+   "group": "fix",
+   "id": "kiln_glow",
+   "mount": "practical",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit"
+   ],
+   "uv1": false,
+   "children": [
+    "Fix_kiln_glow_emit"
+   ],
+   "aabb": [
+    [
+     -0.2,
+     0.0,
+     -0.05
+    ],
+    [
+     0.2,
+     0.3,
+     0.05
+    ]
+   ],
+   "tris": {
+    "hi": 24,
+    "md": 24,
+    "lo": 24
+   }
+  },
+  "Fix_night_light": {
+   "file": "wood",
+   "group": "fix",
+   "id": "night_light",
+   "mount": "surface",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit"
+   ],
+   "uv1": false,
+   "children": [
+    "Fix_night_light_emit"
+   ],
+   "aabb": [
+    [
+     -0.075,
+     0.0,
+     -0.075
+    ],
+    [
+     0.075,
+     0.25,
+     0.075
+    ]
+   ],
+   "tris": {
+    "hi": 24,
+    "md": 24,
+    "lo": 24
+   }
+  },
+  "Fix_pendant_shade": {
+   "file": "wood",
+   "group": "fix",
+   "id": "pendant_shade",
+   "mount": "ceiling",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit"
+   ],
+   "uv1": false,
+   "children": [
+    "Fix_pendant_shade_emit"
+   ],
+   "aabb": [
+    [
+     -0.225,
+     -0.35,
+     -0.225
+    ],
+    [
+     0.225,
+     0.0,
+     0.225
+    ]
+   ],
+   "tris": {
+    "hi": 24,
+    "md": 24,
+    "lo": 24
+   }
+  },
+  "Fix_sconce_candles": {
+   "file": "tile",
+   "group": "fix",
+   "id": "sconce_candles",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit"
+   ],
+   "uv1": false,
+   "children": [
+    "Fix_sconce_candles_emit"
+   ],
+   "aabb": [
+    [
+     -0.175,
+     1.75,
+     0.0
+    ],
+    [
+     0.175,
+     2.2,
+     0.22
+    ]
+   ],
+   "tris": {
+    "hi": 24,
+    "md": 24,
+    "lo": 24
+   }
+  },
+  "Fix_sconce_shade": {
+   "file": "wood",
+   "group": "fix",
+   "id": "sconce_shade",
+   "mount": "wall",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit"
+   ],
+   "uv1": false,
+   "children": [
+    "Fix_sconce_shade_emit"
+   ],
+   "aabb": [
+    [
+     -0.15,
+     1.8,
+     0.0
+    ],
+    [
+     0.15,
+     2.2,
+     0.25
+    ]
+   ],
+   "tris": {
+    "hi": 24,
+    "md": 24,
+    "lo": 24
+   }
+  },
+  "Fix_standard_lamp": {
+   "file": "tile",
+   "group": "fix",
+   "id": "standard_lamp",
+   "mount": "floor",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Emit"
+   ],
+   "uv1": false,
+   "children": [
+    "Fix_standard_lamp_emit"
+   ],
+   "aabb": [
+    [
+     -0.225,
+     0.0,
+     -0.225
+    ],
+    [
+     0.225,
+     1.6,
+     0.225
+    ]
+   ],
+   "tris": {
+    "hi": 24,
+    "md": 24,
+    "lo": 24
+   }
+  },
+  "Isl_bed_screen": {
+   "file": "wood",
+   "group": "island",
+   "id": "isl_bed_screen",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.975,
+     0.0,
+     -0.725
+    ],
+    [
+     0.975,
+     1.65,
+     0.725
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.95,
+    1.45
+   ],
+   "footU": [
+    43,
+    32
+   ]
+  },
+  "Isl_boiler": {
+   "file": "concrete",
+   "group": "island",
+   "id": "isl_boiler",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [
+    "Isl_boiler_fix"
+   ],
+   "aabb": [
+    [
+     -0.95,
+     0.0,
+     -0.75
+    ],
+    [
+     0.95,
+     3.4,
+     0.75
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.9,
+    1.5
+   ],
+   "footU": [
+    42,
+    33
+   ]
+  },
+  "Isl_crate_stack": {
+   "file": "concrete",
+   "group": "island",
+   "id": "isl_crate_stack",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.8,
+     0.0,
+     -0.65
+    ],
+    [
+     0.8,
+     1.5,
+     0.65
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.6,
+    1.3
+   ],
+   "footU": [
+    36,
+    29
+   ]
+  },
+  "Isl_crib_rocker": {
+   "file": "wood",
+   "group": "island",
+   "id": "isl_crib_rocker",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [
+    "Isl_crib_rocker_RockPivot"
+   ],
+   "aabb": [
+    [
+     -0.7,
+     0.0,
+     -0.875
+    ],
+    [
+     0.7,
+     1.1,
+     0.875
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.4,
+    1.75
+   ],
+   "footU": [
+    31,
+    39
+   ]
+  },
+  "Isl_dining": {
+   "file": "tile",
+   "group": "island",
+   "id": "isl_dining",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [
+    "Isl_dining_fix"
+   ],
+   "aabb": [
+    [
+     -0.975,
+     0.0,
+     -0.725
+    ],
+    [
+     0.975,
+     1.1,
+     0.725
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.95,
+    1.45
+   ],
+   "footU": [
+    43,
+    32
+   ]
+  },
+  "Isl_dollhouse": {
+   "file": "wood",
+   "group": "island",
+   "id": "isl_dollhouse",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.8,
+     0.0,
+     -0.65
+    ],
+    [
+     0.8,
+     1.45,
+     0.65
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.6,
+    1.3
+   ],
+   "footU": [
+    36,
+    29
+   ]
+  },
+  "Isl_dress_forms": {
+   "file": "attic",
+   "group": "island",
+   "id": "isl_dress_forms",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.8,
+     0.0,
+     -0.65
+    ],
+    [
+     0.8,
+     1.65,
+     0.65
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.6,
+    1.3
+   ],
+   "footU": [
+    36,
+    29
+   ]
+  },
+  "Isl_drying_rack": {
+   "file": "workshop",
+   "group": "island",
+   "id": "isl_drying_rack",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.9,
+     0.0,
+     -0.65
+    ],
+    [
+     0.9,
+     1.9,
+     0.65
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.8,
+    1.3
+   ],
+   "footU": [
+    40,
+    29
+   ]
+  },
+  "Isl_grand_piano": {
+   "file": "tile",
+   "group": "island",
+   "id": "isl_grand_piano",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.75,
+     0.0,
+     -0.975
+    ],
+    [
+     0.75,
+     1.9,
+     0.975
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.5,
+    1.95
+   ],
+   "footU": [
+    33,
+    43
+   ]
+  },
+  "Isl_hanging_dolls": {
+   "file": "workshop",
+   "group": "island",
+   "id": "isl_hanging_dolls",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [
+    "Isl_hanging_dolls_SwayPivot"
+   ],
+   "aabb": [
+    [
+     -0.8,
+     0.0,
+     -0.65
+    ],
+    [
+     0.8,
+     2.1,
+     0.65
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.6,
+    1.3
+   ],
+   "footU": [
+    36,
+    29
+   ]
+  },
+  "Isl_kiln": {
+   "file": "workshop",
+   "group": "island",
+   "id": "isl_kiln",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [
+    "Isl_kiln_fix"
+   ],
+   "aabb": [
+    [
+     -0.7,
+     0.0,
+     -0.65
+    ],
+    [
+     0.7,
+     4.6,
+     0.65
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.4,
+    1.3
+   ],
+   "footU": [
+    31,
+    29
+   ]
+  },
+  "Isl_office_desk": {
+   "file": "workshop",
+   "group": "island",
+   "id": "isl_office_desk",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.85,
+     0.0,
+     -0.65
+    ],
+    [
+     0.85,
+     1.1,
+     0.65
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.7,
+    1.3
+   ],
+   "footU": [
+    38,
+    29
+   ]
+  },
+  "Isl_parlour": {
+   "file": "tile",
+   "group": "island",
+   "id": "isl_parlour",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [
+    "Isl_parlour_fix"
+   ],
+   "aabb": [
+    [
+     -0.95,
+     0.0,
+     -0.8
+    ],
+    [
+     0.95,
+     1.1,
+     0.8
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.9,
+    1.6
+   ],
+   "footU": [
+    42,
+    36
+   ]
+  },
+  "Isl_reading": {
+   "file": "tile",
+   "group": "island",
+   "id": "isl_reading",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.95,
+     0.0,
+     -0.65
+    ],
+    [
+     0.95,
+     1.2,
+     0.65
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.9,
+    1.3
+   ],
+   "footU": [
+    42,
+    29
+   ]
+  },
+  "Isl_servant_bed": {
+   "file": "attic",
+   "group": "island",
+   "id": "isl_servant_bed",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.95,
+     0.0,
+     -0.7
+    ],
+    [
+     0.95,
+     1.0,
+     0.7
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.9,
+    1.4
+   ],
+   "footU": [
+    42,
+    31
+   ]
+  },
+  "Isl_sheeted_armoire": {
+   "file": "attic",
+   "group": "island",
+   "id": "isl_sheeted_armoire",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.65,
+     0.0,
+     -0.65
+    ],
+    [
+     0.65,
+     2.0,
+     0.65
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.3,
+    1.3
+   ],
+   "footU": [
+    29,
+    29
+   ]
+  },
+  "Isl_sheeted_sofa": {
+   "file": "attic",
+   "group": "island",
+   "id": "isl_sheeted_sofa",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.95,
+     0.0,
+     -0.65
+    ],
+    [
+     0.95,
+     1.9,
+     0.65
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.9,
+    1.3
+   ],
+   "footU": [
+    42,
+    29
+   ]
+  },
+  "Isl_shelving_double": {
+   "file": "concrete",
+   "group": "island",
+   "id": "isl_shelving_double",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.925,
+     0.0,
+     -0.65
+    ],
+    [
+     0.925,
+     2.0,
+     0.65
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.85,
+    1.3
+   ],
+   "footU": [
+    41,
+    29
+   ]
+  },
+  "Isl_sorting_table": {
+   "file": "workshop",
+   "group": "island",
+   "id": "isl_sorting_table",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.9,
+     0.0,
+     -0.65
+    ],
+    [
+     0.9,
+     0.95,
+     0.65
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.8,
+    1.3
+   ],
+   "footU": [
+    40,
+    29
+   ]
+  },
+  "Isl_tea_party": {
+   "file": "wood",
+   "group": "island",
+   "id": "isl_tea_party",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.75,
+     0.0,
+     -0.7
+    ],
+    [
+     0.75,
+     0.95,
+     0.7
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.5,
+    1.4
+   ],
+   "footU": [
+    33,
+    31
+   ]
+  },
+  "Isl_toy_circle": {
+   "file": "attic",
+   "group": "island",
+   "id": "isl_toy_circle",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.85,
+     0.0,
+     -0.85
+    ],
+    [
+     0.85,
+     0.4,
+     0.85
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.7,
+    1.7
+   ],
+   "footU": [
+    38,
+    38
+   ]
+  },
+  "Isl_trunk_pile": {
+   "file": "attic",
+   "group": "island",
+   "id": "isl_trunk_pile",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [
+    "Isl_trunk_pile_fix"
+   ],
+   "aabb": [
+    [
+     -0.85,
+     0.0,
+     -0.65
+    ],
+    [
+     0.85,
+     1.3,
+     0.65
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.7,
+    1.3
+   ],
+   "footU": [
+    38,
+    29
+   ]
+  },
+  "Isl_twin_cribs": {
+   "file": "wood",
+   "group": "island",
+   "id": "isl_twin_cribs",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [
+    "Isl_twin_cribs_MobilePivot"
+   ],
+   "aabb": [
+    [
+     -0.7,
+     0.0,
+     -0.925
+    ],
+    [
+     0.7,
+     1.8,
+     0.925
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.4,
+    1.85
+   ],
+   "footU": [
+    31,
+    41
+   ]
+  },
+  "Isl_washstand": {
+   "file": "wood",
+   "group": "island",
+   "id": "isl_washstand",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.7,
+     0.0,
+     -0.65
+    ],
+    [
+     0.7,
+     1.1,
+     0.65
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.4,
+    1.3
+   ],
+   "footU": [
+    31,
+    29
+   ]
+  },
+  "Isl_washtubs": {
+   "file": "concrete",
+   "group": "island",
+   "id": "isl_washtubs",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.9,
+     0.0,
+     -0.65
+    ],
+    [
+     0.9,
+     1.4,
+     0.65
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.8,
+    1.3
+   ],
+   "footU": [
+    40,
+    29
+   ]
+  },
+  "Isl_wine_rack": {
+   "file": "concrete",
+   "group": "island",
+   "id": "isl_wine_rack",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.925,
+     0.0,
+     -0.65
+    ],
+    [
+     0.925,
+     1.9,
+     0.65
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.85,
+    1.3
+   ],
+   "footU": [
+    41,
+    29
+   ]
+  },
+  "Isl_workbench_double": {
+   "file": "workshop",
+   "group": "island",
+   "id": "isl_workbench_double",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [
+    "Isl_workbench_double_fix"
+   ],
+   "aabb": [
+    [
+     -0.95,
+     0.0,
+     -0.65
+    ],
+    [
+     0.95,
+     0.92,
+     0.65
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "island",
+   "foot": [
+    1.9,
+    1.3
+   ],
+   "footU": [
+    42,
+    29
+   ]
+  },
+  "Mod_breach_brick_A_concrete": {
+   "file": "concrete",
+   "group": "arch",
+   "id": "Mod_breach_brick_A_concrete",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.12
+    ],
+    [
+     1.125,
+     3.0,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 30,
+    "md": 30,
+    "lo": 30
+   }
+  },
+  "Mod_breach_brick_B_concrete": {
+   "file": "concrete",
+   "group": "arch",
+   "id": "Mod_breach_brick_B_concrete",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.12
+    ],
+    [
+     1.125,
+     3.0,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 30,
+    "md": 30,
+    "lo": 30
+   }
+  },
+  "Mod_breach_brick_C_concrete": {
+   "file": "concrete",
+   "group": "arch",
+   "id": "Mod_breach_brick_C_concrete",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.12
+    ],
+    [
+     1.125,
+     3.0,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 30,
+    "md": 30,
+    "lo": 30
+   }
+  },
+  "Mod_ceilhole_attic": {
+   "file": "attic",
+   "group": "arch",
+   "id": "Mod_ceilhole_attic",
+   "mount": "ceiling",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     -0.3,
+     -1.125
+    ],
+    [
+     1.125,
+     0.3,
+     1.125
+    ]
+   ],
+   "tris": {
+    "hi": 32,
+    "md": 32,
+    "lo": 32
+   }
+  },
+  "Mod_ceilhole_concrete": {
+   "file": "concrete",
+   "group": "arch",
+   "id": "Mod_ceilhole_concrete",
+   "mount": "ceiling",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     -0.3,
+     -1.125
+    ],
+    [
+     1.125,
+     0.3,
+     1.125
+    ]
+   ],
+   "tris": {
+    "hi": 32,
+    "md": 32,
+    "lo": 32
+   }
+  },
+  "Mod_ceilhole_wood": {
+   "file": "wood",
+   "group": "arch",
+   "id": "Mod_ceilhole_wood",
+   "mount": "ceiling",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     -0.3,
+     -1.125
+    ],
+    [
+     1.125,
+     0.3,
+     1.125
+    ]
+   ],
+   "tris": {
+    "hi": 32,
+    "md": 32,
+    "lo": 32
+   }
+  },
+  "Mod_ceilhole_workshop": {
+   "file": "workshop",
+   "group": "arch",
+   "id": "Mod_ceilhole_workshop",
+   "mount": "ceiling",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     -0.3,
+     -1.125
+    ],
+    [
+     1.125,
+     0.3,
+     1.125
+    ]
+   ],
+   "tris": {
+    "hi": 32,
+    "md": 32,
+    "lo": 32
+   }
+  },
+  "Mod_fireplace_tile": {
+   "file": "tile",
+   "group": "arch",
+   "id": "Mod_fireplace_tile",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [
+    "Mod_fireplace_tile_fix"
+   ],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.45
+    ],
+    [
+     1.125,
+     3.0,
+     0.42
+    ]
+   ],
+   "tris": {
+    "hi": 114,
+    "md": 114,
+    "lo": 114
+   }
+  },
+  "Mod_fireplace_wood": {
+   "file": "wood",
+   "group": "arch",
+   "id": "Mod_fireplace_wood",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [
+    "Mod_fireplace_wood_fix"
+   ],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.45
+    ],
+    [
+     1.125,
+     3.0,
+     0.42
+    ]
+   ],
+   "tris": {
+    "hi": 114,
+    "md": 114,
+    "lo": 114
+   }
+  },
+  "Mod_fireplace_workshop": {
+   "file": "workshop",
+   "group": "arch",
+   "id": "Mod_fireplace_workshop",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [
+    "Mod_fireplace_workshop_fix"
+   ],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.45
+    ],
+    [
+     1.125,
+     3.0,
+     0.42
+    ]
+   ],
+   "tris": {
+    "hi": 114,
+    "md": 114,
+    "lo": 114
+   }
+  },
+  "Mod_hole_boards_A_attic": {
+   "file": "attic",
+   "group": "arch",
+   "id": "Mod_hole_boards_A_attic",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.12
+    ],
+    [
+     1.125,
+     3.0,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 30,
+    "md": 30,
+    "lo": 30
+   }
+  },
+  "Mod_hole_boards_B_attic": {
+   "file": "attic",
+   "group": "arch",
+   "id": "Mod_hole_boards_B_attic",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.12
+    ],
+    [
+     1.125,
+     3.0,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 30,
+    "md": 30,
+    "lo": 30
+   }
+  },
+  "Mod_hole_boards_C_attic": {
+   "file": "attic",
+   "group": "arch",
+   "id": "Mod_hole_boards_C_attic",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.12
+    ],
+    [
+     1.125,
+     3.0,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 30,
+    "md": 30,
+    "lo": 30
+   }
+  },
+  "Mod_niche_tile": {
+   "file": "tile",
+   "group": "arch",
+   "id": "Mod_niche_tile",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.35
+    ],
+    [
+     1.125,
+     3.0,
+     0.05
+    ]
+   ],
+   "tris": {
+    "hi": 42,
+    "md": 42,
+    "lo": 42
+   }
+  },
+  "Mod_skylight_attic": {
+   "file": "attic",
+   "group": "arch",
+   "id": "Mod_skylight_attic",
+   "mount": "ceiling",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Glass"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -1.125
+    ],
+    [
+     1.125,
+     0.6,
+     1.125
+    ]
+   ],
+   "tris": {
+    "hi": 22,
+    "md": 22,
+    "lo": 22
+   }
+  },
+  "Mod_skylight_workshop": {
+   "file": "workshop",
+   "group": "arch",
+   "id": "Mod_skylight_workshop",
+   "mount": "ceiling",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey",
+    "Glass"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -1.125
+    ],
+    [
+     1.125,
+     0.6,
+     1.125
+    ]
+   ],
+   "tris": {
+    "hi": 22,
+    "md": 22,
+    "lo": 22
+   }
+  },
+  "Mod_wallhole_lath_A_tile": {
+   "file": "tile",
+   "group": "arch",
+   "id": "Mod_wallhole_lath_A_tile",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.12
+    ],
+    [
+     1.125,
+     3.0,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 30,
+    "md": 30,
+    "lo": 30
+   }
+  },
+  "Mod_wallhole_lath_A_wood": {
+   "file": "wood",
+   "group": "arch",
+   "id": "Mod_wallhole_lath_A_wood",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.12
+    ],
+    [
+     1.125,
+     3.0,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 30,
+    "md": 30,
+    "lo": 30
+   }
+  },
+  "Mod_wallhole_lath_A_workshop": {
+   "file": "workshop",
+   "group": "arch",
+   "id": "Mod_wallhole_lath_A_workshop",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.12
+    ],
+    [
+     1.125,
+     3.0,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 30,
+    "md": 30,
+    "lo": 30
+   }
+  },
+  "Mod_wallhole_lath_B_tile": {
+   "file": "tile",
+   "group": "arch",
+   "id": "Mod_wallhole_lath_B_tile",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.12
+    ],
+    [
+     1.125,
+     3.0,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 30,
+    "md": 30,
+    "lo": 30
+   }
+  },
+  "Mod_wallhole_lath_B_wood": {
+   "file": "wood",
+   "group": "arch",
+   "id": "Mod_wallhole_lath_B_wood",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.12
+    ],
+    [
+     1.125,
+     3.0,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 30,
+    "md": 30,
+    "lo": 30
+   }
+  },
+  "Mod_wallhole_lath_B_workshop": {
+   "file": "workshop",
+   "group": "arch",
+   "id": "Mod_wallhole_lath_B_workshop",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.12
+    ],
+    [
+     1.125,
+     3.0,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 30,
+    "md": 30,
+    "lo": 30
+   }
+  },
+  "Mod_wallhole_lath_C_tile": {
+   "file": "tile",
+   "group": "arch",
+   "id": "Mod_wallhole_lath_C_tile",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.12
+    ],
+    [
+     1.125,
+     3.0,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 30,
+    "md": 30,
+    "lo": 30
+   }
+  },
+  "Mod_wallhole_lath_C_wood": {
+   "file": "wood",
+   "group": "arch",
+   "id": "Mod_wallhole_lath_C_wood",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.12
+    ],
+    [
+     1.125,
+     3.0,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 30,
+    "md": 30,
+    "lo": 30
+   }
+  },
+  "Mod_wallhole_lath_C_workshop": {
+   "file": "workshop",
+   "group": "arch",
+   "id": "Mod_wallhole_lath_C_workshop",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey"
+   ],
+   "uv1": true,
+   "children": [],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.12
+    ],
+    [
+     1.125,
+     3.0,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 30,
+    "md": 30,
+    "lo": 30
+   }
+  },
+  "Solid_boiler_wall": {
+   "file": "concrete",
+   "group": "solid",
+   "id": "boiler_wall",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [
+    "Solid_boiler_wall_fix"
+   ],
+   "aabb": [
+    [
+     -0.495,
+     0.0,
+     0.0
+    ],
+    [
+     0.495,
+     3.4,
+     1.4
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "wall",
+   "foot": [
+    0.99,
+    1.4
+   ],
+   "footU": [
+    22,
+    31
+   ]
+  },
+  "Solid_chest_freezer": {
+   "file": "concrete",
+   "group": "solid",
+   "id": "chest_freezer",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.495,
+     0.0,
+     -0.33
+    ],
+    [
+     0.495,
+     0.88,
+     0.33
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.99,
+    0.66
+   ],
+   "footU": [
+    22,
+    15
+   ]
+  },
+  "Solid_crate_stack_v0": {
+   "file": "concrete",
+   "group": "solid",
+   "id": "crate_stack",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.45,
+     0.0,
+     -0.45
+    ],
+    [
+     0.45,
+     1.0,
+     0.45
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.9,
+    0.9
+   ],
+   "footU": [
+    20,
+    20
+   ]
+  },
+  "Solid_crate_stack_v1": {
+   "file": "concrete",
+   "group": "solid",
+   "id": "crate_stack",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.45,
+     0.0,
+     -0.45
+    ],
+    [
+     0.45,
+     1.6,
+     0.45
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.9,
+    0.9
+   ],
+   "footU": [
+    20,
+    20
+   ]
+  },
+  "Solid_crib_v0": {
+   "file": "wood",
+   "group": "solid",
+   "id": "crib",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [
+    "Solid_crib_v0_MobilePivot"
+   ],
+   "aabb": [
+    [
+     -0.36,
+     0.0,
+     0.0
+    ],
+    [
+     0.36,
+     1.05,
+     1.3
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "wall",
+   "foot": [
+    0.72,
+    1.3
+   ],
+   "footU": [
+    16,
+    29
+   ]
+  },
+  "Solid_crib_v1": {
+   "file": "wood",
+   "group": "solid",
+   "id": "crib",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [
+    "Solid_crib_v1_MobilePivot"
+   ],
+   "aabb": [
+    [
+     -0.36,
+     0.0,
+     0.0
+    ],
+    [
+     0.36,
+     1.05,
+     1.3
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "wall",
+   "foot": [
+    0.72,
+    1.3
+   ],
+   "footU": [
+    16,
+    29
+   ]
+  },
+  "Solid_display_bench": {
+   "file": "tile",
+   "group": "solid",
+   "id": "display_bench",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.35,
+     0.0,
+     -1.55
+    ],
+    [
+     0.35,
+     1.25,
+     1.55
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "bar",
+   "foot": [
+    0.7,
+    3.1
+   ],
+   "footU": [
+    16,
+    69
+   ]
+  },
+  "Solid_doll_house": {
+   "file": "wood",
+   "group": "solid",
+   "id": "doll_house",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.475,
+     0.0,
+     -0.3
+    ],
+    [
+     0.475,
+     1.3,
+     0.3
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.95,
+    0.6
+   ],
+   "footU": [
+    21,
+    13
+   ]
+  },
+  "Solid_dress_form": {
+   "file": "workshop",
+   "group": "solid",
+   "id": "dress_form",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.25,
+     0.0,
+     -0.25
+    ],
+    [
+     0.25,
+     1.65,
+     0.25
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.5,
+    0.5
+   ],
+   "footU": [
+    11,
+    11
+   ]
+  },
+  "Solid_drying_rack": {
+   "file": "workshop",
+   "group": "solid",
+   "id": "drying_rack",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.3,
+     0.0,
+     -1.5
+    ],
+    [
+     0.3,
+     2.0,
+     1.5
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "bar",
+   "foot": [
+    0.6,
+    3
+   ],
+   "footU": [
+    13,
+    67
+   ]
+  },
+  "Solid_iron_bed": {
+   "file": "wood",
+   "group": "solid",
+   "id": "iron_bed",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.475,
+     0.0,
+     0.0
+    ],
+    [
+     0.475,
+     1.1,
+     2.0
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "wall",
+   "foot": [
+    0.95,
+    2
+   ],
+   "footU": [
+    21,
+    44
+   ]
+  },
+  "Solid_iron_bed_sheeted": {
+   "file": "attic",
+   "group": "solid",
+   "id": "iron_bed_sheeted",
+   "mount": "wall",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.475,
+     0.0,
+     0.0
+    ],
+    [
+     0.475,
+     1.0,
+     2.0
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "wall",
+   "foot": [
+    0.95,
+    2
+   ],
+   "footU": [
+    21,
+    44
+   ]
+  },
+  "Solid_kiln": {
+   "file": "workshop",
+   "group": "solid",
+   "id": "kiln",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [
+    "Solid_kiln_fix"
+   ],
+   "aabb": [
+    [
+     -0.495,
+     0.0,
+     -0.495
+    ],
+    [
+     0.495,
+     4.6,
+     0.495
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.99,
+    0.99
+   ],
+   "footU": [
+    22,
+    22
+   ]
+  },
+  "Solid_nursery_table": {
+   "file": "wood",
+   "group": "solid",
+   "id": "nursery_table",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.425,
+     0.0,
+     -1.3
+    ],
+    [
+     0.425,
+     0.62,
+     1.3
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "bar",
+   "foot": [
+    0.85,
+    2.6
+   ],
+   "footU": [
+    19,
+    58
+   ]
+  },
+  "Solid_plinth_bust": {
+   "file": "tile",
+   "group": "solid",
+   "id": "plinth_bust",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.3,
+     0.0,
+     -0.3
+    ],
+    [
+     0.3,
+     1.45,
+     0.3
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.6,
+    0.6
+   ],
+   "footU": [
+    13,
+    13
+   ]
+  },
+  "Solid_pram": {
+   "file": "wood",
+   "group": "solid",
+   "id": "pram",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.3,
+     0.0,
+     -0.495
+    ],
+    [
+     0.3,
+     1.05,
+     0.495
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.6,
+    0.99
+   ],
+   "footU": [
+    13,
+    22
+   ]
+  },
+  "Solid_rocking_chair": {
+   "file": "wood",
+   "group": "solid",
+   "id": "rocking_chair",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": false,
+   "materials": [
+    "Kit_rocking_chair"
+   ],
+   "uv1": false,
+   "children": [
+    "Solid_rocking_chair_RockPivot"
+   ],
+   "aabb": [
+    [
+     -0.3269,
+     0.0002,
+     -0.4645
+    ],
+    [
+     0.3269,
+     1.098,
+     0.4645
+    ]
+   ],
+   "tris": {
+    "hi": 10184,
+    "md": 10184,
+    "lo": 4596
+   },
+   "slot": "pocket",
+   "foot": [
+    0.66,
+    0.95
+   ],
+   "footU": [
+    15,
+    21
+   ]
+  },
+  "Solid_rocking_horse": {
+   "file": "wood",
+   "group": "solid",
+   "id": "rocking_horse",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.495,
+     0.0,
+     -0.21
+    ],
+    [
+     0.495,
+     0.9,
+     0.21
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.99,
+    0.42
+   ],
+   "footU": [
+    22,
+    9
+   ]
+  },
+  "Solid_sewing_table": {
+   "file": "workshop",
+   "group": "solid",
+   "id": "sewing_table",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.475,
+     0.0,
+     -0.275
+    ],
+    [
+     0.475,
+     1.15,
+     0.275
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.95,
+    0.55
+   ],
+   "footU": [
+    21,
+    12
+   ]
+  },
+  "Solid_sheet_chair_v0": {
+   "file": "attic",
+   "group": "solid",
+   "id": "sheet_chair",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.475,
+     0.0,
+     -0.475
+    ],
+    [
+     0.475,
+     1.1,
+     0.475
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.95,
+    0.95
+   ],
+   "footU": [
+    21,
+    21
+   ]
+  },
+  "Solid_sheet_chair_v1": {
+   "file": "attic",
+   "group": "solid",
+   "id": "sheet_chair",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.475,
+     0.0,
+     -0.475
+    ],
+    [
+     0.475,
+     1.1,
+     0.475
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.95,
+    0.95
+   ],
+   "footU": [
+    21,
+    21
+   ]
+  },
+  "Solid_sheet_sofa": {
+   "file": "attic",
+   "group": "solid",
+   "id": "sheet_sofa",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.475,
+     0.0,
+     -1.1
+    ],
+    [
+     0.475,
+     0.95,
+     1.1
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "bar",
+   "foot": [
+    0.95,
+    2.2
+   ],
+   "footU": [
+    21,
+    49
+   ]
+  },
+  "Solid_sheet_tall_v0": {
+   "file": "attic",
+   "group": "solid",
+   "id": "sheet_tall",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.495,
+     0.0,
+     -0.35
+    ],
+    [
+     0.495,
+     1.95,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.99,
+    0.7
+   ],
+   "footU": [
+    22,
+    16
+   ]
+  },
+  "Solid_sheet_tall_v1": {
+   "file": "attic",
+   "group": "solid",
+   "id": "sheet_tall",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.495,
+     0.0,
+     -0.35
+    ],
+    [
+     0.495,
+     1.95,
+     0.35
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.99,
+    0.7
+   ],
+   "footU": [
+    22,
+    16
+   ]
+  },
+  "Solid_shelf_rack": {
+   "file": "concrete",
+   "group": "solid",
+   "id": "shelf_rack",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.3,
+     0.0,
+     -1.55
+    ],
+    [
+     0.3,
+     2.0,
+     1.55
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "bar",
+   "foot": [
+    0.6,
+    3.1
+   ],
+   "footU": [
+    13,
+    69
+   ]
+  },
+  "Solid_steamer_trunk_v0": {
+   "file": "attic",
+   "group": "solid",
+   "id": "steamer_trunk",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.475,
+     0.0,
+     -0.275
+    ],
+    [
+     0.475,
+     0.65,
+     0.275
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.95,
+    0.55
+   ],
+   "footU": [
+    21,
+    12
+   ]
+  },
+  "Solid_steamer_trunk_v1": {
+   "file": "attic",
+   "group": "solid",
+   "id": "steamer_trunk",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.475,
+     0.0,
+     -0.275
+    ],
+    [
+     0.475,
+     0.65,
+     0.275
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.95,
+    0.55
+   ],
+   "footU": [
+    21,
+    12
+   ]
+  },
+  "Solid_toy_chest_v0": {
+   "file": "wood",
+   "group": "solid",
+   "id": "toy_chest",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.45,
+     0.0,
+     -0.25
+    ],
+    [
+     0.45,
+     0.6,
+     0.25
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.9,
+    0.5
+   ],
+   "footU": [
+    20,
+    11
+   ]
+  },
+  "Solid_toy_chest_v1": {
+   "file": "wood",
+   "group": "solid",
+   "id": "toy_chest",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.45,
+     0.0,
+     -0.25
+    ],
+    [
+     0.45,
+     0.6,
+     0.25
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.9,
+    0.5
+   ],
+   "footU": [
+    20,
+    11
+   ]
+  },
+  "Solid_truss_post": {
+   "file": "attic",
+   "group": "solid",
+   "id": "truss_post",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.125,
+     0.0,
+     -0.125
+    ],
+    [
+     0.125,
+     2.6,
+     0.125
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "pocket",
+   "foot": [
+    0.25,
+    0.25
+   ],
+   "footU": [
+    6,
+    6
+   ]
+  },
+  "Solid_vitrine_double": {
+   "file": "tile",
+   "group": "solid",
+   "id": "vitrine_double",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.495,
+     0.0,
+     -1.0
+    ],
+    [
+     0.495,
+     1.95,
+     1.0
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "bar",
+   "foot": [
+    0.99,
+    2
+   ],
+   "footU": [
+    22,
+    44
+   ]
+  },
+  "Solid_workbench": {
+   "file": "workshop",
+   "group": "solid",
+   "id": "workbench",
+   "mount": "floor",
+   "fit": "exact",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [
+    "Solid_workbench_fix"
+   ],
+   "aabb": [
+    [
+     -0.425,
+     0.0,
+     -1.55
+    ],
+    [
+     0.425,
+     1.6,
+     1.55
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "slot": "bar",
+   "foot": [
+    0.85,
+    3.1
+   ],
+   "footU": [
+    19,
+    69
+   ]
+  },
+  "Ward_body_attic": {
+   "file": "attic",
+   "group": "ward",
+   "id": "Ward_body_attic",
+   "mount": "floor",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.625,
+     0.0,
+     -0.33
+    ],
+    [
+     0.625,
+     2.35,
+     0.33
+    ]
+   ],
+   "tris": {
+    "hi": 72,
+    "md": 72,
+    "lo": 72
+   }
+  },
+  "Ward_body_concrete": {
+   "file": "concrete",
+   "group": "ward",
+   "id": "Ward_body_concrete",
+   "mount": "floor",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.625,
+     0.0,
+     -0.33
+    ],
+    [
+     0.625,
+     2.35,
+     0.33
+    ]
+   ],
+   "tris": {
+    "hi": 72,
+    "md": 72,
+    "lo": 72
+   }
+  },
+  "Ward_body_tile": {
+   "file": "tile",
+   "group": "ward",
+   "id": "Ward_body_tile",
+   "mount": "floor",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.625,
+     0.0,
+     -0.33
+    ],
+    [
+     0.625,
+     2.35,
+     0.33
+    ]
+   ],
+   "tris": {
+    "hi": 72,
+    "md": 72,
+    "lo": 72
+   }
+  },
+  "Ward_body_wood": {
+   "file": "wood",
+   "group": "ward",
+   "id": "Ward_body_wood",
+   "mount": "floor",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.625,
+     0.0,
+     -0.33
+    ],
+    [
+     0.625,
+     2.35,
+     0.33
+    ]
+   ],
+   "tris": {
+    "hi": 72,
+    "md": 72,
+    "lo": 72
+   }
+  },
+  "Ward_body_workshop": {
+   "file": "workshop",
+   "group": "ward",
+   "id": "Ward_body_workshop",
+   "mount": "floor",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.625,
+     0.0,
+     -0.33
+    ],
+    [
+     0.625,
+     2.35,
+     0.33
+    ]
+   ],
+   "tris": {
+    "hi": 72,
+    "md": 72,
+    "lo": 72
+   }
+  },
+  "Ward_leafL_attic": {
+   "file": "attic",
+   "group": "ward",
+   "id": "Ward_leafL_attic",
+   "mount": "hinge",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     0.0,
+     0.0,
+     -0.015
+    ],
+    [
+     0.575,
+     2.2,
+     0.015
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "hinge": [
+    -0.575,
+    0.025,
+    0.305
+   ]
+  },
+  "Ward_leafL_concrete": {
+   "file": "concrete",
+   "group": "ward",
+   "id": "Ward_leafL_concrete",
+   "mount": "hinge",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     0.0,
+     0.0,
+     -0.015
+    ],
+    [
+     0.575,
+     2.2,
+     0.015
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "hinge": [
+    -0.575,
+    0.025,
+    0.305
+   ]
+  },
+  "Ward_leafL_tile": {
+   "file": "tile",
+   "group": "ward",
+   "id": "Ward_leafL_tile",
+   "mount": "hinge",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     0.0,
+     0.0,
+     -0.015
+    ],
+    [
+     0.575,
+     2.2,
+     0.015
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "hinge": [
+    -0.575,
+    0.025,
+    0.305
+   ]
+  },
+  "Ward_leafL_wood": {
+   "file": "wood",
+   "group": "ward",
+   "id": "Ward_leafL_wood",
+   "mount": "hinge",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     0.0,
+     0.0,
+     -0.015
+    ],
+    [
+     0.575,
+     2.2,
+     0.015
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "hinge": [
+    -0.575,
+    0.025,
+    0.305
+   ]
+  },
+  "Ward_leafL_workshop": {
+   "file": "workshop",
+   "group": "ward",
+   "id": "Ward_leafL_workshop",
+   "mount": "hinge",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     0.0,
+     0.0,
+     -0.015
+    ],
+    [
+     0.575,
+     2.2,
+     0.015
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "hinge": [
+    -0.575,
+    0.025,
+    0.305
+   ]
+  },
+  "Ward_leafR_attic": {
+   "file": "attic",
+   "group": "ward",
+   "id": "Ward_leafR_attic",
+   "mount": "hinge",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.575,
+     0.0,
+     -0.015
+    ],
+    [
+     0.0,
+     2.2,
+     0.015
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "hinge": [
+    0.575,
+    0.025,
+    0.305
+   ]
+  },
+  "Ward_leafR_concrete": {
+   "file": "concrete",
+   "group": "ward",
+   "id": "Ward_leafR_concrete",
+   "mount": "hinge",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.575,
+     0.0,
+     -0.015
+    ],
+    [
+     0.0,
+     2.2,
+     0.015
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "hinge": [
+    0.575,
+    0.025,
+    0.305
+   ]
+  },
+  "Ward_leafR_tile": {
+   "file": "tile",
+   "group": "ward",
+   "id": "Ward_leafR_tile",
+   "mount": "hinge",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.575,
+     0.0,
+     -0.015
+    ],
+    [
+     0.0,
+     2.2,
+     0.015
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "hinge": [
+    0.575,
+    0.025,
+    0.305
+   ]
+  },
+  "Ward_leafR_wood": {
+   "file": "wood",
+   "group": "ward",
+   "id": "Ward_leafR_wood",
+   "mount": "hinge",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.575,
+     0.0,
+     -0.015
+    ],
+    [
+     0.0,
+     2.2,
+     0.015
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "hinge": [
+    0.575,
+    0.025,
+    0.305
+   ]
+  },
+  "Ward_leafR_workshop": {
+   "file": "workshop",
+   "group": "ward",
+   "id": "Ward_leafR_workshop",
+   "mount": "hinge",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "Kit_grey"
+   ],
+   "uv1": false,
+   "children": [],
+   "aabb": [
+    [
+     -0.575,
+     0.0,
+     -0.015
+    ],
+    [
+     0.0,
+     2.2,
+     0.015
+    ]
+   ],
+   "tris": {
+    "hi": 12,
+    "md": 12,
+    "lo": 12
+   },
+   "hinge": [
+    0.575,
+    0.025,
+    0.305
+   ]
+  },
+  "Win_cellar": {
+   "file": "concrete",
+   "group": "arch",
+   "id": "Win_cellar",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey",
+    "Glass",
+    "SkyPlane"
+   ],
+   "uv1": true,
+   "children": [
+    "Win_cellar_frame",
+    "Win_cellar_glass",
+    "Win_cellar_sky"
+   ],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.34
+    ],
+    [
+     1.125,
+     3.0,
+     0.0
+    ]
+   ],
+   "tris": {
+    "hi": 68,
+    "md": 68,
+    "lo": 68
+   }
+  },
+  "Win_cellar_short": {
+   "file": "concrete",
+   "group": "arch",
+   "id": "Win_cellar_short",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey",
+    "Glass",
+    "SkyPlane"
+   ],
+   "uv1": true,
+   "children": [
+    "Win_cellar_short_frame",
+    "Win_cellar_short_glass",
+    "Win_cellar_short_sky"
+   ],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.34
+    ],
+    [
+     1.125,
+     3.0,
+     0.0
+    ]
+   ],
+   "tris": {
+    "hi": 68,
+    "md": 68,
+    "lo": 68
+   }
+  },
+  "Win_dormer": {
+   "file": "attic",
+   "group": "arch",
+   "id": "Win_dormer",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey",
+    "Glass",
+    "SkyPlane"
+   ],
+   "uv1": true,
+   "children": [
+    "Win_dormer_curtain",
+    "Win_dormer_frame",
+    "Win_dormer_glass",
+    "Win_dormer_sky"
+   ],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.34
+    ],
+    [
+     1.125,
+     3.0,
+     0.2
+    ]
+   ],
+   "tris": {
+    "hi": 92,
+    "md": 92,
+    "lo": 92
+   }
+  },
+  "Win_industrial": {
+   "file": "workshop",
+   "group": "arch",
+   "id": "Win_industrial",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey",
+    "Glass",
+    "SkyPlane"
+   ],
+   "uv1": true,
+   "children": [
+    "Win_industrial_curtain",
+    "Win_industrial_frame",
+    "Win_industrial_glass",
+    "Win_industrial_sky"
+   ],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.34
+    ],
+    [
+     1.125,
+     3.0,
+     0.2
+    ]
+   ],
+   "tris": {
+    "hi": 92,
+    "md": 92,
+    "lo": 92
+   }
+  },
+  "Win_oculus": {
+   "file": "attic",
+   "group": "arch",
+   "id": "Win_oculus",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey",
+    "Glass",
+    "SkyPlane"
+   ],
+   "uv1": true,
+   "children": [
+    "Win_oculus_frame",
+    "Win_oculus_glass",
+    "Win_oculus_sky"
+   ],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.34
+    ],
+    [
+     1.125,
+     3.0,
+     0.0
+    ]
+   ],
+   "tris": {
+    "hi": 68,
+    "md": 68,
+    "lo": 68
+   }
+  },
+  "Win_sash": {
+   "file": "wood",
+   "group": "arch",
+   "id": "Win_sash",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey",
+    "Glass",
+    "SkyPlane"
+   ],
+   "uv1": true,
+   "children": [
+    "Win_sash_curtain",
+    "Win_sash_frame",
+    "Win_sash_glass",
+    "Win_sash_sky"
+   ],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.34
+    ],
+    [
+     1.125,
+     3.0,
+     0.2
+    ]
+   ],
+   "tris": {
+    "hi": 92,
+    "md": 92,
+    "lo": 92
+   }
+  },
+  "Win_tall": {
+   "file": "tile",
+   "group": "arch",
+   "id": "Win_tall",
+   "mount": "face",
+   "fit": "max",
+   "placeholder": true,
+   "materials": [
+    "WallSurface",
+    "Kit_grey",
+    "Glass",
+    "SkyPlane"
+   ],
+   "uv1": true,
+   "children": [
+    "Win_tall_curtain",
+    "Win_tall_frame",
+    "Win_tall_glass",
+    "Win_tall_sky"
+   ],
+   "aabb": [
+    [
+     -1.125,
+     0.0,
+     -0.34
+    ],
+    [
+     1.125,
+     3.0,
+     0.2
+    ]
+   ],
+   "tris": {
+    "hi": 92,
+    "md": 92,
+    "lo": 92
+   }
+  }
+ }
+}

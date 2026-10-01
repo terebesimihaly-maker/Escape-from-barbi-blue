@@ -16,34 +16,55 @@ let titleEyes = null, titleT = 0, reviveTarget = null, revP = 0, lastDt = 0.016,
 // generateFloor builds the maze and places everything (n = number of players), applyFloor sets the game up from that data.
 // the time between her screams: shorter on later floors and with more players, never under 22 s
 const huntTime = (i, n, D) => Math.max(22, rnd(45, 65) - i * 6 - (n - 1) * 2 + D.hunt);
-function generateFloor(i, n, diff) {
-  const F = FLOORS[i], D = DIFFS[diff] || DIFFS.medium;
+// Every floor comes from a seed (the same seed: the same house). A house with halls and furniture is checked (js/layout.js
+// validateFloor): if anything can't be reached it tries the next seed, 6 in all, and after that builds the plain maze (classic).
+function generateFloor(i, n, diff, seed) {
+  const base = (seed === undefined || seed === null ? Math.random() * 2 ** 32 : seed) >>> 0;
+  if (!LAYOUT_FORCE_CLASSIC) for (let k = 0; k < 6; k++) {
+    const s = (base + k * 0x9E3779B1) >>> 0, d = withSeed(s, () => buildFloorData(i, n, diff, s, true)), bad = validateFloor(d);
+    if (!bad.length) return d;
+    LAYOUT_REJECTS.push({ i, n, diff, s, bad });
+  }
+  const d = withSeed(base ^ 0x5bd1e995, () => buildFloorData(i, n, diff, base, false)); d.classic = 1;
+  return d;
+}
+// full: with halls and furniture (classic: the maze, the alcoves and everything else, but no halls or furniture)
+function buildFloorData(i, n, diff, seed, full) {
+  const F = FLOORS[i], D = DIFFS[diff] || DIFFS.medium, quota = 4 + i * 2 + (n - 1);
   genMaze(F.cw, F.ch);
   if (n > 1) for (let y = 1; y <= 3; y++) for (let x = 1; x <= 3; x++) grid[y][x] = 0;   // a room for everyone to start in
-  const dist = bfsDist(1, 1);
-  const far = CELLS.reduce((a, c) => dist[idx(c[0], c[1])] > dist[idx(a[0], a[1])] ? c : a, [1, 1]);
-  const maxD = dist[idx(far[0], far[1])];
-  const used = new Set(['1,1', '1,3', '3,1', '3,3', far.join(',')]);
+  // halls (rooms several tiles across, and hallways), each with only a few ways in; then dead ends for the wardrobes (js/layout.js)
+  const rooms = full ? stampHalls(i) : [];
+  if (full) doorBudget(rooms);
+  alcovePass(quota, rooms);
+  // the exit: the dead end farthest from the start, kept before anything else goes in. The wardrobes: other dead ends.
+  const far = reserveExit(), closetsD = pickClosets(quota, far);
+  // the furniture you bump into, and the steps between tiles it blocks (cut: every search here goes round them)
+  const { solids, cut } = full ? furnishHalls(rooms, protectedTiles(closetsD, far)) : { solids: [], cut: null };
+  const dist = bfsDist(1, 1, cut), maxD = CELLS.reduce((m, c) => Math.max(m, dist[idx(c[0], c[1])]), 0);
+  const used = new Set(['1,1', '1,3', '3,1', '3,3', far.join(','), ...closetsD.map(c => c[0] + ',' + c[1])]);
 
-  const dead = shuffle(CELLS.filter(c => !used.has(c.join(',')) && wallCount(c[0], c[1]) === 3));
-  const closetsD = dead.slice(0, 4 + i * 2 + (n - 1)).map(c => { used.add(c.join(','));
-    const [ox, oy] = DIRS.find(([dx, dy]) => !isWall(c[0] + dx, c[1] + dy)); return [c[0], c[1], ox, oy]; });
-
-  // the puzzles: boxes on the walls (a different kind on every floor), each in its own cell away from the start (js/puzzles.js)
+  // the puzzles: boxes on the walls (a different kind on every floor), each in its own cell away from the start (js/puzzles.js),
+  // never on a wall with furniture in front of it
   const cand = shuffle(CELLS.filter(c => !used.has(c.join(',')) && dist[idx(c[0], c[1])] > Math.max(2, maxD * 0.12)));
-  const puzzlesD = makePuzzles(puzzleCount(i, diff), cand, i, diff);
+  const puzzlesD = makePuzzles(puzzleCount(i, diff), cand, i, diff, full ? (x, y, dx, dy) => faceClear(solids, x, y, dx, dy) : undefined);
   for (const p of puzzlesD) used.add(p.cell.join(','));
   const fusesD = puzzlesD.map(p => p.cell.slice());       // (the stations: solving one counts as a "fuse")
   const nc = shuffle(CELLS.filter(c => !used.has(c.join(',')) && dist[idx(c[0], c[1])] > 2));
   // torn notes: which three of this floor's four, and where, is different every time
   const pick = shuffle(NOTE_POOL[i].map((_, k) => k)).slice(0, NOTES_PER_FLOOR);
   const notesD = nc.slice(0, pick.length).map((c, j) => { used.add(c.join(',')); return [c[0], c[1], +rnd(-0.6, 0.6).toFixed(2), pick[j]]; });
-  // loose floorboards: in the rooms and the corridors between them (never at the start, the door, a wardrobe or a puzzle).
-  // About nine in ten lie along one side of their tile, with plenty of room to step around them. Now and then (one board in
-  // ten) a long one lies right across the middle of a corridor, from wall to wall: there's no way round that one.
+  // servant corridors: a straight run of corridor that only looks different (js/layout.js); no loose boards in them
+  const runs = markRuns(i, rooms, keepTiles(closetsD, far, puzzlesD)), onRun = new Set();
+  for (const [, x0, y0, x1, y1] of runs) for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) onRun.add(x + ',' + y);
+  const byBox = nearBoxes(solids, GW, GH, 14);
+  // loose floorboards: in the rooms and the corridors between them (never at the start, the door, a wardrobe, a puzzle, by furniture
+  // or in a servant corridor). About nine in ten lie along one side of their tile, with plenty of room to step around them. Now and
+  // then (one board in ten) a long one lies right across the middle of a corridor, from wall to wall: there's no way round that one.
   // A board: [x, y, along (its length runs along y), length]
   const open = [];
-  for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) if (!grid[y][x] && !used.has(x + ',' + y) && (x > 4 || y > 4) && dist[idx(x, y)] > 2) open.push([x, y]);
+  for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++)
+    if (!grid[y][x] && !used.has(x + ',' + y) && (x > 4 || y > 4) && dist[idx(x, y)] > 2 && !byBox[idx(x, y)] && !onRun.has(x + ',' + y)) open.push([x, y]);
   const nBoards = Math.round(CELLS.length / 10 * D.creaks) + i, cells = shuffle(open);
   const vertical = (x, y) => isWall(x - 1, y) && isWall(x + 1, y), horizontal = (x, y) => isWall(x, y - 1) && isWall(x, y + 1);
   const corridors = cells.filter(([x, y]) => vertical(x, y) !== horizontal(x, y));   // (walls on two opposite sides only)
@@ -69,13 +90,16 @@ function generateFloor(i, n, diff) {
   const spawns = n > 1 ? [[-13, -13], [13, 13], [13, -13], [-13, 13]].map(([ox, oy]) => [T * 2.5 + ox, T * 2.5 + oy]) : [[T * 1.5, T * 1.5]];
   const mc = CELLS.filter(c => dist[idx(c[0], c[1])] > maxD * 0.55 && !(c[0] === far[0] && c[1] === far[1]));
   const m0 = mc.length ? mc[Math.random() * mc.length | 0] : far;
+  // (v, kv: the layout and kit versions it was made with; rooms, runs, solids: js/layout.js, rebuilt into nav on every client)
   return { i, n, rows: grid.map(r => Array.from(r).join('')), exit: far, closets: closetsD, fuses: fusesD, puzzles: puzzlesD, notes: notesD, decals: decalsD, creaks: creaksD,
-    spawns, a0, m0, hunt: huntTime(i, n, D), diff: DIFFS[diff] ? diff : 'medium' };
+    spawns, a0, m0, hunt: huntTime(i, n, D), diff: DIFFS[diff] ? diff : 'medium',
+    v: LAYOUT_VERSION, kv: KIT.version, seed, rooms: rooms.map(r => [r.tpl, r.tx0, r.ty0, r.tx1, r.ty1, r.flags]), runs, solids: solids.map(encodeSolid) };
 }
 function applyFloor(d, slot) {
   floorIdx = d.i; const F = FLOORS[d.i]; curDiff = d.diff || 'medium'; levelTime = 0; lastFuseAt = 0;
   grid = d.rows.map(r => Uint8Array.from(r, ch => ch === '1' ? 1 : 0)); GH = grid.length; GW = grid[0].length;
   CELLS = []; for (let y = 1; y < GH; y += 2) for (let x = 1; x < GW; x += 2) CELLS.push([x, y]);
+  applyLayout(d);                                          // (the furniture, cuts and ceilings: js/layout.js)
   exit = { tx: d.exit[0], ty: d.exit[1], ...center(d.exit) };
   closets = d.closets.map(([tx, ty, ox, oy]) => ({ ...center([tx, ty]), ox, oy }));
   fuses = d.fuses.map(([tx, ty]) => ({ tx, ty, ...center([tx, ty]), got: false }));

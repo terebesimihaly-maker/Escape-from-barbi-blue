@@ -3,21 +3,27 @@
 'use strict';
 
 /* ---------- building a floor ---------- */
+const TEX_KEYS = ['map', 'emissiveMap', 'bumpMap', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'lightMap', 'alphaMap', 'envMap'];
 function disposeLevel() {
   if (!level) return;
   if (level.house) level.house.dispose();
   scene.remove(level.group);
   const seen = new Set();
+  // (a texture marked shared outlives the floor: the portraits painted in Blender, loaded once for every floor)
+  const tex = t => { if (t && t !== glowTex && !t.userData.shared && !seen.has(t)) { seen.add(t); t.dispose(); } };
+  const mat = m => { if (seen.has(m)) return; seen.add(m);
+    for (const k of TEX_KEYS) tex(m[k]);
+    if (m.userData) { tex(m.userData.overlay); if (m.userData.disposables) m.userData.disposables.forEach(tex); }
+    m.dispose(); };
   level.group.traverse(o => {
-    if (o.userData.shared) return;                         // (copies of a loaded model: the model keeps its geometry, materials and textures)
+    const u = o.userData;                                  // (copies of a loaded model: the model keeps its geometry, materials and textures)
+    if (u.shared || u.sharedGeo || u.kit) return;
     if (o.geometry && !seen.has(o.geometry)) { seen.add(o.geometry); o.geometry.dispose(); }
-    const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
-    for (const m of ms) { if (seen.has(m)) continue; seen.add(m);
-      for (const k of ['map', 'emissiveMap', 'bumpMap', 'normalMap', 'roughnessMap']) if (m[k] && m[k] !== glowTex && !seen.has(m[k])) { seen.add(m[k]); m[k].dispose(); }
-      if (m.userData && m.userData.overlay) m.userData.overlay.dispose();
-      m.dispose(); }
+    if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(mat);
   });
-  if (level.door) { level.door.openMat.map.dispose(); level.door.openMat.dispose(); level.door.lockedMat.map.dispose(); level.door.lockedMat.dispose(); }
+  // (not always in the scene: a changer's second picture until it has changed, the exit door's open look until it opens)
+  if (level.paintings) for (const p of level.paintings) if (p.mat) mat(p.mat);
+  if (level.door) { mat(level.door.openMat); mat(level.door.lockedMat); }
   level = null;
 }
 function buildLevel() {
@@ -84,9 +90,10 @@ function upgradeSurfaces(F, floorMat, G) {
     if (!s || level !== lv) return;
     // the floor: the baked boards/tiles (one texture per tile), with the painted shade, stains and words multiplied over it
     const rep = t => { const c = t.clone(); c.repeat.set(GW, GH); c.needsUpdate = true; return c; };
-    const ov = floorOverlay(F);
+    const ov = floorOverlay(F), painted = floorMat.map;
     floorMat.map = rep(s.map); floorMat.normalMap = rep(s.normalMap); floorMat.roughnessMap = s.roughnessMap && rep(s.roughnessMap);
     floorMat.bumpMap = null; floorMat.roughness = 1; floorMat.color.setScalar(1.25); floorMat.normalScale.set(1, 1);
+    if (painted) painted.dispose();                      // (the painted floor, which was its relief too: nothing uses it any more)
     floorMat.userData.overlay = ov;
     floorMat.onBeforeCompile = sh => {
       sh.uniforms.uOverlay = { value: ov };
@@ -98,8 +105,11 @@ function upgradeSurfaces(F, floorMat, G) {
   });
   surfaceSet(set.wall).then(s => {
     if (!s || level !== lv) return;
-    G.traverse(o => { const m = o.material; if (!m || !m.userData || !m.userData.wallSurface) return;
-      m.map = s.map.clone(); m.normalMap = s.normalMap.clone(); m.bumpMap = null; m.color.setScalar(1.15); m.needsUpdate = true; });   // (clones: the level's own, disposed with it)
+    const mats = new Set(), painted = new Set();          // (the walls and the tops of the doorways share the painted wall and its relief)
+    G.traverse(o => { const m = o.material; if (m && m.userData && m.userData.wallSurface) mats.add(m); });
+    for (const m of mats) { painted.add(m.map).add(m.bumpMap);
+      m.map = s.map.clone(); m.normalMap = s.normalMap.clone(); m.bumpMap = null; m.color.setScalar(1.15); m.needsUpdate = true; }   // (clones: the level's own, disposed with it)
+    for (const t of painted) if (t) t.dispose();
   });
 }
 // what the painted floor adds over the baked one: shade in the corners, stains, petals, words, the loose boards (white = nothing)
@@ -390,8 +400,9 @@ function wallDecor(G, F, faces, doorTiles, skip) {
   const glowDot = P && new THREE.MeshBasicMaterial({ color: new THREE.Color(0x9fe6ff).multiplyScalar(2.5) }), dotGeo = P && new THREE.CircleGeometry(0.009, 12);
   const words = {};
   const exitFace = f => f.x === exit.tx && f.y === exit.ty;
+  const inWardrobe = new Set(closets.map(c => Math.floor(c.x / T) + ',' + Math.floor(c.y / T)));   // (nothing on the walls of a wardrobe's dead end: it would hang inside it)
   faces.forEach((f, i) => {
-    if (exitFace(f) || (doorTiles && doorTiles.has(f.x + ',' + f.y)) || (skip && skip(f))) return;
+    if (exitFace(f) || inWardrobe.has(f.x + ',' + f.y) || (doorTiles && doorTiles.has(f.x + ',' + f.y)) || (skip && skip(f))) return;
     const r = hash(f.x * 7 + f.nx, f.y * 7 + f.nz, 91), cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2, rot = Math.atan2(f.nx, f.nz);
     if (r < F.frames) {
       // (a few of each per floor: every pair of eyes is extra drawing)

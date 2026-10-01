@@ -126,9 +126,13 @@ function render3D(t) {
   }
   drawPhantom();
   // a new floor: compile every material now (her included, even while she's hidden), not the first time each one is seen
+  // (on High the picture goes through the glow's buffer, not straight to the screen, and that needs other shaders: those)
   if (!level.compiled && renderer.compileAsync) { level.compiled = true;
     const was = barbi ? barbi.obj.visible : false; if (barbi) barbi.obj.visible = true;
-    renderer.compileAsync(scene, camera).catch(() => {}); if (barbi) barbi.obj.visible = was; }
+    const rt = renderer.getRenderTarget(), viaGlow = useBloom && composer;
+    if (viaGlow) renderer.setRenderTarget(composer.renderTarget1);
+    renderer.compileAsync(scene, camera).catch(() => {}); if (barbi) barbi.obj.visible = was;
+    if (viaGlow) renderer.setRenderTarget(rt); }
   // in the wardrobe scene the camera turns to look her in the eyes as she leans in
   if (barbi && closetScene && p.closet && barbi.eyes.length) {
     const k = clamp((closetScene.t - SC.lean) / (SC.leanEnd - SC.lean), 0, 1) * (closetScene.t < SC.vanish ? 1 : 0);

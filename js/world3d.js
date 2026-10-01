@@ -47,15 +47,16 @@ function init3D() {
   } catch (e) { composer = null; }
 
   scene = new THREE.Scene(); scene.background = new THREE.Color(0x020205); scene.fog = new THREE.Fog(0x020205, 1.5, 16);
-  camera = new THREE.PerspectiveCamera(70, 1, 0.05, 60); camera.rotation.order = 'YXZ'; scene.add(camera);
+  camera = new THREE.PerspectiveCamera(70, 1, 0.05, 18); camera.rotation.order = 'YXZ'; scene.add(camera);   // (the fog hides everything past 16 m)
   scene.add(new THREE.HemisphereLight(0x4a5a8a, 0x140c0c, 0.3));
   // the flashlight is held low and to the right, so her shadow falls on the walls behind her
   flash = new THREE.SpotLight(0xffe0b0, FLASH_I, 22, 0.52, 0.55, 0.95);
   flash.position.set(0.2, -0.25, 0.1); flash.target.position.set(0.1, -0.4, -6);
   camera.add(flash); camera.add(flash.target);
   flash.castShadow = true; const sm = LOWQ ? 1024 : 2048; flash.shadow.mapSize.set(sm, sm); flash.shadow.radius = 2.5;
-  flashCookie = flashlightCookie(); flash.map = flashCookie;
-  { const i = new Image(); i.onload = () => { const t = new THREE.CanvasTexture(i); t.colorSpace = THREE.SRGBColorSpace; flash.map = flashCookie = t; };   // (the real beam pattern: tools/blender/flashlight_cookie.py)
+  // (the beam pattern is Medium and High only, like the shadow: applyQuality, js/core.js, switches it later)
+  flashCookie = flashlightCookie(); flash.map = settings.quality !== 'low' ? flashCookie : null;
+  { const i = new Image(); i.onload = () => { const t = new THREE.CanvasTexture(i); t.colorSpace = THREE.SRGBColorSpace; flashCookie = t; flash.map = settings.quality !== 'low' ? t : null; };   // (the real beam pattern: tools/blender/flashlight_cookie.py)
     i.src = 'textures/flashlight_cookie.webp'; }
   flash.shadow.camera.near = 0.25; flash.shadow.camera.far = 22; flash.shadow.bias = -0.0006; flash.shadow.normalBias = 0.03;
   aura = new THREE.PointLight(0x8595c8, 1.2, 4.5, 1.4); camera.add(aura);     // a little light around you, even in the wardrobe
@@ -168,7 +169,8 @@ function loadBoardsTemplate() {
 let portraits = null;
 function loadPortraits() {
   if (portraits !== null || !renderer) return; portraits = false;
-  const img = n => new Promise(res => { const i = new Image(); i.onload = () => { const t = new THREE.CanvasTexture(i); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; res(t); }; i.onerror = () => res(null); i.src = 'textures/portrait_' + n + '.webp'; });
+  // (shared: every floor uses the same ones, so they aren't thrown away with a floor: disposeLevel, js/level.js)
+  const img = n => new Promise(res => { const i = new Image(); i.onload = () => { const t = new THREE.CanvasTexture(i); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; t.userData.shared = true; res(t); }; i.onerror = () => res(null); i.src = 'textures/portrait_' + n + '.webp'; });
   Promise.all(['a', 'b', 'c', 'changed', 'watch'].map(img).concat([fetch('textures/portrait_eyes.json').then(r => r.json()).catch(() => null)]))
     .then(([a, b, c, changed, watch, eyes]) => { if (a && b && c && changed && watch && eyes && eyes.eyes) portraits = { plain: [a, b, c], changed, watch, eyes: eyes.eyes }; });
 }

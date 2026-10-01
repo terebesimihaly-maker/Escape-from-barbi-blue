@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
-  '.glb': 'model/gltf-binary', '.mp3': 'audio/mpeg', '.png': 'image/png', '.txt': 'text/plain' };
+  '.glb': 'model/gltf-binary', '.mp3': 'audio/mpeg', '.png': 'image/png', '.txt': 'text/plain',
+  '.webp': 'image/webp', '.bin': 'application/octet-stream', '.exr': 'image/x-exr' };
 
 function testPage() {
   let s = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');

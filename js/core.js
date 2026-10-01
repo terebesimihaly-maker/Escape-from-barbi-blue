@@ -116,20 +116,21 @@ const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.r
 
 /* ---------- content ---------- */
 const FLOORS = [
-  { name: 'The Nursery', cw: 7, ch: 11,
+  { name: 'The Nursery', cw: 7, ch: 11, ceil: 3.0,
     text: "You wake up in a nursery that isn't yours. The door is locked. Someone has left puzzle boxes on the walls.",
     style: 'wood', floorA: '#3b2722', wallTop: '#1c1118', face: '#6a3d54', pattern: '#7f4b66', dot: '#d3a9bd', base: '#2a1820', frames: 0.12 },
-  { name: 'The Doll Hallway', cw: 8, ch: 13,
+  { name: 'The Doll Hallway', cw: 8, ch: 13, ceil: 3.2,
     text: 'The stairs only go down. Porcelain faces line the walls. Some of them turn to watch you.',
     style: 'tile', floorA: '#22333a', floorB: '#0f181b', grout: '#070b0c', wallTop: '#0d171b', face: '#244650', pattern: '#2f5a67', base: '#0e1e23', frames: 0.4 },
-  { name: 'The Basement', cw: 9, ch: 15,
+  { name: 'The Basement', cw: 9, ch: 15, ceil: 2.7,
     text: "It's wet down here. The humming is louder. This is where she was left.",
     style: 'concrete', floorA: '#2c2a25', wallTop: '#151410', face: '#4d3b2e', mortar: '#241d17', base: '#1b1611', frames: 0.05 },
-  // (floor: which floor painting, and which footsteps; walls: which wall painting; style: how js/house.js dresses it)
-  { name: 'The Attic', cw: 9, ch: 15,
+  // (floor: which floor painting, and which footsteps; walls: which wall painting; style: how js/house.js dresses it;
+  //  ceil: the ceiling height in metres outside the halls, js/layout.js)
+  { name: 'The Attic', cw: 9, ch: 15, ceil: 2.8,
     text: "The basement door didn't lead outside. It led up. Everything up here is covered in sheets, and something under them is breathing.",
     style: 'attic', floor: 'wood', walls: 'attic', floorA: '#3a2c20', wallTop: '#140f0b', face: '#4a3726', pattern: '#3a2a1c', base: '#1f160f', frames: 0.06 },
-  { name: 'The Workshop', cw: 10, ch: 16,
+  { name: 'The Workshop', cw: 10, ch: 16, ceil: 3.4,
     text: 'This is where she was made. Shelves of glass eyes watch you work. The front door is on the other side.',
     style: 'workshop', floor: 'tile', walls: 'workshop', floorA: '#4a4640', floorB: '#191816', grout: '#0c0b0a', wallTop: '#12140f', face: '#4e5647', pattern: '#3c4236', base: '#15130f', frames: 0.2 },
 ];
@@ -196,10 +197,23 @@ const MELODY = [659, 784, 988, 880, 784, 659, 740, 622, 659, 0, 523, 494, 523, 5
 
 /* ---------- maze ---------- */
 let grid, GW, GH, CELLS = [];
+// the floor's layout (js/layout.js applyLayout): the furniture you bump into (boxes in units), the nav built from it, ceiling heights
+// per tile (m), the halls, the servant corridors, and the seed every look of the floor comes from
+let SOLIDS = [], NAV = null, CEIL = null, ROOMS = [], RUNS = [], VSEED = 0;
+// a small seeded random number generator (the same as js/puzzles.js's, which loads later); withSeed runs fn with Math.random seeded,
+// so making a floor (the maze, the shuffles, the puzzles) comes out the same from the same seed
+const seededRng = s => { let a = s >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+function withSeed(s, fn) { const r = Math.random; Math.random = seededRng(s); try { return fn(); } finally { Math.random = r; } }
 const idx = (x, y) => y * GW + x;
 const isWall = (x, y) => x < 0 || y < 0 || x >= GW || y >= GH || grid[y][x] === 1;
 const wallAt = (x, y) => isWall(Math.floor(x / T), Math.floor(y / T));
-const blocked = (x, y, r) => wallAt(x - r, y - r) || wallAt(x + r, y - r) || wallAt(x - r, y + r) || wallAt(x + r, y + r);
+// a box of furniture within r of (x, y) (r up to 14: NAV.bucket holds each tile's boxes within 14 u)
+const solidAt = (x, y, r) => { if (!NAV) return false; const tx = Math.floor(x / T), ty = Math.floor(y / T);
+  if (tx < 0 || ty < 0 || tx >= GW || ty >= GH) return false; const b = NAV.bucket[ty * GW + tx];
+  if (b) for (const i of b) { const s = SOLIDS[i]; if (x + r > s.x0 && x - r < s.x1 && y + r > s.y0 && y - r < s.y1) return true; } return false; };
+const blocked = (x, y, r) => wallAt(x - r, y - r) || wallAt(x + r, y - r) || wallAt(x - r, y + r) || wallAt(x + r, y + r) || solidAt(x, y, r);
+// is the step from tile (x, y) to (x+dx, y+dy) cut (a box blocks it: the searches go round)? cut: the floor's own unless given (null: none)
+const cutAt = (x, y, dx, dy, cut = NAV && NAV.cut) => !!cut && !!(dx === 1 ? cut[idx(x, y)] & 1 : dx === -1 ? cut[idx(x - 1, y)] & 1 : dy === 1 ? cut[idx(x, y)] & 2 : cut[idx(x, y - 1)] & 2);
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 function genMaze(cw, ch) {
@@ -228,23 +242,24 @@ function genMaze(cw, ch) {
   CELLS = [];
   for (let y = 1; y < GH; y += 2) for (let x = 1; x < GW; x += 2) CELLS.push([x, y]);
 }
-function bfsDist(sx, sy) {
+// distances in tiles (and the shortest path) over open tiles, never across a cut step (an island tile gives -1 / null)
+function bfsDist(sx, sy, cut = NAV && NAV.cut) {
   const d = new Int16Array(GW * GH).fill(-1), q = [[sx, sy]]; d[idx(sx, sy)] = 0;
   for (let i = 0; i < q.length; i++) {
     const [x, y] = q[i];
     for (const [dx, dy] of DIRS) { const nx = x + dx, ny = y + dy;
-      if (!isWall(nx, ny) && d[idx(nx, ny)] < 0) { d[idx(nx, ny)] = d[idx(x, y)] + 1; q.push([nx, ny]); } }
+      if (!isWall(nx, ny) && d[idx(nx, ny)] < 0 && !cutAt(x, y, dx, dy, cut)) { d[idx(nx, ny)] = d[idx(x, y)] + 1; q.push([nx, ny]); } }
   }
   return d;
 }
-function bfsPath(sx, sy, tx, ty) {
+function bfsPath(sx, sy, tx, ty, cut = NAV && NAV.cut) {
   if (sx === tx && sy === ty) return [];
   const prev = new Int32Array(GW * GH).fill(-1), q = [[sx, sy]]; prev[idx(sx, sy)] = idx(sx, sy);
   for (let i = 0; i < q.length; i++) {
     const [x, y] = q[i];
     if (x === tx && y === ty) break;
     for (const [dx, dy] of DIRS) { const nx = x + dx, ny = y + dy;
-      if (!isWall(nx, ny) && prev[idx(nx, ny)] < 0) { prev[idx(nx, ny)] = idx(x, y); q.push([nx, ny]); } }
+      if (!isWall(nx, ny) && prev[idx(nx, ny)] < 0 && !cutAt(x, y, dx, dy, cut)) { prev[idx(nx, ny)] = idx(x, y); q.push([nx, ny]); } }
   }
   if (isWall(tx, ty) || prev[idx(tx, ty)] < 0) return null;
   const path = []; let c = idx(tx, ty);
@@ -256,6 +271,30 @@ const center = c => ({ x: c[0] * T + T / 2, y: c[1] * T + T / 2 });
 function los(ax, ay, bx, by) {
   const dx = bx - ax, dy = by - ay, n = Math.ceil(Math.hypot(dx, dy) / 8);
   for (let i = 1; i < n; i++) if (wallAt(ax + dx * i / n, ay + dy * i / n)) return false;
+  return true;
+}
+// her sight (only hers, and what hangs on it): walls as los(), and tall furniture; low furniture too if you're crouching behind it
+// (NAV.occ, a 10 u raster). The ends are skipped for 8 u, so the box you stand right next to doesn't hide you from yourself.
+function losSight(ax, ay, bx, by, crouch) {
+  if (!los(ax, ay, bx, by)) return false;
+  if (!NAV) return true;
+  const dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy), n = Math.ceil(L / 8), m = crouch ? 3 : 1, NX = GW * 5;
+  for (let i = 1; i < n; i++) { const s = L * i / n; if (s < 8 || L - s < 8) continue;
+    const a = Math.floor((ax + dx * i / n) / 10), b = Math.floor((ay + dy * i / n) / 10);
+    if (a >= 0 && b >= 0 && a < NX && b < GH * 5 && NAV.occ[b * NX + a] & m) return false; }
+  return true;
+}
+// a body of radius r could go straight from a to b without touching a box (walls are los()'s business)
+function clearLine(ax, ay, bx, by, r) {
+  const dx = bx - ax, dy = by - ay;
+  for (const s of SOLIDS) {
+    const x0 = s.x0 - r, x1 = s.x1 + r, y0 = s.y0 - r, y1 = s.y1 + r;
+    if (Math.max(ax, bx) <= x0 || Math.min(ax, bx) >= x1 || Math.max(ay, by) <= y0 || Math.min(ay, by) >= y1) continue;
+    let t0 = 0, t1 = 1;                           // (slabs: where the segment is inside the box's x range, and its y range)
+    if (dx) { const u = (x0 - ax) / dx, v = (x1 - ax) / dx; t0 = Math.max(t0, Math.min(u, v)); t1 = Math.min(t1, Math.max(u, v)); }
+    if (dy) { const u = (y0 - ay) / dy, v = (y1 - ay) / dy; t0 = Math.max(t0, Math.min(u, v)); t1 = Math.min(t1, Math.max(u, v)); }
+    if (t0 < t1) return false;
+  }
   return true;
 }
 function moveEntity(e, dx, dy, r) {

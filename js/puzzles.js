@@ -29,10 +29,11 @@ function puzzleSpec(kind, floor, diff) {
 function seeded(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
 /* ---------- making a floor's boxes (on the host: everyone gets the same ones) ---------- */
-function makePuzzles(n, cells, floor, diff) {
+// okFace(x, y, dx, dy), if given: may a box hang on that wall (no furniture in front of it, js/layout.js faceClear)
+function makePuzzles(n, cells, floor, diff, okFace) {
   const out = [], kind = FLOOR_KIND[floor] || 'maze';
   for (let i = 0; i < cells.length && out.length < n; i++) {
-    const [x, y] = cells[i], walls = DIRS.filter(([dx, dy]) => isWall(x + dx, y + dy));
+    const [x, y] = cells[i], walls = DIRS.filter(([dx, dy]) => isWall(x + dx, y + dy) && (!okFace || okFace(x, y, dx, dy)));
     if (!walls.length) continue;
     const [dx, dy] = walls[Math.random() * walls.length | 0];
     out.push({ cell: [x, y], dir: [dx, dy], seed: Math.random() * 1e9 | 0, kind, spec: puzzleSpec(kind, floor, diff) });

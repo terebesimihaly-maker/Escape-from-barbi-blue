@@ -5,32 +5,43 @@ const b = await launch();
 const p = await solo(b, 'low', 640, 360);
 
 console.log('== every floor can be completed');
-// many random houses for every floor, number of players and difficulty: everything you need must be reachable
+// many houses for every floor, number of players and difficulty (fixed seeds): everything you need must be reachable. The furniture you
+// bump into blocks steps between tiles: the search here goes round them with its own cuts (a step is cut when a box from d.solids crosses
+// the 13 u band between the two tile centres), and each box must be its KIT footprint (js/kitdefs.js).
 const report = await p.evaluate(() => {
   const bad = [], counts = {};
   for (let i = 0; i < FLOORS.length; i++) for (let n = 1; n <= 4; n++) for (const diff of ['easy', 'medium', 'hard']) for (let s = 0; s < 25; s++) {
-    const d = generateFloor(i, n, diff), rows = d.rows, H = rows.length, W = rows[0].length, wall = (x, y) => x < 0 || y < 0 || x >= W || y >= H || rows[y][x] === '1';
-    const tile = ([x, y]) => [Math.floor(x / T), Math.floor(y / T)];
+    const d = generateFloor(i, n, diff, (i * 7907 + n * 503 + diff.length * 97 + s * 65537) >>> 0), rows = d.rows, H = rows.length, W = rows[0].length, wall = (x, y) => x < 0 || y < 0 || x >= W || y >= H || rows[y][x] === '1';
+    const tag = `floor ${i + 1}, ${n}p, ${diff}`, tile = ([x, y]) => [Math.floor(x / T), Math.floor(y / T)];
+    const boxes = d.solids.map(([k, x0, y0, x1, y1, rot, v]) => { const it = Object.assign({}, KIT.items[KIT.solidIds[k]], (KIT.items[KIT.solidIds[k]].var || [])[v]);
+      const w = Math.round(it.w / KIT.u), dd = Math.round(it.d / KIT.u), [ex, ey] = rot & 1 ? [dd, w] : [w, dd];
+      if (Math.abs((x1 - x0) / 2 - ex) > 0.5 || Math.abs((y1 - y0) / 2 - ey) > 0.5) bad.push(tag + ': a box that is not its KIT footprint');
+      return { x0: x0 / 2, y0: y0 / 2, x1: x1 / 2, y1: y1 / 2 }; });
+    const cutStep = (x, y, dx, dy) => { const ax = Math.min(x, x + dx) * T + T / 2, ay = Math.min(y, y + dy) * T + T / 2;
+      const [bx0, by0, bx1, by1] = dx ? [ax, ay - 13, ax + T, ay + 13] : [ax - 13, ay, ax + 13, ay + T];
+      return boxes.some(o => o.x0 < bx1 && o.x1 > bx0 && o.y0 < by1 && o.y1 > by0); };
     const start = tile(d.spawns[0]), seen = new Set([start.join()]), q = [start];
-    while (q.length) { const [x, y] = q.shift(); for (const [dx, dy] of DIRS) { const k = (x + dx) + ',' + (y + dy); if (!wall(x + dx, y + dy) && !seen.has(k)) { seen.add(k); q.push([x + dx, y + dy]); } } }
-    const tag = `floor ${i + 1}, ${n}p, ${diff}`, reach = c => seen.has(c[0] + ',' + c[1]);
+    while (q.length) { const [x, y] = q.shift(); for (const [dx, dy] of DIRS) { const k = (x + dx) + ',' + (y + dy); if (!wall(x + dx, y + dy) && !seen.has(k) && !cutStep(x, y, dx, dy)) { seen.add(k); q.push([x + dx, y + dy]); } } }
+    const reach = c => seen.has(c[0] + ',' + c[1]);
     const closetCells = new Set(d.closets.map(c => c[0] + ',' + c[1]));
     if (!reach(d.exit)) bad.push(tag + ': exit unreachable');
     d.puzzles.forEach(z => { const f = z.cell; if (!reach(f)) bad.push(tag + ': a labyrinth box is unreachable'); if (closetCells.has(f.join())) bad.push(tag + ': a box is in a wardrobe cell');
       if (f.join() === d.exit.join()) bad.push(tag + ': a box is on the exit'); if (!wall(f[0] + z.dir[0], f[1] + z.dir[1])) bad.push(tag + ': a box hangs on no wall'); });
     const want = puzzleCount(i, diff);
-    if (d.puzzles.length < 1) bad.push(tag + ': no labyrinth box');
+    if (d.puzzles.length !== want) bad.push(tag + ': ' + d.puzzles.length + ' labyrinth boxes, not ' + want);
     counts[d.puzzles.length < want ? 'short' : 'full'] = (counts[d.puzzles.length < want ? 'short' : 'full'] || 0) + 1;
+    if (d.closets.length !== 4 + i * 2 + (n - 1)) bad.push(tag + ': ' + d.closets.length + ' wardrobes, not ' + (4 + i * 2 + (n - 1)));
     d.spawns.slice(0, n).forEach(sp => { const t = tile(sp); if (wall(t[0], t[1]) || !reach(t)) bad.push(tag + ': a spawn is in a wall');
-      // room to stand: the player (radius 11) must not touch a wall at the spawn
-      for (const [ox, oy] of [[-11, -11], [11, -11], [-11, 11], [11, 11]]) if (wall(Math.floor((sp[0] + ox) / T), Math.floor((sp[1] + oy) / T))) bad.push(tag + ': a spawn touches a wall'); });
+      // room to stand: the player (radius 11) must not touch a wall or a box at the spawn
+      for (const [ox, oy] of [[-11, -11], [11, -11], [-11, 11], [11, 11]]) if (wall(Math.floor((sp[0] + ox) / T), Math.floor((sp[1] + oy) / T))) bad.push(tag + ': a spawn touches a wall');
+      if (boxes.some(o => sp[0] + 11 > o.x0 && sp[0] - 11 < o.x1 && sp[1] + 11 > o.y0 && sp[1] - 11 < o.y1)) bad.push(tag + ': a spawn touches a box'); });
     d.closets.forEach(([x, y, ox, oy]) => { if (!reach([x, y])) bad.push(tag + ': a wardrobe is unreachable'); if (wall(x + ox, y + oy)) bad.push(tag + ': a wardrobe faces a wall');
       if (DIRS.filter(([dx, dy]) => !wall(x + dx, y + dy)).length !== 1) bad.push(tag + ': a wardrobe is not in a dead end'); });
     if (!reach(d.m0)) bad.push(tag + ': she starts somewhere unreachable');
   }
   return { bad: [...new Set(bad)].slice(0, 20), counts, total: FLOORS.length * 4 * 3 * 25 };
 });
-check(report.bad.length === 0, `${report.total} random houses (5 floors x 1-4 players x 3 difficulties): every labyrinth box, the exit, every spawn and wardrobe reachable`, report.bad);
+check(report.bad.length === 0, `${report.total} houses (5 floors x 1-4 players x 3 difficulties, fixed seeds): every labyrinth box, the exit, every spawn and wardrobe reachable around the furniture; all the wardrobes and boxes there`, report.bad);
 console.log('  (labyrinth boxes placed: all of them in', report.counts.full || 0, 'houses; fewer than planned in', report.counts.short || 0, ')');
 check(await p.evaluate(() => T - 2 * 11 >= 22), 'hallways are wide enough for two players side by side (tile ' + await p.evaluate(() => T) + ' units)');
 

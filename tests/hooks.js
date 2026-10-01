@@ -17,6 +17,12 @@ window.bb = {
   get scares() { return scares },
   T, isWall, center, los, CELLS: () => CELLS,
   startFloor, die, toggleHide, startScream, downPlayer, allPlayers, hostEmit, applyFuse,
+  // the layout (js/layout.js): furniture boxes, nav, ceilings, halls, servant runs; and the pieces that may not exist yet (guarded)
+  SOLIDS: () => SOLIDS, NAV: () => NAV, CEIL: () => CEIL, ROOMS: () => ROOMS, RUNS: () => RUNS,
+  cutAt, losSight, clearLine, validateFloor, applyLayout, LAYOUT_REJECTS: () => LAYOUT_REJECTS,
+  get stepAlongPath() { return typeof stepAlongPath === 'function' ? stepAlongPath : undefined; },
+  Kit: () => typeof Kit !== 'undefined' ? Kit : undefined, LightBaker: () => typeof LightBaker !== 'undefined' ? LightBaker : undefined,
+  kitReady: s => typeof Kit !== 'undefined' && Kit.ready(s),
 };
 
 window.bbAudio = {

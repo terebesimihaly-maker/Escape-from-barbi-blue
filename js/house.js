@@ -445,7 +445,7 @@ function makeDoll(THREE, env, p, seed) {
   const dresses = [0x9fb4e6, 0xe6a8b8, 0xf0ece0, 0xb6d4c0], hairs = [0x1a120c, 0xd8b06a, 0x5a2a14, 0x0b0b0b];
   if (env.doll) {                                          // the model made in Blender (models/doll.glb): its lowest point is at 0, so it sits on the floor or the table
     const d = env.doll.clone(true), glowEyes = seed % 3 === 0, faceTex = env.toTex(dollFaceCanvas(glowEyes));
-    faceTex.wrapS = faceTex.wrapT = THREE.ClampToEdgeWrapping;
+    faceTex.wrapS = faceTex.wrapT = 1001;                 // (ClampToEdgeWrapping: this three.js doesn't export the name)
     const aged = [0x4d5f91, 0x93505f, 0xa49a84, 0x4f7560];     // (the model's dresses: older, dirtier colours than the stand-in's)
     d.traverse(o => { if (!o.isMesh) return; o.material = o.material.clone();
       const n = o.material.name;

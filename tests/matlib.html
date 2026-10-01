@@ -1,0 +1,381 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>MatLib test room</title>
+<!-- The material library (js/matlib.js) on its own: a small room with every material family, on one tier (?tier=low|medium|high),
+     synthetic baked maps (64x64 ImageData), a fake light field, instanced and skinned light-field objects, a decal, lamp emissives and
+     glows. It checks shader errors, counts programs, and that the per-frame uniforms change the picture without recompiling.
+     Results: window.RESULT (tests/matlib.test.mjs reads it). -->
+<link rel="icon" href="data:,">
+<style>html,body{margin:0;background:#000;color:#bbb;font:12px monospace}canvas{display:block}pre{margin:4px;white-space:pre-wrap}</style>
+</head><body>
+<canvas id="c" width="640" height="360"></canvas><pre id="log"></pre>
+<script src="../lib/three.min.js"></script>
+<script src="../js/matlib.js"></script>
+<script>
+'use strict';
+const ERR = [], WARN = [];
+{ const e = console.error.bind(console), w = console.warn.bind(console);
+  console.error = (...a) => { ERR.push(a.map(String).join(' ').slice(0, 3000)); e(...a); };
+  console.warn = (...a) => { WARN.push(a.map(String).join(' ').slice(0, 600)); w(...a); }; }
+window.addEventListener('error', ev => { ERR.push('page error: ' + ev.message); if (!window.RESULT) window.RESULT = { failed: true, errors: ERR.slice(), warnings: WARN.slice() }; });
+const say = s => { document.getElementById('log').textContent += s + '\n'; };
+
+const TIER = ['low', 'medium', 'high'].includes(new URLSearchParams(location.search).get('tier')) ? new URLSearchParams(location.search).get('tier') : 'low';
+const LV = { low: 0, medium: 1, high: 2 }[TIER];
+const NX = 4, NZ = 3, L = 2.25, W = NX * L, H = NZ * L, WALL = 3;   // a 4 x 3 tile room
+MatLib.tier = TIER;
+const U = MatLib.U;
+
+/* ---------- synthetic pictures and data (ImageData, row 0 = top) ---------- */
+function rng(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function img(w, h, fn) {
+  const d = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const v = fn(x, y), i = (y * w + x) * 4; d[i] = v[0]; d[i + 1] = v[1]; d[i + 2] = v[2]; d[i + 3] = v.length > 3 ? v[3] : 255; }
+  return new ImageData(d, w, h);
+}
+const planMap = fn => img(64, 64, (x, y) => fn((x + 0.5) / 64 * W, (y + 0.5) / 64 * H));       // fn(x m, z m)
+const enc = E => Math.round(255 * (x => x <= 0.0031308 ? 12.92 * x : 1.055 * Math.pow(x, 1 / 2.4) - 0.055)(Math.min(1, Math.max(0, E / 4))));
+const lin = E => Math.round(255 * Math.min(1, Math.max(0, E / 4)));
+const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+function noise(n, seed, cells) {   // tileable value noise, 0..1
+  const r = rng(seed), g = Array.from({ length: cells * cells }, r), v = (i, j) => g[((j % cells + cells) % cells) * cells + ((i % cells + cells) % cells)];
+  return (x, y) => { const fx = x / n * cells, fy = y / n * cells, i = Math.floor(fx), j = Math.floor(fy), u = sstep(0, 1, fx - i), w = sstep(0, 1, fy - j);
+    return (v(i, j) * (1 - u) + v(i + 1, j) * u) * (1 - w) + (v(i, j + 1) * (1 - u) + v(i + 1, j + 1) * u) * w; };
+}
+function normalFrom(w, h, ht, k) {   // a tangent-space normal map from a height function (wrapping)
+  return img(w, h, (x, y) => { const dx = ht((x + 1) % w, y) - ht((x - 1 + w) % w, y), dy = ht(x, (y - 1 + h) % h) - ht(x, (y + 1) % h);
+    const n = [-dx * k, -dy * k, 1], l = Math.hypot(...n); return n.map(c => 128 + 127 * c / l); });
+}
+// lamps of the room
+const S = new THREE.Vector3(2.6, 2.45, 2.4), F = new THREE.Vector3(8.7, 1.95, 4.6), D = new THREE.Vector3(5.4, 2.45, 5.6);
+const fall = r => Math.pow(Math.max(0, 1 - Math.pow(r / 7, 4)), 2);
+const lampE = (lamp, k, p, n) => { const l = lamp.clone().sub(p), r = Math.max(0.3, l.length()); return k * Math.max(0, n.dot(l.normalize())) / (r * r) * fall(r); };
+const moonFloor = (x, z) => sstep(4.9, 5.1, x) * sstep(6.9, 6.7, x) * sstep(0.5, 0.7, z) * sstep(2.3, 2.1, z);
+const up = new THREE.Vector3(0, 1, 0), down = new THREE.Vector3(0, -1, 0), v3 = new THREE.Vector3();
+
+const maps = { GW: NX, GH: NZ, L };
+maps.floorLM = planMap((x, z) => { const p = v3.set(x, 0, z), E = lampE(S, 9, p, up), Ef = lampE(F, 6, p, up); return [enc(E * 1.0), enc(E * 0.82), enc(E * 0.64), lin(Ef)]; });
+maps.floorAux = planMap((x, z) => [255 * moonFloor(x, z), 0, 255, 255]);
+maps.ceilLM = planMap((x, z) => { const p = v3.set(x, WALL, z), E = 1.2 / (1 + ((x - S.x) ** 2 + (z - S.z) ** 2) / 1.5), Ef = 1.4 / (1 + ((x - F.x) ** 2 + (z - F.z) ** 2)); return [enc(E), enc(E * 0.85), enc(E * 0.7), lin(Ef)]; });
+maps.ceilAux = planMap(() => [0, 0, 255, 255]);
+maps.flickId = img(NX, NZ, x => [x >= 2 ? 1 : 0, 0, 0, 255]);
+// wall atlas: 2 x 2 cells of 32 px: north, east / south, west; cell u along the wall (x0 -> x1), v up
+const WALLS = [
+  { p0: [0, 0], p1: [W, 0], n: [0, 1], cell: [0, 0] }, { p0: [W, 0], p1: [W, H], n: [-1, 0], cell: [1, 0] },
+  { p0: [W, H], p1: [0, H], n: [0, -1], cell: [0, 1] }, { p0: [0, H], p1: [0, 0], n: [1, 0], cell: [1, 1] }];
+const wallCell = (x, y) => { const w = WALLS.find(q => q.cell[0] === (x >> 5) && q.cell[1] === (y >> 5)); return { w, cu: ((x & 31) + 0.5) / 32, cv: 1 - ((y & 31) + 0.5) / 32 }; };
+maps.wallLM = img(64, 64, (x, y) => { const { w, cu, cv } = wallCell(x, y), p = v3.set(w.p0[0] + (w.p1[0] - w.p0[0]) * cu, cv * WALL, w.p0[1] + (w.p1[1] - w.p0[1]) * cu).clone(), n = new THREE.Vector3(w.n[0], 0, w.n[1]);
+  p.addScaledVector(n, 0.02); const E = lampE(S, 9, p, n), Ef = lampE(F, 6, p, n); return [enc(E), enc(E * 0.82), enc(E * 0.64), lin(Ef)]; });
+maps.wallAux = img(64, 64, (x, y) => { const { w, cu, cv } = wallCell(x, y), moon = w.cell[0] === 0 && w.cell[1] === 0 ? sstep(0.53, 0.57, cu) * sstep(0.77, 0.73, cu) * sstep(0.08, 0.12, cv) * sstep(0.62, 0.58, cv) : 0;
+  return [230 * moon, 0, 255 * (0.5 + 0.5 * sstep(0, 0.12, cv) * sstep(1, 0.93, cv))]; });
+// the light field at 1.1 m: steady + flicker, main direction toward the steady lamp, moon in the window's beam
+maps.lf0 = planMap((x, z) => { const p = v3.set(x, 1.1, z), r2 = p.distanceToSquared(S), rf = p.distanceToSquared(F), E = 2.2 / (1 + r2 / 2), Ef = 3 / (1 + rf); return [enc(E), enc(E * 0.82), enc(E * 0.64), lin(Ef)]; });
+maps.lf1 = planMap((x, z) => { const d = S.clone().sub(v3.set(x, 1.1, z)).normalize(), moon = sstep(4.6, 5, x) * sstep(7.4, 7, x) * sstep(2.9, 2.5, z);
+  return [128 + 127 * d.x, 128 + 127 * d.z, 128 + 127 * d.y, 255 * moon]; });
+// the floor overlays (D1): wet patch, dust, a walked path with wear, corner shade; tileInfo: turned boards in the middle row, variant B
+maps.ovSurf = planMap((x, z) => { const wall = Math.min(x, z, W - x, H - z), path = sstep(2.8, 3.0, z) * sstep(3.6, 3.4, z) * sstep(0.3, 0.6, x) * sstep(8.7, 8.4, x);
+  return [255 * sstep(2.9, 3.3, x) * sstep(5.0, 4.6, x) * sstep(3.5, 3.9, z) * sstep(5.2, 4.8, z), 255 * Math.min(1, 0.55 + 0.4 * sstep(0.4, 0, wall)), 255 * path, 180 * path]; });
+maps.ovAlbedo = planMap((x, z) => { const s = 0.55 + 0.45 * sstep(0, 0.45, Math.min(x, z, W - x, H - z)); return [255 * s, 255 * s, 255 * s]; });
+maps.tileInfo = img(NX, NZ, (x, y) => [(x === 0 && y === 0) || (x === 3 && y === 2) || (x === 1 && y === 2) ? 255 : 0, y === 1 ? 255 : 0, 0, 255]);
+{ const n1 = noise(64, 7, 8), n2 = noise(64, 9, 6); maps.dustDetail = img(64, 64, (x, y) => { const v = 255 * (0.35 + 0.65 * n1(x, y)); return [v, v, v]; });
+  // (the wet edge as a loaded picture would come: an opaque image in a texture, which MatLib reads back to pack with the dust tile)
+  const c = document.createElement('canvas'); c.width = c.height = 64; c.getContext('2d').putImageData(img(64, 64, (x, y) => { const v = 255 * n2(x, y); return [v, v, v]; }), 0, 0);
+  maps.wetEdge = new THREE.CanvasTexture(c); }
+maps.dustCol = 0x7d766c;
+
+// surfaces (what the Blender kit will give): floor boards A and B, normal, orh (R AO, G roughness, B height); wall A|B atlas; ceiling
+const boardH = (() => { const g = noise(128, 3, 16); return (x, y) => { const u = (x + 0.5) / 128 * 6, f = u - Math.floor(u), b = Math.floor(u), v = ((y + 0.5) / 128 + b * 0.37) % 1;
+  return f < 0.035 || f > 0.965 || v < 0.012 ? 0 : 0.82 + 0.18 * g(x * 0.5, y * 4); }; })();
+const boardCol = (worn) => { const r = rng(5), tint = Array.from({ length: 6 }, () => 0.8 + 0.4 * r()), g = noise(128, 11, 32);
+  return img(128, 128, (x, y) => { const b = Math.floor((x + 0.5) / 128 * 6), h = boardH(x, y), gr = 0.85 + 0.3 * g(x * 0.3, y * 6), k = tint[b] * gr * (h === 0 ? 0.25 : 1) * (worn ? 1.3 : 1);
+    return worn ? [150 * k, 112 * k, 78 * k] : [118 * k, 74 * k, 42 * k]; }); };
+const tex = (im, srgb, rep) => { const t = MatLib.dataTexture(im, { srgb, repeat: rep !== false }); return t; };
+const floorA = tex(boardCol(false), true), floorB = tex(boardCol(true), true);
+const floorN = tex(normalFrom(128, 128, boardH, 6)), floorORH = tex(img(128, 128, (x, y) => [255, 120 + 60 * boardH(x, y), 255 * boardH(x, y)]));
+const wallHt = (x, y) => { const v = 1 - (y + 0.5) / 128, u = (x + 0.5) / 64;   // panel wainscot to 0.31 (0.93 m), rail at 0.31
+  if (v > 0.295 && v < 0.33) return 1; if (v < 0.295) return u > 0.1 && u < 0.9 && v > 0.04 && v < 0.25 ? 0.4 : 0.85; return 0.7; };
+const wallAB = tex(img(128, 128, (x, y) => { const B = x >= 64, u = ((x & 63) + 0.5) / 64, v = 1 - (y + 0.5) / 128, h = wallHt(x & 63, y);
+  if (v < 0.33) { const k = h === 1 ? 1.25 : h < 0.5 ? 0.8 : 1; return [96 * k, 62 * k, 40 * k]; }
+  const dia = Math.abs((u * 4) % 1 - 0.5) + Math.abs((v * 5) % 1 - 0.5) < 0.22, k = dia ? 0.78 : 1, st = B ? 1 - 0.35 * sstep(0.25, 0, Math.hypot(u - 0.4, v - 0.62)) : 1;
+  return [178 * k * st, 140 * k * st * (B ? 0.95 : 1), 136 * k * st * (B ? 0.85 : 1)]; }), true);
+const wallN = tex(normalFrom(64, 128, wallHt, 4)), wallORH = tex(img(64, 128, (x, y) => [255, wallHt(x, y) < 0.9 ? 150 : 225, 255 * wallHt(x, y)]));
+const ceilT = (() => { const g = noise(64, 21, 8); return tex(img(64, 64, (x, y) => { const k = 0.85 + 0.15 * g(x, y); return [205 * k, 198 * k, 186 * k]; }), true); })();
+const decalT = tex(img(64, 64, (x, y) => { const u = (x + 0.5) / 64, v = 1 - (y + 0.5) / 64;
+  let a = sstep(0.24, 0.2, Math.hypot(u - 0.5, (v - 0.36) * 1.1));
+  for (let f = 0; f < 5; f++) { const ang = -0.9 + f * 0.42, cx = 0.5 + Math.sin(ang) * 0.3, cy = 0.4 + Math.cos(ang) * 0.32; a = Math.max(a, sstep(0.075, 0.05, Math.hypot(u - cx, v - cy))); }
+  return [80, 26, 20, 230 * a]; }), true, false);
+const env = tex(img(32, 16, (x, y) => { const k = 1 - y / 15, win = Math.hypot(x - 8, y - 6) < 2.5 ? 3 : 1; return [10 * k * win + 4, 12 * k * win + 4, 24 * k * win + 6]; }), true, false);
+env.mapping = 303;
+const cookie = tex(img(64, 64, (x, y) => { const r = Math.hypot(x - 31.5, y - 31.5) / 32, v = 255 * sstep(1, 0.2, r) * (0.85 + 0.15 * Math.cos(r * 18)); return [v, v, v]; }), true, false);
+
+/* ---------- the room ---------- */
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, preserveDrawingBuffer: true });
+renderer.debug.checkShaderErrors = true;
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.2;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.setPixelRatio(1); renderer.setSize(640, 360, false);
+const gl = renderer.getContext();
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x020205); scene.fog = new THREE.Fog(0x020205, 1.5, 16);
+const camera = new THREE.PerspectiveCamera(70, 640 / 360, 0.05, 18); camera.position.set(1.0, 1.6, 6.3); camera.lookAt(6.0, 0.9, 1.8); scene.add(camera);
+// the game's fixed lights (C2): hemisphere, flashlight (shadow + cookie on md/hi), aura, exit light
+scene.add(new THREE.HemisphereLight(0x4a5a8a, 0x140c0c, 0.16));
+const flash = new THREE.SpotLight(0xffe0b0, 14, 22, 0.52, 0.55, 0.95); flash.position.set(0.2, -0.25, 0.1); flash.target.position.set(0.6, -0.9, -6);
+camera.add(flash); camera.add(flash.target);
+if (LV >= 1) { flash.castShadow = true; flash.shadow.mapSize.set(1024, 1024); flash.map = cookie; }
+const aura = new THREE.PointLight(0x8595c8, 1.2, 4.5, 1.4); camera.add(aura);
+const exitLight = new THREE.PointLight(0x50ff90, 0, 9, 1.3); exitLight.position.set(4, 1, 1); scene.add(exitLight);
+
+function Geo() {
+  const P = [], N = [], A = [], B = [], I = [];
+  return { quad(ps, n, uv0, uv1) { const b = P.length / 3; ps.forEach((p, k) => { P.push(...p); N.push(...n); A.push(...uv0[k]); B.push(...uv1[k]); }); I.push(b, b + 1, b + 2, b, b + 2, b + 3); },
+    build() { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(A, 2)); g.setAttribute('uv1', new THREE.Float32BufferAttribute(B, 2)); g.setIndex(I); return g; } };
+}
+const mats = {};
+mats.floor = MatLib.floorMaterial({ map: floorA, mapB: floorB, normalMap: floorN, orh: floorORH, env, GW: NX, GH: NZ, color: 0xe0d8d0 });
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, H), mats.floor); floor.rotation.x = -Math.PI / 2; floor.position.set(W / 2, 0, H / 2); floor.receiveShadow = true; scene.add(floor);
+mats.ceil = MatLib.ceilingMaterial({ map: ceilT });
+{ const g = Geo(), c = [[0, 0], [W, 0], [W, H], [0, H]];
+  g.quad(c.map(([x, z]) => [x, WALL, z]), [0, -1, 0], c.map(([x, z]) => [x / L, z / L]), c.map(([x, z]) => [x / W, 1 - z / H]));
+  const ceil = new THREE.Mesh(g.build(), mats.ceil); ceil.receiveShadow = true; scene.add(ceil); }
+// walls: one face per tile, uv0 = the variant trick, uv1 = the wall's atlas cell; the south and west walls use a second wall material
+// made after the level's maps were set (as Arch makes the upper band / service walls), which must pick them up
+mats.wall = MatLib.wallMaterial({ map: wallAB, normalMap: wallN, orh: wallORH });
+const wallGeo = which => { const g = Geo();
+  for (const wi of which) { const w = WALLS[wi], len = Math.hypot(w.p1[0] - w.p0[0], w.p1[1] - w.p0[1]), n = Math.round(len / L);
+    for (let k = 0; k < n; k++) { const t0 = k / n, t1 = (k + 1) / n, at = t => [w.p0[0] + (w.p1[0] - w.p0[0]) * t, w.p0[1] + (w.p1[1] - w.p0[1]) * t];
+      const [ax, az] = at(t0), [bx, bz] = at(t1), varnt = (k + wi) % 2, cu = t => (w.cell[0] + t) / 2, cv = y => 1 - (w.cell[1] + 1 - y / WALL) / 2;
+      g.quad([[ax, 0, az], [bx, 0, bz], [bx, WALL, bz], [ax, WALL, az]], [w.n[0], 0, w.n[1]], [[0.5 * varnt, 0], [0.5 + 0.5 * varnt, 0], [0.5 + 0.5 * varnt, 1], [0.5 * varnt, 1]],
+        [[cu(t0), cv(0)], [cu(t1), cv(0)], [cu(t1), cv(WALL)], [cu(t0), cv(WALL)]]); } }
+  return g.build(); };
+const walls = new THREE.Mesh(wallGeo([0, 1]), mats.wall); walls.receiveShadow = walls.castShadow = true; scene.add(walls);
+// a decal on the north wall, 3 mm proud, with the wall's own uv1
+mats.decal = MatLib.decalMaterial({ map: decalT });
+{ const g = Geo(), q = [[1.2, 0.9], [1.8, 0.9], [1.8, 1.5], [1.2, 1.5]];
+  g.quad(q.map(([x, y]) => [x, y, 0.003]), [0, 0, 1], [[0, 0], [1, 0], [1, 1], [0, 1]], q.map(([x, y]) => [x / W / 2, 1 - (1 - y / WALL) / 2]));
+  scene.add(new THREE.Mesh(g.build(), mats.decal)); }
+// light-field objects: instanced boxes (Standard with instanceColor, and Lambert), a plain Lambert sphere, a skinned quad (glTF)
+mats.boxStd = MatLib.withLightField(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7 }));
+const boxes = new THREE.InstancedMesh(new THREE.BoxGeometry(0.7, 0.9, 0.7), mats.boxStd, 4), m4 = new THREE.Matrix4();
+[[1.0, 1.2, 0xb08868], [7.7, 3.2, 0xa0a8b0], [6.9, 2.4, 0xc8c0b8], [3.6, 0.7, 0x9a6050]].forEach(([x, z, c], i) => { boxes.setMatrixAt(i, m4.makeTranslation(x, 0.45, z)); boxes.setColorAt(i, new THREE.Color(c)); });
+if (LV >= 1) boxes.castShadow = true;
+boxes.receiveShadow = true; scene.add(boxes);
+mats.boxLam = MatLib.withLightField(new THREE.MeshLambertMaterial({ color: 0x8a9a7a }));
+const boxes2 = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 1.2, 0.5), mats.boxLam, 2);
+boxes2.setMatrixAt(0, m4.makeTranslation(8.4, 0.6, 1.0)); boxes2.setMatrixAt(1, m4.makeTranslation(0.6, 0.6, 3.2)); scene.add(boxes2);
+mats.sphere = new THREE.MeshLambertMaterial({ color: 0xd0c8c0 });
+const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.35, 24, 16), mats.sphere); sphere.position.set(3.4, 0.4, 1.4); scene.add(sphere);
+MatLib.withLightField(sphere);
+// emissive bulbs (steady, flickering group 0, dead) and their glows: one Points draw
+const bulbs = MatLib.emissiveMesh(new THREE.SphereGeometry(0.07, 12, 8), 3), warm = new THREE.Color(1, 0.78, 0.55);
+MatLib.setEmissive(bulbs, 0, m4.makeTranslation(S.x, S.y, S.z), warm.clone().multiplyScalar(4), null);
+MatLib.setEmissive(bulbs, 1, m4.makeTranslation(F.x, F.y, F.z), new THREE.Color(1, 0.7, 0.45).multiplyScalar(4), 0);
+MatLib.setEmissive(bulbs, 2, m4.makeTranslation(D.x, D.y, D.z), warm.clone().multiplyScalar(0.03), null);
+scene.add(bulbs);
+const glows = MatLib.glowPoints([{ pos: S, color: [1, 0.78, 0.55], size: 0.5 }, { pos: F, color: [1, 0.7, 0.45], size: 0.4, group: 0 }, { pos: D, color: [0, 0, 0], size: 0.3 }]);
+scene.add(glows);
+
+function skinnedQuad() {   // a minimal skinned glTF (one joint) built in memory: her and teammates are skinned meshes
+  const buf = new ArrayBuffer(252), f = new Float32Array(buf), u8 = new Uint8Array(buf), u16 = new Uint16Array(buf);
+  f.set([-0.4, 0, 0, 0.4, 0, 0, 0.4, 1.6, 0, -0.4, 1.6, 0], 0); f.set([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1], 12);
+  f.set([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], 24); f.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], 40);
+  u8.fill(0, 224, 240); u16.set([0, 1, 2, 0, 2, 3], 120);
+  let s = ''; for (const b of new Uint8Array(buf)) s += String.fromCharCode(b);
+  const bv = (o, l) => ({ buffer: 0, byteOffset: o, byteLength: l });
+  const json = { asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [0, 1] }], nodes: [{ mesh: 0, skin: 0, name: 'Quad' }, { name: 'Bone' }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1, WEIGHTS_0: 2, JOINTS_0: 4 }, indices: 5, material: 0 }] }],
+    materials: [{ pbrMetallicRoughness: { baseColorFactor: [0.75, 0.5, 0.55, 1], metallicFactor: 0, roughnessFactor: 0.8 } }],
+    skins: [{ joints: [1], inverseBindMatrices: 3 }], buffers: [{ byteLength: 252, uri: 'data:application/octet-stream;base64,' + btoa(s) }],
+    bufferViews: [bv(0, 48), bv(48, 48), bv(96, 64), bv(160, 64), bv(224, 16), bv(240, 12)],
+    accessors: [{ bufferView: 0, componentType: 5126, count: 4, type: 'VEC3', min: [-0.4, 0, 0], max: [0.4, 1.6, 0] }, { bufferView: 1, componentType: 5126, count: 4, type: 'VEC3' },
+      { bufferView: 2, componentType: 5126, count: 4, type: 'VEC4' }, { bufferView: 3, componentType: 5126, count: 1, type: 'MAT4' },
+      { bufferView: 4, componentType: 5121, count: 4, type: 'VEC4' }, { bufferView: 5, componentType: 5123, count: 6, type: 'SCALAR' }] };
+  return new Promise((ok, no) => new THREE.GLTFLoader().parse(JSON.stringify(json), '', ok, no));
+}
+
+/* ---------- measuring ---------- */
+const POINTS = { steadyFloor: [2.6, 0, 2.7], flickFloor: [8.1, 0, 4.4], moonFloor: [5.7, 0, 1.4], steadyOnly: [2.0, 0, 3.9], boxSteady: [1.0, 0.9, 1.2],
+  boxFlick: [7.7, 0.45, 3.56], boxMoon: [6.9, 0.45, 2.76], wallFlick: [8.995, 1.2, 4.2], wallMoon: [5.8, 1.0, 0.0], wallSteady: [2.9, 1.6, 0.0], ceiling: [2.8, 3.0, 2.6], bulbSteady: [S.x, S.y, S.z], bulbFlick: [F.x, F.y, F.z] };
+function screen(p) { const v = new THREE.Vector3(...p).project(camera); return [Math.round((v.x + 1) / 2 * 640), Math.round((1 - v.y) / 2 * 360), v.z < 1 && Math.abs(v.x) < 1 && Math.abs(v.y) < 1]; }
+function measure() {
+  renderer.render(scene, camera);
+  const out = {}, b = new Uint8Array(5 * 5 * 4);
+  for (const k in POINTS) { const [x, y] = screen(POINTS[k]); gl.readPixels(x - 2, 360 - 1 - y - 2, 5, 5, gl.RGBA, gl.UNSIGNED_BYTE, b);
+    let s = 0; for (let i = 0; i < 25; i++) s += 0.2126 * b[i * 4] + 0.7152 * b[i * 4 + 1] + 0.0722 * b[i * 4 + 2]; out[k] = Math.round(s / 25 * 10) / 10; }
+  return out;
+}
+function programInfo() {
+  const T = new Set([gl.SAMPLER_2D, gl.SAMPLER_CUBE, gl.SAMPLER_2D_SHADOW, gl.SAMPLER_3D, gl.SAMPLER_2D_ARRAY, gl.SAMPLER_2D_ARRAY_SHADOW, gl.SAMPLER_CUBE_SHADOW,
+    gl.INT_SAMPLER_2D, gl.UNSIGNED_INT_SAMPLER_2D]);
+  return renderer.info.programs.map(p => { const pr = p.program, n = gl.getProgramParameter(pr, gl.ACTIVE_UNIFORMS); let samplers = 0;
+    for (let i = 0; i < n; i++) { const u = gl.getActiveUniform(pr, i); if (T.has(u.type)) samplers += u.size; }
+    const key = String(p.cacheKey), fam = ['mlFloor1', 'mlCeil1', 'mlWall1', 'mlDecal1', 'mlEmit1'].find(f => key.includes(f)) || (key.includes('|mlLF1') ? 'lightField' : p.name);
+    return { name: p.name, family: fam, lf: key.includes('|mlLF1'), linked: !!gl.getProgramParameter(pr, gl.LINK_STATUS), log: (gl.getProgramInfoLog(pr) || '').trim().slice(0, 400), samplers }; });
+}
+function probe(t, alpha) {   // read one texel back through a ShaderMaterial (no colour conversion when drawing into a target)
+  const rt = new THREE.WebGLRenderTarget(4, 4), sc = new THREE.Scene();
+  const m = new THREE.ShaderMaterial({ uniforms: { t: { value: t } }, vertexShader: 'void main() { gl_Position = vec4( position.xy, 0.0, 1.0 ); }',
+    fragmentShader: 'uniform sampler2D t; void main() { vec4 c = texture2D( t, vec2( 0.5 ) ); gl_FragColor = ' + (alpha ? 'vec4( vec3( c.a ), 1.0 )' : 'vec4( c.rgb, 1.0 )') + '; }' });
+  const q = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m); q.frustumCulled = false; sc.add(q);
+  renderer.setRenderTarget(rt); renderer.render(sc, camera); renderer.setRenderTarget(null);
+  const px = new Uint8Array(64); renderer.readRenderTargetPixels(rt, 0, 0, 4, 4, px);
+  rt.dispose(); m.dispose(); q.geometry.dispose();
+  return [px[0], px[1], px[2], px[3]];
+}
+
+// camera presets: the room, and close grazing views of the floor (wet patch, path, turned boards) and of a wall panel (parallax)
+const VIEWS = { main: [[1.0, 1.6, 6.3], [6.0, 0.9, 1.8]], floor: [[2.3, 0.5, 5.7], [4.3, 0.0, 3.8]], wall: [[5.0, 0.5, 1.1], [6.2, 0.42, 0.0]] };
+window.view = name => { const [p, t] = VIEWS[name]; camera.position.set(...p); camera.lookAt(...t); renderer.render(scene, camera);
+  return { programs: renderer.info.programs.length, errors: ERR.length }; };
+// materials and maps over a level's life: clones, copies, replaced maps, tier names, a bake without GW / GH (leaves the room as it was)
+function lifecycle() {
+  const o = {}, key = m => { const p = renderer.properties.get(m).currentProgram; return p ? String(p.cacheKey) : ''; };
+  const lfCount = m => (key(m).match(/\|mlLF1/g) || []).length;
+  // the light field survives clone(), and a copy made without clone() (which keeps userData but not the patch) can be patched again
+  const lf = MatLib.withLightField(new THREE.MeshStandardMaterial({ color: 0x888888 }));
+  const lfc = { clone: lf.clone(), copy: MatLib.withLightField(new THREE.MeshStandardMaterial().copy(lf)),
+    twice: MatLib.withLightField(MatLib.withLightField(new THREE.MeshLambertMaterial()).clone()), again: MatLib.withLightField(lf) };
+  // the wall atlas without mipmaps (cells would bleed into each other)
+  o.atlasNoMips = ['wallLM', 'wallAux'].map(k => { const t = MatLib.maps()[k]; return !!t && t.generateMipmaps === false && t.minFilter === 1006; });
+  // level-sized maps (LightBaker md) replace the room's: the old textures leave every bag; then cloning a wall / floor is quick, keeps
+  // the family's program, and its bag holds textures only
+  const old = Object.assign({}, MatLib.maps()), n0 = mats.wall.userData.disposables.length, big = (w, h) => ({ w, h, data: new Uint8ClampedArray(w * h * 4) });
+  MatLib.setLevelMaps({ wallLM: big(2048, 1024), wallAux: big(2048, 1024), floorLM: big(1024, 768), lf0: big(512, 384) });
+  o.bags = { wallSame: mats.wall.userData.disposables.length === n0,
+    noStale: Object.values(mats).every(m => !m.userData.disposables || !['wallLM', 'wallAux', 'floorLM', 'lf0'].some(k => m.userData.disposables.includes(old[k]))) };
+  let t0 = performance.now();
+  const wc = mats.wall.clone(), fc = mats.floor.clone();
+  o.cloneMs = Math.round((performance.now() - t0) * 10) / 10;
+  o.cloneBag = [wc, fc].every(m => Array.isArray(m.userData.disposables) && m.userData.disposables.every(t => t && t.isTexture && typeof t.dispose === 'function'));
+  o.cloneDefines = !!fc.defines && 'ML_MAPB' in fc.defines && 'ML_TILEINFO' in fc.defines && (LV === 2) === ('ML_POM' in fc.defines);
+  o.cloneOwnU = fc.userData.mlUniforms.uPomDepth !== mats.floor.userData.mlUniforms.uPomDepth && fc.userData.mlUniforms.uPomDepth.value === mats.floor.userData.mlUniforms.uPomDepth.value;
+  // a copy of a family material made without clone() lost its patch: withLightField leaves it alone (and says so)
+  const w0 = WARN.length, famCopy = MatLib.withLightField(new THREE.MeshStandardMaterial().copy(mats.floor));
+  o.famCopy = !Object.prototype.hasOwnProperty.call(famCopy, 'onBeforeCompile') && WARN.slice(w0).some(s => /lost its patch/.test(s));
+  const em = bulbs.material.clone(), gm = glows.material.clone();
+  o.emitClone = em.customProgramCacheKey() === 'mlEmit1' && Object.prototype.hasOwnProperty.call(em, 'onBeforeCompile') && !!em.defaultAttributeValues.mlGroup;
+  o.glowClone = gm.uniforms.uLampK === U.uLampK && gm.uniforms.uFlick === U.uFlick;
+  // compile them all (off to one side): no new program for the clones of the room's families
+  const p0 = renderer.info.programs.length, extra = [];
+  const add = (geo, m, x) => { const me = new THREE.Mesh(geo, m); me.position.set(x, 0.5, -20); scene.add(me); extra.push(me); };
+  add(walls.geometry, wc, 0); add(floor.geometry, fc, 3);
+  Object.values(lfc).forEach((m, i) => add(new THREE.BoxGeometry(0.3, 0.3, 0.3), m, 6 + i));
+  renderer.compile(scene, camera);
+  o.lf = Object.fromEntries(Object.entries(lfc).map(([k, m]) => [k, lfCount(m)]));
+  o.wallCloneKey = key(wc).includes('mlWall1'); o.floorCloneKey = key(fc).includes('mlFloor1');
+  o.cloneProgramsShared = renderer.properties.get(wc).currentProgram === renderer.properties.get(mats.wall).currentProgram
+    && renderer.properties.get(fc).currentProgram === renderer.properties.get(mats.floor).currentProgram;
+  // uPlan: reset with the level; a bake result without GW / GH takes the game's GW, GH (and its moonDir), and warns when there are none
+  const moon0 = U.uMoonDir.value.clone();
+  MatLib.releaseLevel();
+  o.planReset = U.uPlan.value.x === 1 && U.uPlan.value.y === 1;
+  const w1 = WARN.length; MatLib.setLevelMaps({ lf0: maps.lf0 });
+  o.planWarn = WARN.slice(w1).some(s => /uPlan/.test(s));
+  window.GW = 5; window.GH = 2;
+  MatLib.setLevelMaps({ lf0: maps.lf0, moonDir: [0, -1, 0] });
+  delete window.GW; delete window.GH;
+  o.planGlobal = Math.abs(U.uPlan.value.x - 1 / (5 * 2.25)) < 1e-6 && Math.abs(U.uPlan.value.y - 1 / (2 * 2.25)) < 1e-6;
+  o.moonDir = U.uMoonDir.value.toArray().map(v => Math.round(v * 1000) / 1000);
+  MatLib.setMoon(moon0); MatLib.setLevelMaps(maps);
+  o.cloneFollows = wc.lightMap === MatLib.maps().wallLM && fc.lightMap === MatLib.maps().floorLM && wc.userData.disposables.includes(MatLib.maps().wallLM);
+  // asset-tier names, and an unknown tier warns
+  const w2 = WARN.length, tm = { hi: MatLib.wallMaterial({ tier: 'hi' }), md: MatLib.wallMaterial({ tier: 'md' }), lo: MatLib.wallMaterial({ tier: 'lo' }), HIGH: MatLib.wallMaterial({ tier: 'HIGH' }), ultra: MatLib.wallMaterial({ tier: 'ultra' }) };
+  o.tiers = Object.fromEntries(Object.entries(tm).map(([k, m]) => [k, m.type.replace('Mesh', '').replace('Material', '') + (m.defines && 'ML_POM' in m.defines ? '+pom' : '')]));
+  o.tierWarn = WARN.slice(w2).some(s => /unknown tier "ultra"/.test(s));
+  // a material's repeat copy of a kit texture is the material's own (E5 skips textures tagged kit)
+  const kt = MatLib.dataTexture(img(8, 8, () => [128, 128, 128]), {}); kt.userData.kit = true;
+  const km = MatLib.floorMaterial({ map: kt, GW: 5, GH: 4 });
+  o.repOwned = km.map !== kt && !km.map.userData.kit && km.map.userData.mlOwned === true && km.userData.disposables.includes(km.map);
+  // clean up: the extra materials go, their programs with them
+  extra.forEach(me => scene.remove(me));
+  for (const m of [wc, fc, em, gm, lf, ...Object.values(lfc), ...Object.values(tm), km]) m.dispose();
+  km.map.dispose(); kt.dispose();   // (km's bag also holds the live level maps, which stay)
+  renderer.render(scene, camera);
+  o.programsBack = renderer.info.programs.length;
+  o.programsBefore = p0;
+  return o;
+}
+
+async function run() {
+  const R = { tier: TIER };
+  const gltf = await skinnedQuad(); gltf.scene.position.set(7.4, 0, 1.0); scene.add(gltf.scene);
+  MatLib.withLightField(gltf.scene);
+  let skinned = null; gltf.scene.traverse(o => { if (o.isSkinnedMesh) skinned = o; });
+  R.skinned = !!skinned;
+  // the level's maps arrive after the materials (E2 order); then a late material picks them up
+  MatLib.setLevelMaps(maps);
+  MatLib.setFlick([1], [[1, 0.7, 0.45]]);
+  mats.wall2 = MatLib.wallMaterial({ map: wallAB, normalMap: wallN, orh: wallORH, variant: false });
+  const walls2 = new THREE.Mesh(wallGeo([2, 3]), mats.wall2); scene.add(walls2);
+  // (lf0, lf1 and flickId name no family: a floor or wall made later must still hold them for disposal)
+  R.lateLightMap = mats.wall2.lightMap === MatLib.maps().wallLM && ['wallLM', 'wallAux', 'lf0', 'lf1', 'flickId'].every(k => mats.wall2.userData.disposables.includes(MatLib.maps()[k]));
+  R.types = Object.fromEntries(Object.entries(mats).map(([k, m]) => [k, m.type]));
+
+  const t0 = performance.now();
+  renderer.compile(scene, camera);          // (every material, seen or not)
+  renderer.render(scene, camera);
+  R.compileMs = Math.round(performance.now() - t0);
+  R.programs = renderer.info.programs.length;
+  R.progs = programInfo();
+  R.maxUnits = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
+  R.maxFragUniforms = gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS);
+  R.drawCalls = renderer.info.render.calls;
+  say(`${TIER}: ${R.programs} programs, compile ${R.compileMs} ms`);
+
+  // per-frame changes are uniform writes: the picture changes, the programs don't (H13)
+  const versions = () => Object.values(mats).map(m => m.version).join();
+  const v0 = versions();
+  flash.intensity = 0; aura.intensity = 0;
+  const S0 = {}; S0.base = measure();
+  U.uLampK.value = 0; S0.lampOff = measure(); U.uLampK.value = 1;
+  MatLib.setK(0.5, false, false); S0.lampHalf = measure();
+  MatLib.setK(1, true, false); S0.dark = measure(); MatLib.setK(1, false, false);
+  MatLib.setFlick([0]); S0.flickOff = measure(); MatLib.setFlick([1]);
+  U.uMoonK.value = 0; S0.moonOff = measure(); U.uMoonK.value = 1;
+  for (const m of [mats.floor, mats.ceil, mats.wall, mats.wall2, mats.decal]) m.lightMapIntensity = 3;
+  S0.lmi3 = measure();
+  for (const m of [mats.floor, mats.ceil, mats.wall, mats.wall2, mats.decal]) m.lightMapIntensity = 1;
+  S0.again = measure();
+  R.samples = S0;
+  R.programsAfterUniforms = renderer.info.programs.length;
+  R.versionsSame = versions() === v0;
+  R.frameFns = ['setK', 'setFlick', 'setTime'].map(n => MatLib[n].toString()).some(s => /needsUpdate|defines/.test(s)) ? 'touches needsUpdate/defines' : 'uniforms only';
+  R.visible = Object.fromEntries(Object.entries(POINTS).map(([k, p]) => [k, screen(p)[2]]));
+
+  // releasing the level frees MatLib's textures and puts stand-ins back, still without a recompile; then the maps again
+  const tex0 = renderer.info.memory.textures;
+  MatLib.releaseLevel(); renderer.render(scene, camera);
+  R.release = { before: tex0, after: renderer.info.memory.textures, standIn: U.uLF0.value !== null && !MatLib.maps().lf0, programs: renderer.info.programs.length };
+  MatLib.setLevelMaps(maps); renderer.render(scene, camera);
+  R.release.reset = renderer.info.programs.length;
+
+  // data textures: ImageData with alpha 0 (or 1) keeps its colour (no premultiplication, H14 / F3.6)
+  const one = (a, srgb) => MatLib.dataTexture(new ImageData(new Uint8ClampedArray([200, 100, 50, a, 200, 100, 50, a, 200, 100, 50, a, 200, 100, 50, a]), 2, 2), { srgb, nearest: true });
+  const t0a = one(0), t1a = one(1), tsrgb = one(0, true);
+  R.probe = { a0: probe(t0a), a1: probe(t1a), alpha0: probe(t0a, true)[0], srgb: probe(tsrgb) };
+  [t0a, t1a, tsrgb].forEach(t => t.dispose());
+  R.programsWithProbe = renderer.info.programs.length;
+
+  // parallax (High only, D7): with the floor and wall depth at 0, the close views must change on High and nowhere else
+  const grab = () => { const px = new Uint8Array(640 * 360 * 4); gl.readPixels(0, 0, 640, 360, gl.RGBA, gl.UNSIGNED_BYTE, px); return px; };
+  const changed = (a, b2) => { let n = 0; for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b2[i]) + Math.abs(a[i + 1] - b2[i + 1]) + Math.abs(a[i + 2] - b2[i + 2]) > 6) n++; return n; };
+  R.pom = {};
+  for (const [v, m] of [['floor', mats.floor], ['wall', mats.wall]]) {
+    const u = m.userData.mlUniforms.uPomDepth, d0 = u.value;
+    u.value = 0.04; window.view(v); const a = grab();          // (4 cm: a clear difference whatever the view)
+    u.value = 0; window.view(v); const b2 = grab(); u.value = d0;
+    R.pom[v] = changed(a, b2);
+  }
+  window.view('main');
+  R.life = lifecycle();
+  R.programsFinal = renderer.info.programs.length;
+  // the picture for the screenshot: flashlight on again
+  flash.intensity = 14; aura.intensity = 1.2;
+  renderer.render(scene, camera);
+  R.errors = ERR.slice(); R.warnings = WARN.slice();
+  say(JSON.stringify({ programs: R.programs, errors: R.errors.length, samples: R.samples.base }));
+  window.RESULT = R;
+}
+run().catch(e => { ERR.push('run failed: ' + (e && e.stack || e)); window.RESULT = { tier: TIER, failed: true, errors: ERR.slice(), warnings: WARN.slice() }; });
+</script>
+</body></html>
