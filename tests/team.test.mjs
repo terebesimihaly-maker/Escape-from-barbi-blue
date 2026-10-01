@@ -152,7 +152,8 @@ check(await until(A, id => team.pings.some(q => q.by === id && q.k === 'ghost'),
 const gp = await A.evaluate(id => { const q = team.pings.find(q => q.by === id), m = bb.monster; return Math.hypot(q.x - m.x, q.y - m.y); }, benId);
 check(gp < 5, 'right where she is', gp);
 check(await until(B, () => !!achieved.ghost, null, 10000), '"From beyond" for Ben');
-check(await B.evaluate(() => team.warnCool > 25 && document.getElementById('warnBtn').disabled), 'then the button waits 30 seconds');
+check(await B.evaluate(() => WARN_COOL === 30 && team.warnCool > 0 && team.warnCool <= 30 && document.getElementById('warnBtn').disabled), 'then the button waits 30 seconds',
+  await B.evaluate(() => team.warnCool));   // (counting down: how far, depends on how fast this machine draws)
 await A.evaluate(() => { team.pings = []; });
 await B.evaluate(() => { team.warnCool = 0; warnTeam(); });          // (his own game let him: the host still says no)
 await A.waitForTimeout(2000);
