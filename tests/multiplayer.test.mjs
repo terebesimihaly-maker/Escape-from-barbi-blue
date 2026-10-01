@@ -39,7 +39,8 @@ check(await A.evaluate(() => bb.state) === 'lobby', 'no start while Cara is not 
 check(/2 of 3 ready/.test(await text(C, 'lbStatus')), 'status shows 2 of 3 ready', await text(C, 'lbStatus'));
 await click(C, '#lbReady');
 check(await until(C, () => /Starting in/.test(document.getElementById('lbStatus').textContent), null, 5000), 'countdown starts when everyone is ready');
-const started = await Promise.all([A, B, C].map(P => until(P, () => bb.state === 'play' && bb.MP.inGame, null, 20000)));
+// (60 s: each page's first frame in the house builds all its shaders, which software rendering does slowly and one page at a time)
+const started = await Promise.all([A, B, C].map(P => until(P, () => bb.state === 'play' && bb.MP.inGame, null, 60000)));
 check(started.every(Boolean), 'the game starts for all 3 players', started);
 const grids = await Promise.all([A, B, C].map(P => P.evaluate(() => bb.grid.map(r => r.join('')).join('|'))));
 check(grids[0] === grids[1] && grids[1] === grids[2], 'everyone got the same house');
@@ -156,7 +157,7 @@ check(g2[0] === g2[1] && g2[1] === g2[2], 'floor 2 is the same house for everyon
 console.log('== game over');
 await freeze();
 for (const id of [ids.A, Bid, Cid]) { await A.evaluate(id => bb.downPlayer({ id }, 'test'), id); await A.waitForTimeout(300); }
-check((await Promise.all([A, B, C].map(P => until(P, () => !document.getElementById('dead').classList.contains('hidden') && /EVERYONE/.test(document.getElementById('dTitle').textContent), null, 30000)))).every(Boolean), 'everyone down: "SHE GOT EVERYONE" for all');
+check((await Promise.all([A, B, C].map(P => until(P, () => !document.getElementById('dead').classList.contains('hidden') && /EVERYONE/.test(document.getElementById('dTitle').textContent), null, 60000)))).every(Boolean), 'everyone down: "SHE GOT EVERYONE" for all');
 await B.screenshot({ timeout: 120000, path: OUT + '/game_over.png' });
 await click(B, '#retry');
 check(await until(B, () => !document.getElementById('lobby').classList.contains('hidden') && /0 of 3 ready/.test(document.getElementById('lbStatus').textContent), null, 10000), 'back in the lobby, nobody is ready yet', await text(B, 'lbStatus'));
