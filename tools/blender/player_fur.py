@@ -15,7 +15,7 @@ def angles(p):
 def sph_uv(p):
     az, el = angles(p); return [0.5 + az / 360, (el - hair_textures2.EL0) / (hair_textures2.EL1 - hair_textures2.EL0)]
 
-def build_fur(arm, name, height, lean, flow, margin=6, tile=0.014, keep=None, mat=None, region=None, head_uv=False):
+def build_fur(arm, name, height, lean, flow, margin=13, tile=0.014, keep=None, mat=None, region=None, head_uv=False):
     """height: how long the hairs stand (m); lean: how far along the flow their tips are from their roots (m);
     flow(p): which way the hair grows at p (any vector: only its part along the scalp counts); keep(p): which faces get hair
     region(p): instead of the scalp, these faces of the head (facial hair); head_uv: UV0 is then the head's own layout (the face

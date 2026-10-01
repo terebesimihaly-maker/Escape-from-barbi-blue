@@ -278,7 +278,5 @@ def drape_all(bodies):
         bm.normal_update()
         keep_out(bm, trees_of, 0.004, ax)                      # (after smoothing: the body never shows through)
         bm.normal_update(); bm.to_mesh(o.data); bm.free()
-        m = o.modifiers.new('dec', 'DECIMATE'); m.ratio = min(1.0, 7000 / len(o.data.vertices))   # (back down to a size a phone can draw)
-        with bpy.context.temp_override(object=o, active_object=o): bpy.ops.object.modifier_move_to_index(modifier=m.name, index=0)
-        with bpy.context.temp_override(object=o, active_object=o): bpy.ops.object.modifier_apply(modifier=m.name)
+        # (kept at full detail: the folds stay smooth)
         print('draped', name, len(o.data.vertices))

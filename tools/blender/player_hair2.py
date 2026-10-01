@@ -170,7 +170,7 @@ def build_hair(arm):
 
     # --- short: the top longer (4-5 cm), lying back over the fur at the sides, the front swept to one side
     rng = random.Random(21); K = Cards()
-    for layer, (n, off0, lift, wid, shade) in enumerate([(380, 0.004, 0.003, (0.014, 0.018), 0.7), (320, 0.0065, 0.004, (0.012, 0.016), 0.9), (240, 0.009, 0.004, (0.009, 0.012), 1.0)]):
+    for layer, (n, off0, lift, wid, shade) in enumerate([(560, 0.004, 0.003, (0.012, 0.016), 0.7), (460, 0.0065, 0.004, (0.01, 0.014), 0.9), (340, 0.009, 0.004, (0.008, 0.011), 1.0)]):
         for p in roots(n, rng, keep=lambda p, az, el: el > 18 + 10 * sm(60, 120, abs(az))):
             az, el = angles(p); top = sm(18, 55, el)
             L = (0.022 + 0.026 * top) * rng.uniform(0.85, 1.1)
@@ -181,7 +181,7 @@ def build_hair(arm):
 
     # --- bob: to the jaw, parted in the middle, a fringe to the eyebrows, the ends turned under a little
     rng = random.Random(22); K = Cards()
-    for layer, (n, off0, lift, wid, shade) in enumerate([(380, 0.003, 0.006, (0.021, 0.028), 0.62), (330, 0.0045, 0.012, (0.017, 0.023), 0.85), (260, 0.006, 0.017, (0.013, 0.018), 1.0)]):
+    for layer, (n, off0, lift, wid, shade) in enumerate([(680, 0.003, 0.006, (0.018, 0.024), 0.62), (600, 0.0045, 0.012, (0.015, 0.02), 0.85), (470, 0.006, 0.017, (0.012, 0.016), 1.0)]):
         for p in roots(n, rng):
             az, el = angles(p); side = 1 if p.x >= 0 else -1
             if abs(az) < 38 and el > 22:                    # (the fringe)
@@ -198,12 +198,12 @@ def build_hair(arm):
 
     # --- long: past the shoulders, parted in the middle, swept back off the face
     rng = random.Random(23); K = Cards()
-    for layer, (n, off0, lift, wid, shade) in enumerate([(360, 0.003, 0.006, (0.024, 0.03), 0.62), (320, 0.0045, 0.011, (0.019, 0.025), 0.85), (260, 0.006, 0.016, (0.014, 0.019), 1.0)]):
+    for layer, (n, off0, lift, wid, shade) in enumerate([(680, 0.003, 0.006, (0.02, 0.026), 0.62), (600, 0.0045, 0.011, (0.016, 0.022), 0.85), (500, 0.006, 0.016, (0.012, 0.017), 1.0)]):
         for p in roots(n, rng):
             az, el = angles(p); side = 1 if p.x >= 0 else -1
             d0 = from_part(p)
             if abs(az) < 50 and el > 14: d0 = tangent(p, Vector((side, 0.55, -0.15)))       # (the front: back over the temples)
-            pts = grow(p, d0, rng.uniform(0.42, 0.5), 10, lambda t, a=off0, b=lift: a + b * math.sin(min(1, t * 1.6) * math.pi * 0.5), grav=1.0, rng=rng,
+            pts = grow(p, d0, rng.uniform(0.42, 0.5), 14, lambda t, a=off0, b=lift: a + b * math.sin(min(1, t * 1.6) * math.pi * 0.5), grav=1.0, rng=rng,
                        wave=0.006, stop=lambda q, t: q.z < 1.13 + rng.uniform(-0.012, 0.012))
             K.add(pts, rng.uniform(*wid), rng, col=3 if layer == 0 else None, shade=shade, root_dark=0.7, taper=0.4)
     styles['HairLong'] = K.obj('HairLong', cards_m)
@@ -211,12 +211,14 @@ def build_hair(arm):
     # --- ponytail: the tail hanging from the tie (the hair on the head is the fur, combed back to it)
     rng = random.Random(24); K = Cards()
     spine = [G + Vector((0.004 * math.sin(i / 13 * 3), 0.022 + 0.032 * math.sin(i / 13 * 1.6), -0.25 * i / 13)) for i in range(14)]
-    for ring, (n, r0, wid, shade) in enumerate([(30, 0.004, 0.018, 0.6), (44, 0.009, 0.016, 0.82), (52, 0.014, 0.013, 1.0)]):
+    for ring, (n, r0, wid, shade) in enumerate([(40, 0.004, 0.014, 0.6), (62, 0.009, 0.012, 0.8), (80, 0.014, 0.0105, 0.92), (60, 0.018, 0.009, 1.0)]):
         for k in range(n):
-            a = k / n * 6.283 + rng.uniform(-0.12, 0.12); L = rng.uniform(0.78, 1.0); m = max(3, int(len(spine) * L)); pts = []
+            a = k / n * 6.283 + rng.uniform(-0.12, 0.12); L = rng.uniform(0.72, 1.0); m = max(3, int(len(spine) * L)); pts = []
+            ph, wv = rng.uniform(0, 6.28), rng.uniform(0.002, 0.004)          # (each strand waves a little of its own)
             for i in range(m):
                 t = i / (len(spine) - 1); r = r0 * (1.0 + 0.7 * math.sin(min(1, t * 2.2) * 2.4)) * (1 - 0.65 * t ** 2)
-                pts.append(spine[i] + Vector((math.cos(a) * r, math.sin(a) * r * 0.85, 0)))
+                aa = a + math.sin(ph + t * 5) * wv / max(r, 0.004)
+                pts.append(spine[i] + Vector((math.cos(aa) * r, math.sin(aa) * r * 0.85, 0)))
             K.add(pts, wid * rng.uniform(0.85, 1.1), rng, col=3 if ring == 0 else None, shade=shade, root_dark=0.7,
                   normal=lambda q, i, a=a: Vector((math.cos(a), math.sin(a), 0)), taper=0.5, out_n=lambda q, a=a: Vector((math.cos(a), math.sin(a), 0)))
     styles['HairPony'] = K.obj('HairPony', cards_m)
@@ -238,7 +240,7 @@ def build_hair(arm):
 
     # --- curly: curly locks springing up and out, to about the jaw, off the face
     rng = random.Random(26); K = Cards()
-    for layer, (n, off0, wid, shade, L0) in enumerate([(380, 0.005, (0.023, 0.03), 0.6, 0.07), (360, 0.012, (0.02, 0.025), 0.82, 0.08), (300, 0.02, (0.016, 0.02), 1.0, 0.085)]):
+    for layer, (n, off0, wid, shade, L0) in enumerate([(680, 0.005, (0.02, 0.026), 0.6, 0.07), (680, 0.012, (0.017, 0.022), 0.82, 0.08), (560, 0.02, (0.014, 0.018), 1.0, 0.085)]):
         for p in roots(n, rng):
             az, el = angles(p); out = (p - C).normalized()
             d0 = (out * 0.8 + from_crown(p) * 0.6 + UP * 0.25)

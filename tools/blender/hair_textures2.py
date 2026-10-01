@@ -104,7 +104,7 @@ def hairline(az):
     return pts[-1][1]
 
 EL0, EL1 = -55.0, 90.0                                               # (v = 0 at 55 degrees below the middle, 1 at the top)
-def scalp(path, W=1024, H=512, seed=12, sharp=False):
+def scalp(path, W=2048, H=1024, seed=12, sharp=False):
     """sharp: the outline only (for the extra layers of a buzz cut: hair stands a little above the scalp)"""
     rng = np.random.default_rng(seed); SS = 2                         # (drawn at twice the size, then made smaller: smooth hairs)
     big = Image.new('L', (W * SS, H * SS), 0); dc = Image.new('L', (W * SS, H * SS), 0)

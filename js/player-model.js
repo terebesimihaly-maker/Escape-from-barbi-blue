@@ -499,6 +499,18 @@ function furTexture(THREE) {
   img.src = 'textures/hair_fur.webp';
   return furUniform;
 }
+// the highlight hair has (Kajiya-Kay): a band across the strands, from the strand's direction (worked out per pixel from how
+// its texture coordinates run: hUV, and the direction along them: hDir), a bright one and a second one in the hair's colour a
+// little lower, only as strong as the light that actually reaches it
+const HAIR_SHEEN = (hUV, hDir, amount) => [
+  'vec3 hq0 = dFdx( -vViewPosition ), hq1 = dFdy( -vViewPosition );', 'vec2 hs0 = dFdx( ' + hUV + ' ), hs1 = dFdy( ' + hUV + ' );', 'vec2 hD = ' + hDir + ';',
+  'vec3 hN = normalize( normal ), hTu = cross( hq1, hN ) * hs0.x + cross( hN, hq0 ) * hs1.x, hTv = cross( hq1, hN ) * hs0.y + cross( hN, hq0 ) * hs1.y;',
+  'vec3 hB = normalize( hTu * hD.x + hTv * hD.y + 1e-6 );',
+  'vec3 hV = normalize( vViewPosition ), hL = normalize( vec3( 0.25, 0.75, 0.6 ) );',
+  'float hT1 = dot( hB, normalize( hL + hV ) ), hT2 = dot( hB, normalize( hL + hV + hN * 0.35 ) );',
+  'float hS = pow( max( 0.0, sqrt( max( 0.0, 1.0 - hT1 * hT1 ) ) ), 80.0 ) * 0.16 + pow( max( 0.0, sqrt( max( 0.0, 1.0 - hT2 * hT2 ) ) ), 20.0 ) * 0.1;',
+  'float hLit = dot( reflectedLight.directDiffuse + reflectedLight.indirectDiffuse, vec3( 0.3, 0.59, 0.11 ) ) / max( 0.05, dot( diffuseColor.rgb, vec3( 0.3, 0.59, 0.11 ) ) );',
+  'outgoingLight += sheenTint * hS * ' + amount + ' * clamp( hLit, 0.0, 2.0 ) * diffuseColor.a;'].join('\n');
 // hair cards: a neutral strand texture, cut out with soft edges (no sorting), lit like hair: besides the usual light, the
 // highlight that runs across the strands (Kajiya-Kay: from the strand's direction, the cards' UV v, worked out per pixel), a
 // bright one and a second one in the hair's own colour a little lower, only as strong as the light that actually reaches it
@@ -508,16 +520,7 @@ function hairCardMaterial(THREE, src, hair) {
   m.onBeforeCompile = sh => {
     sh.uniforms.sheenTint = { value: col.clone().lerp(new THREE.Color(0xffffff), 0.18) };
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 sheenTint;')
-      .replace('#include <opaque_fragment>', [
-        'vec3 hq0 = dFdx( -vViewPosition ), hq1 = dFdy( -vViewPosition );',
-        '#ifdef USE_MAP', 'vec2 hs0 = dFdx( vMapUv ), hs1 = dFdy( vMapUv );', '#else', 'vec2 hs0 = vec2( 0.0, 1.0 ), hs1 = vec2( 1.0, 0.0 );', '#endif',
-        'vec3 hN = normalize( normal ), hB = normalize( cross( hq1, hN ) * hs0.y + cross( hN, hq0 ) * hs1.y + 1e-6 );',   // (along the strand)
-        'vec3 hV = normalize( vViewPosition ), hL = normalize( vec3( 0.25, 0.75, 0.6 ) );',
-        'float hT1 = dot( hB, normalize( hL + hV ) ), hT2 = dot( hB, normalize( hL + hV + hN * 0.35 ) );',
-        'float hS = pow( max( 0.0, sqrt( max( 0.0, 1.0 - hT1 * hT1 ) ) ), 80.0 ) * 0.16 + pow( max( 0.0, sqrt( max( 0.0, 1.0 - hT2 * hT2 ) ) ), 20.0 ) * 0.1;',
-        'float hLit = dot( reflectedLight.directDiffuse + reflectedLight.indirectDiffuse, vec3( 0.3, 0.59, 0.11 ) ) / max( 0.05, dot( diffuseColor.rgb, vec3( 0.3, 0.59, 0.11 ) ) );',
-        'outgoingLight += sheenTint * hS * clamp( hLit, 0.0, 2.0 ) * diffuseColor.a;',
-        '#include <opaque_fragment>'].join('\n'));
+      .replace('#include <opaque_fragment>', '#ifdef USE_MAP\n' + HAIR_SHEEN('vMapUv', 'vec2( 0.0, 1.0 )', '1.0') + '\n#endif\n#include <opaque_fragment>');
   };
   m.customProgramCacheKey = () => 'haircard';
   return m;
@@ -526,17 +529,19 @@ function furMaterial(THREE, src, color, fill, many) {
   const m = new THREE.MeshStandardMaterial({ map: src.map, color, roughness: 0.72, metalness: 0 });
   const fu = furTexture(THREE);
   m.onBeforeCompile = sh => {
+    sh.uniforms.sheenTint = { value: color.clone().lerp(new THREE.Color(0xffffff), 0.25) };
     sh.uniforms.furMap = fu; sh.uniforms.furFill = { value: fill }; sh.uniforms.furMany = { value: many === undefined ? 1 : many }; sh.uniforms.furVar = { value: many === undefined ? 0.65 : many < 0.5 ? 0.35 : 0.7 };   // (scalp hair; stubble; beards and a buzz cut)
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float _layer;\nvarying float vLayer;\nvarying vec2 vFurRoot;\nvarying vec2 vFurTip;\n#ifndef USE_UV1\nattribute vec2 uv1;\n#endif\n#ifndef USE_UV2\nattribute vec2 uv2;\n#endif')
       .replace('#include <uv_vertex>', '#include <uv_vertex>\nvLayer = _layer; vFurRoot = uv1; vFurTip = uv2;');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D furMap;\nuniform float furFill;\nuniform float furMany;\nuniform float furVar;\nvarying float vLayer;\nvarying vec2 vFurRoot;\nvarying vec2 vFurTip;')
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 sheenTint;\nuniform sampler2D furMap;\nuniform float furFill;\nuniform float furMany;\nuniform float furVar;\nvarying float vLayer;\nvarying vec2 vFurRoot;\nvarying vec2 vFurTip;')
       .replace('#include <map_fragment>', [
         '#ifdef USE_MAP', 'float dens = texture2D( map, vMapUv ).a;', '#else', 'float dens = 1.0;', '#endif',
         'vec4 fr = texture2D( furMap, mix( vFurRoot, vFurTip, vLayer ) );',
         'float hh = fr.a * step( fract( fr.r * 17.0 ), dens * furMany ) * ( 0.45 + 0.55 * smoothstep( 0.2, 0.9, dens ) );',   // (fewer and shorter hairs at the hairline)
         'if ( vLayer < 0.001 ) { if ( hh < 0.04 && ( dens < 0.92 || furFill < 0.5 ) ) discard; }',   // (the scalp: the hairs\' roots; covered between them too where the hair is thick)
         'else if ( hh < vLayer * 0.97 + 0.02 ) discard;',
-        'diffuseColor.rgb *= ( 1.0 - furVar * 0.75 + furVar * fr.r ) * mix( 0.5, 1.05, vLayer );'].join('\n'));   // (darker down among the roots)
+        'diffuseColor.rgb *= ( 1.0 - furVar * 0.75 + furVar * fr.r ) * mix( 0.5, 1.05, vLayer );'].join('\n'))   // (darker down among the roots)
+      .replace('#include <opaque_fragment>', HAIR_SHEEN('vFurRoot', 'normalize( vFurTip - vFurRoot + vec2( 0.0, 1e-5 ) )', '( 0.4 + 0.6 * vLayer )') + '\n#include <opaque_fragment>');
   };
   m.customProgramCacheKey = () => 'fur';
   return m;
