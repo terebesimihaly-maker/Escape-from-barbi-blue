@@ -368,7 +368,7 @@ def _flat(name, v):
     im.colorspace_settings.name = 'Non-Color'; return im
 def _white(): return _flat('kit_white', 1.0)
 
-def aged(m, col, rough, h, up_dust=0.5, grime=0.7, edge_wear=0.0, wear_col=None, wear_rough=0.6):
+def aged(m, col, rough, h, up_dust=0.5, grime=0.7, edge_wear=0.0, wear_col=None, wear_rough=0.6, dust_col=(0.27, 0.25, 0.215)):
     """the life a piece has had, over any base: grime packed into every crevice (the baked cavity), edges and handled parts
        worn through to what is underneath (the baked edge map and the 'wear' attribute, broken up by noise), dust settled on whatever faces
        up and wasn't touched, fine scratches. Returns colour, roughness and height sockets."""
@@ -397,7 +397,7 @@ def aged(m, col, rough, h, up_dust=0.5, grime=0.7, edge_wear=0.0, wear_col=None,
     d = m.math('MULTIPLY', up, m.remap(m.math('ADD', dn, m.math('MULTIPLY', dn2, 0.5)), 0.55, 1.05, 0.25, 1.0))
     d = m.math('MULTIPLY', d, m.math('ADD', 0.55, m.math('MULTIPLY', m.remap(cav, 1.0, 0.6), 0.6)))
     d = m.math('MULTIPLY', m.math('MULTIPLY', d, m.math('SUBTRACT', 1.0, m.math('MULTIPLY', m.attr('wear'), 0.9))), up_dust)
-    col = m.mix(d, col, (0.30, 0.285, 0.26)); rough = m.mixf(d, rough, 0.93)
+    col = m.mix(d, col, dust_col); rough = m.mixf(d, rough, 0.93)
     return col, rough, h, worn
 
 def wood(name, species='beech', finish='varnish', stain=None, age=1.0, paint=None, chips=0.5):
@@ -429,7 +429,7 @@ def wood(name, species='beech', finish='varnish', stain=None, age=1.0, paint=Non
     if species == 'pine':                                   # knots
         kn = m.remap(m.voronoi(m.map(pos, (5, 5, 1.6)), 1.0, 'Distance'), 0.05, 0.015)
         col = m.mix(kn, col, (0.05, 0.022, 0.008))
-    col = m.hsv(col, m.remap(pr, 0, 1, 0.48, 0.52), m.remap(pr, 0, 1, 0.9, 1.1), m.remap(pr, 0, 1, 0.82, 1.12))
+    col = m.hsv(col, m.remap(pr, 0, 1, 0.47, 0.53), m.remap(pr, 0, 1, 0.85, 1.15), m.remap(pr, 0, 1, 0.74, 1.16))   # (no two parts cut from the same board)
     h = m.math('ADD', m.math('MULTIPLY', ring, 0.35), m.math('MULTIPLY', fib, 0.25))
     bare = m.hsv(col, 0.5, 0.75, 0.9)                       # (old bare wood: greyed, a little darker than fresh)
     rough = m.remap(fib, 0.3, 0.7, 0.62, 0.78)
@@ -437,7 +437,10 @@ def wood(name, species='beech', finish='varnish', stain=None, age=1.0, paint=Non
         # the stain takes its hue and saturation, the grain keeps its light and dark (multiplying warm by warm by warm would
         # end orange); then amber varnish, darkened with age
         wc = m.hsv(m.mix(1.0, col, lin(stain), 'COLOR'), 0.5, 1.0, 0.27) if stain else m.hsv(col, 0.5, 1.0, 0.75)
+        wc = m.mix(m.math('MULTIPLY', ring, 0.5), wc, m.hsv(wc, 0.5, 1.15, 0.5))         # (the latewood takes more stain: the figure shows through)
         vc = m.mix(1.0, wc, (0.92, 0.8, 0.62), 'MULTIPLY')
+        fade = m.remap(m.noise(pos, 2.2, 3, 0.5), 0.45, 0.75, 0.0, 0.35 * age)              # (sun-faded, unevenly darkened clouds in the old finish)
+        vc = m.mix(fade, vc, m.hsv(vc, 0.5, 0.8, 1.35)); vc = m.mix(m.remap(m.noise(pos, 3.1, 3, 0.5), 0.5, 0.2, 0.0, 0.3 * age), vc, m.hsv(vc, 0.5, 1.1, 0.7))
         cr = m.voronoi(m.map(pos, (1, 1, 0.45)), 340, 'Distance', 'DISTANCE_TO_EDGE')   # crazing: a fine network of cracks
         crack = m.math('MULTIPLY', m.remap(cr, 0.035, 0.0), m.remap(m.noise(pos, 6, 3), 0.45, 0.65, 0.0, age))
         vc = m.mix(m.math('MULTIPLY', crack, 0.7), vc, m.hsv(vc, 0.5, 1.0, 0.35))
@@ -447,7 +450,7 @@ def wood(name, species='beech', finish='varnish', stain=None, age=1.0, paint=Non
         vc = m.mix(m.math('MULTIPLY', sc, 0.35), vc, m.hsv(bare, 0.5, 0.7, 0.85)); vr = m.mixf(sc, vr, 0.55)
         h = m.math('SUBTRACT', m.math('MULTIPLY', h, 0.35), m.math('ADD', m.math('MULTIPLY', crack, 0.25), m.math('MULTIPLY', sc, 0.3)))
         # half worn: thinned varnish lighter and more orange, then bare (and hand-darkened) wood
-        col, rough, h, worn = aged(m, vc, vr, h, up_dust=0.55 * age, grime=0.75, edge_wear=0.7, wear_col=m.mix(0.55, m.hsv(col, 0.5, 0.85, 0.5), (0.05, 0.032, 0.02)), wear_rough=0.45)
+        col, rough, h, worn = aged(m, vc, vr, h, up_dust=0.55 * age, grime=0.75, edge_wear=0.7, wear_col=m.mix(0.3, m.hsv(col, 0.5, 1.05, 0.95), (0.05, 0.032, 0.02)), wear_rough=0.45)   # (honey-coloured bare wood, hand-greyed a little)
     elif finish == 'paint':
         pc = lin(paint or '#e8dcc8')
         pn = m.noise(pos, 14, 4); pcol = m.mix(m.remap(pn, 0.3, 0.7, 0.0, 0.25), pc, (pc[0] * 0.82, pc[1] * 0.8, pc[2] * 0.74))   # (yellowed unevenly)

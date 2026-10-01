@@ -37,7 +37,7 @@
              wall material, for windows' wall parts), glassMat, skyMat (else Kit.reserved, else plain stand-ins), wallCells
              (LightBaker's, so windows' wall parts sample their face's lightmap cell; default: LightBaker.packAtlas of plan.faces),
              bakeTier, placeholders (use the manifest's grey stand-in nodes too; default Kit.placeholderArt = true), anim, shadows,
-             calm, evict (default true)
+             calm, evict (default true), windows (false: leave plan.windows to Arch.modules, which can place them too; one of the two)
      Kit.upgradeInPlace(level, plan?, opts?)         when a kit arrives after its floor was built with placeholders: swaps only what the
                                                      kit owns (level.kit, the wardrobes, the exit door, level.house.upgrade if any).
                                                      Never rebuilds: scares.doll, level.paintings and the boards stay. Returns the new R.
@@ -129,7 +129,8 @@ function prep(scene, tier) {
     u.kit = true; u.shared = true;
     if (!o.isMesh) return;
     o.castShadow = tier !== 'lo'; o.receiveShadow = true;
-    if (o.geometry && !o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    // (GLTFLoader pads a shape-keyed mesh's box by its largest key offset on every side; three's own box is the exact one)
+    if (o.geometry && (!o.geometry.boundingBox || o.geometry.morphAttributes.position)) o.geometry.computeBoundingBox();
     const ms = [].concat(o.material).map(m => {
       if (tier !== 'lo' || !m || !m.isMeshStandardMaterial || roleOf(m, nameOf(o))) return m;
       let l = lo.get(m); if (!l) { l = lambert(m); lo.set(m, l); } return l; });
@@ -193,7 +194,7 @@ function disposeScene(sc) {
   });
 }
 function dropFile(f) { if (f.state === 'done') disposeScene(f.scene); files.delete(f.key); }
-function dropKits(pred) { for (const [key, k] of kits) if (pred(k)) { for (const m of k.emitMats.values()) m.dispose(); kits.delete(key); } }
+function dropKits(pred) { for (const [key, k] of kits) if (pred(k)) { for (const m of k.emitMats.values()) m.dispose(); for (const g of k.extraGeo || []) g.dispose(); kits.delete(key); } }
 // throw a style's kits away, every tier ('common': the common pieces, and so every kit that holds them)
 function release(style) {
   let n = 0;
@@ -248,6 +249,14 @@ function primsOf(kit, name, still) {
   };
   walk(root, false);
   kit.prims.set(key, P); return P;
+}
+// a shape-keyed part (a curtain) at rest, for the instances: three can't draw an InstancedMesh whose geometry has morph targets but
+// no influences, so the instances get a copy without them (kept with the kit, like its other geometry)
+function still(kit, p) {
+  let q = kit.prims.get(p);
+  if (!q) { const g = p.geo.clone(); g.morphAttributes = {}; g.morphTargetsRelative = false; g.userData = Object.assign({}, g.userData, { kit: true, shared: true });
+    q = Object.assign({}, p, { geo: g, morph: false }); kit.prims.set(p, q); (kit.extraGeo || (kit.extraGeo = [])).push(g); }
+  return q;
 }
 // the light field (C5) on every kit material, once a kit is used (MatLib may not be loaded: then nothing)
 function lightField(kit) {
@@ -431,7 +440,7 @@ function furnish(level, plan, opts) {
       }
       if (p.morph && anim) { morphCopy(p, wm, info); return; }
       const key = name + '|' + k + '|' + ck;
-      let b = inst.get(key); if (!b) inst.set(key, b = { p, kind, name, mount, box: P.box, list: [] });
+      let b = inst.get(key); if (!b) inst.set(key, b = { p: p.morph ? still(kit, p) : p, kind, name, mount, box: P.box, list: [] });
       b.list.push({ m: wm, solid, item });
     });
     for (const pv of P.pivots) animCopy(pv, m, info, x.anim);
@@ -473,7 +482,7 @@ function furnish(level, plan, opts) {
       put('band', name, b.mount === 'corner' ? 'corner' : 'wall', place(b.x, (b.z0 || 0) - (def.z0 || 0), b.z, ry), { band: k, face: b.face, anim: def.anim });
     });
     /* windows: the frame and curtain instanced, the wall, glass and sky parts merged with the reserved materials */
-    (plan.windows || []).forEach((w, k) => {
+    if (o.windows !== false) (plan.windows || []).forEach((w, k) => {
       if (!ok(w.node)) return;
       const f = plan.faces && plan.faces[w.face], pos = w.pos || (f ? [(f.x0 + f.x1) / 2, 0, (f.z0 + f.z1) / 2] : null);
       if (!pos) return;
@@ -541,7 +550,8 @@ function furnish(level, plan, opts) {
   if (cords.length) {
     const im = new THREE.InstancedMesh(S.cyl, S.cord[tierMat], cords.length);
     cords.forEach((m, j) => im.setMatrixAt(j, m)); im.instanceMatrix.needsUpdate = true; im.computeBoundingBox(); im.computeBoundingSphere(); im.name = 'KitCords';
-    im.userData.kit = { kind: 'cord', mount: 'ceiling' }; G.add(im); R.owned.push(im);
+    im.userData.kit = { kind: 'cord', mount: 'ceiling', aabb: boxArr(new THREE.Box3(V(-0.006, 0, -0.006), V(0.006, 1, 0.006))), solid: cords.map(() => -1) };
+    G.add(im); R.owned.push(im);
   }
 
   let clock = 0;

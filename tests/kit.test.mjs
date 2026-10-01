@@ -113,7 +113,7 @@ for (let i = 0; i < 5; i++) for (const tier of TIERS) {
     const L = 2.25, cx = big ? (big.tx0 + big.tx1 + 1) / 2 * L : 1.5 * L, cz = big ? (big.ty0 + big.ty1 + 1) / 2 * L : 1.5 * L;
     const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(70, 16 / 9, 0.05, 18); sc.add(new THREE.HemisphereLight(0xffffff, 0x222222, 1)); sc.add(lv.group);
     let calls = 0, tris = 0;
-    for (let a = 0; a < 4; a++) { cam.position.set(cx, 1.62, cz); cam.rotation.set(0, a * Math.PI / 2, 0); cam.updateMatrixWorld(); renderer.render(sc, cam);
+    for (let a = 0; a < 4; a++) { cam.position.set(cx, 1.62, cz); cam.rotation.set(0, a * Math.PI / 2, 0); cam.updateMatrixWorld(); renderer.info.reset(); renderer.render(sc, cam);
       calls = Math.max(calls, renderer.info.render.calls); tris = Math.max(tris, renderer.info.render.triangles); }
     sc.remove(lv.group);
     const lights1 = __kt.lights(scene) + __kt.lights(lv.group);

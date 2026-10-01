@@ -33,10 +33,10 @@
                               -> {group, joints (each mitre or butt: the two meeting rings, for the tests)}
    Arch.beams(plan, opts)     plan.beams as boxes (joists, collar ties, truss ties, workshop timbers), posts and steel I-beams, split at
                               chunk lines; u = metres along / 2.25, v = round the section.
-   Arch.doorways(plan, kit, opts)  per plan.doorways entry the kit's Door_frame_<style> and two Door_leaf_<style> (the right one mirrored),
+   Arch.doorways(plan, kit, opts)  per plan.doorways entry the kit's Door_frame_<style> and two Door_leaf_<style> (both turned, never mirrored),
                               instanced per chunk on the kit's own geometry and materials (userData.shared / kit, H21), and a header
                               above 2.60 m up to the ceiling (skipped under 0.08 m) in the wall material. The leaves hang on the posts'
-                              inner faces at the lining's face on their swing side, their thickness on that side too, so a leaf's
+                              inner faces at the lining's face on their swing side, their thickness toward their side wall, so a leaf's
                               farthest point from its wall is 0.11 + cos(angle) m (0.42 at 72 degrees, 0.44 at the sway's 70.5): never in
                               the walkway (H11). Pinned leaves stand at 90 degrees, a long board's doorway has none. No kit: the frame
                               as house.js draws it and plain leaf boxes of the same size.  -> {group, doors, procedural}
@@ -130,12 +130,26 @@ class Buf {
 // a convex planar polygon (pts [[x, y, z]...]) as a fan, wound so its front faces normal nrm (Newell's normal decides the order)
 function poly(b, pts, nrm, uv, uv1) {
   const m = pts.length; if (m < 3) return;
+  // a vertex lying on a straight edge (where a gable crosses 3.0 m, shared with the wall's split) becomes the fan's origin, so it is
+  // used by real triangles and no T-junction is left
+  if (m > 3) for (let k = 0; k < m; k++) {
+    const a = pts[(k + m - 1) % m], c = pts[k], e = pts[(k + 1) % m], ux = c[0] - a[0], uy = c[1] - a[1], uz = c[2] - a[2], vx = e[0] - c[0], vy = e[1] - c[1], vz = e[2] - c[2];
+    if (Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) < 1e-9 * Math.max(1e-3, Math.hypot(ux, uy, uz) * Math.hypot(vx, vy, vz))) {
+      if (k) { const rot = q => q && q.slice(k).concat(q.slice(0, k)); pts = rot(pts); uv = rot(uv); uv1 = rot(uv1); }
+      break;
+    }
+  }
   let nx = 0, ny = 0, nz = 0;
   for (let i = 0; i < m; i++) { const a = pts[i], c = pts[(i + 1) % m]; nx += (a[1] - c[1]) * (a[2] + c[2]); ny += (a[2] - c[2]) * (a[0] + c[0]); nz += (a[0] - c[0]) * (a[1] + c[1]); }
   const area = Math.hypot(nx, ny, nz); if (area < 1e-10) return;
   const flip = nx * nrm[0] + ny * nrm[1] + nz * nrm[2] < 0, ids = [];
   for (let i = 0; i < m; i++) ids.push(b.v(pts[i][0], pts[i][1], pts[i][2], nrm[0], nrm[1], nrm[2], uv[i][0], uv[i][1], uv1 ? uv1[i][0] : undefined, uv1 ? uv1[i][1] : undefined));
-  for (let i = 1; i < m - 1; i++) flip ? b.ix.push(ids[0], ids[i + 1], ids[i]) : b.ix.push(ids[0], ids[i], ids[i + 1]);
+  for (let i = 1; i < m - 1; i++) {
+    // (a vertex on a straight edge, e.g. where a gable crosses 3.0 m, would make a zero-area sliver of the fan: left out)
+    const a = pts[0], c = pts[i], e = pts[i + 1], ux = c[0] - a[0], uy = c[1] - a[1], uz = c[2] - a[2], vx = e[0] - a[0], vy = e[1] - a[1], vz = e[2] - a[2];
+    if (Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) < 1e-9) continue;
+    flip ? b.ix.push(ids[0], ids[i + 1], ids[i]) : b.ix.push(ids[0], ids[i], ids[i + 1]);
+  }
 }
 // ear clipping for the small simple polygons of mould profiles and beam sections ([[x, y]...]), counter-clockwise first
 function triangulate(P) {
@@ -250,6 +264,8 @@ function faceCoord(f, L, u) {
 function faceTop(Fl, f) {
   const t = f.y * Fl.GW + f.x, k = Fl.gid[t];
   if (k < 0) return [[0, Fl.C[t]], [1, Fl.C[t]]];
+  // a face along the ridge keeps one height: two points, as the ceiling's edge there has only the tile's corners (no T-junctions)
+  if (Fl.gab[k].y === (f.x0 === f.x1)) { const p = faceCoord(f, Fl.L, 0), h = gabH(Fl.gab[k], p[0], p[1]); return [[0, h], [1, h]]; }
   return FR.map(u => { const p = faceCoord(f, Fl.L, u); return [u, gabH(Fl.gab[k], p[0], p[1])]; });
 }
 const topAt = (top, u) => { for (let j = 0; j < top.length - 1; j++) { const a = top[j], b = top[j + 1]; if (u <= b[0] + 1e-12) return a[1] + (b[1] - a[1]) * (u - a[0]) / ((b[0] - a[0]) || 1); } return top[top.length - 1][1]; };
@@ -348,8 +364,11 @@ function ceilings(plan, opts) {
       let P;
       if (q.y) { const a = edge(tx, j), c = edge(tx, j + 1); P = [vtx(a, ty * L), vtx(c, ty * L), vtx(c, ty * L + L), vtx(a, ty * L + L)]; }
       else { const a = edge(ty, j), c = edge(ty, j + 1); P = [vtx(tx * L, a), vtx(tx * L + L, a), vtx(tx * L + L, c), vtx(tx * L, c)]; }
+      // (plus the points where an edge crosses 3.0 m: the walls split there into main wall and upper band, so they share that vertex)
+      P = P.reduce((o, a, i) => { const c = P[(i + 1) % 4]; o.push(a);
+        if ((a[1] - FACE_H) * (c[1] - FACE_H) < 0) { const t = (FACE_H - a[1]) / (c[1] - a[1]); o.push([a[0] + (c[0] - a[0]) * t, FACE_H, a[2] + (c[2] - a[2]) * t]); } return o; }, []);
       // the strip's normal, pointing down into the room
-      const ux = P[1][0] - P[0][0], uy = P[1][1] - P[0][1], uz = P[1][2] - P[0][2], vx = P[3][0] - P[0][0], vy = P[3][1] - P[0][1], vz = P[3][2] - P[0][2];
+      const ux = P[1][0] - P[0][0], uy = P[1][1] - P[0][1], uz = P[1][2] - P[0][2], vx = P[P.length - 1][0] - P[0][0], vy = P[P.length - 1][1] - P[0][1], vz = P[P.length - 1][2] - P[0][2];
       let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const ln = Math.hypot(nx, ny, nz) || 1; if (ny > 0) { nx = -nx; ny = -ny; nz = -nz; }
       poly(b, P, [nx / ln, ny / ln, nz / ln], P.map(p => [p[0] / L, p[2] / L]), P.map(p => planUV(p[0], p[2])));
     }
@@ -556,15 +575,15 @@ function trims(plan, opts) {
         poly(buf, T3, nrm, T3.map(p => [(s.sw0 + lam) / L + p[1] * 0, P.v[0] + (P.v[1] - P.v[0]) * 0.5]));
       }
     }
-    rings.set(s.i + ':' + k + ':0', { cls: A.cls, ring: R[0].map(o => o.p), lam: a });
-    rings.set(s.i + ':' + k + ':1', { cls: Bn.cls, ring: R[R.length - 1].map(o => o.p), lam: b });
+    if (a <= 1e-6) rings.set(s.i + ':' + k + ':0', { cls: A.cls, ring: R[0].map(o => o.p), lam: a });                // (the segment's own ends only)
+    if (b >= s.len - 1e-6) rings.set(s.i + ':' + k + ':1', { cls: Bn.cls, ring: R[R.length - 1].map(o => o.p), lam: b });
   };
   S.forEach((s, i) => { const o = IV[i]; for (const k of KINDS) if (o[k]) for (const [a, b] of o[k]) sweep(s, k, a, b); });
   // the joints, each once: the two rings that meet (for the tests: they must coincide, at 45 degrees on corners)
   for (const s of S) for (const e of [0, 1]) for (const k of KINDS) {
     const r = rings.get(s.i + ':' + k + ':' + e); if (!r || (r.cls !== 'inside' && r.cls !== 'outside' && r.cls !== 'flat')) continue;
     const g = S[s.ends[e].seg], ge = g.ends[0].seg === s.i ? 0 : 1, rg = rings.get(g.i + ':' + k + ':' + ge); if (!rg || s.i > g.i) continue;
-    joints.push({ kind: k, cls: r.cls, a: r.ring, b: rg.ring, ta: [s.t[0] * (e ? 1 : -1), s.t[1] * (e ? 1 : -1)], tb: [g.t[0] * (ge ? 1 : -1), g.t[1] * (ge ? 1 : -1)], segA: s.i, segB: g.i });
+    joints.push({ kind: k, cls: r.cls, a: r.ring, b: rg.ring, ta: [s.t[0] * (e ? 1 : -1), s.t[1] * (e ? 1 : -1)], tb: [g.t[0] * (ge ? 1 : -1), g.t[1] * (ge ? 1 : -1)], segA: s.i, segB: g.i, na: s.n, nb: g.n });
   }
   const group = new THREE.Group(); group.name = 'arch_trims';
   const mat = matOf(opts, 'trim') || grey(), meshes = [];
@@ -677,7 +696,7 @@ function doorways(plan, kit, opts) {
   const frameBuf = chunkBufs(), headBuf = chunkBufs(), frames = new Map(), leaves = new Map();
   const doors = [];
   for (const d of ds) {
-    const ch = Fl.chunkOf(d.x, d.y), Md = doorM(d), H = Fl.C[d.y * GWof(Fl) + d.x];
+    const ch = Fl.chunkOf(d.x, d.y), Md = doorM(d), H = Fl.C[d.y * Fl.GW + d.x];
     // the header: wall from 2.60 m up to the ceiling, the lining's depth less the architraves, lit like the middle of a side wall
     if (!d.head.skip && H - HEAD_Y0 >= 0.08) {
       const fi = d.axis === 'z' ? (Fl.faceOf(d.x, d.y, 1, 0) >= 0 ? Fl.faceOf(d.x, d.y, 1, 0) : Fl.faceOf(d.x, d.y, -1, 0)) : (Fl.faceOf(d.x, d.y, 0, 1) >= 0 ? Fl.faceOf(d.x, d.y, 0, 1) : Fl.faceOf(d.x, d.y, 0, -1));
@@ -695,15 +714,19 @@ function doorways(plan, kit, opts) {
       addBox(fb, Md, -a + POST, HEAD_Y0, -LINING / 2, a - POST, HEAD_Y0 + 0.06, LINING / 2);
       for (const z of [-1, 1]) addBox(fb, Md, -a + POST, HEAD_Y0, z < 0 ? -LINING / 2 - 0.02 : LINING / 2, a - POST, HEAD_Y0 + 0.07, z < 0 ? -LINING / 2 : LINING / 2 + 0.02);
     } else { if (!frames.has(ch)) frames.set(ch, []); frames.get(ch).push(Md); }
-    // the leaves: hinged at the posts' inner faces (0.11 m from the side walls), at the lining's face on the swing side, thickness
-    // on that side: the leaf's far edge is 0.11 + cos(angle) m from its wall, inside the band players never reach
+    // the leaves: hinged at the posts' inner faces (0.11 m from the side walls: the plan's hinge, whose side is the sign along the
+    // world's across axis), at the lining's face on the swing side, the leaf's thickness toward its wall: its far edge is then
+    // 0.11 + cos(angle) m from that wall, inside the band players never reach (H11). Proper rotations only (no mirrored instance:
+    // three.js would cull the wrong faces of a mirrored instance), so the leaf's body is offset to whichever side faces its wall.
     const door = { d, x: d.x, y: d.y, cx: d.cx, cz: d.cz, leaves: [], open: false, away: 0, hold: 6 + 4 * hash(d.x, d.y, 1301), near: false };
+    const sp = d.axis === 'z' ? [0, d.swing] : [d.swing, 0], ac = d.axis === 'z' ? [1, 0] : [0, 1];
     for (const lf of d.leaves) {
-      const s = lf.side, hingeL = V3(s * (L / 2 - POST), 0, d.swing * LINING / 2);
-      const base = Md.clone().multiply(M().makeTranslation(hingeL.x, 0, hingeL.z));
-      const tail = M().makeScale(s > 0 ? -1 : 1, 1, 1).multiply(M().makeTranslation(0, 0, d.swing * thick / 2 - zc));
-      const leaf = { side: s, rest: lf.rest, pin: !!lf.pin, angle: lf.rest, from: lf.rest, to: lf.rest, t: 1, dur: 1, sway: 0, door,
-        base, tail, sgn: s * d.swing, w: 2 * PI / (4.5 + 3.5 * hash(d.x, d.y, 1302 + (s > 0 ? 1 : 0))), ph: 2 * PI * hash(d.x, d.y, 1304 + (s > 0 ? 1 : 0)), ch, k: -1, mat: M() };
+      const s = lf.side, c = [-s * ac[0], -s * ac[1]];                  // (closed: from the hinge toward the opening's middle)
+      const sig = Math.sign(c[0] * sp[1] - c[1] * sp[0]) || 1;     // (c x up = (-cz, 0, cx) = sig * sp)
+      const hw = [lf.hinge[0] + sp[0] * LINING / 2, lf.hinge[1] + sp[1] * LINING / 2];
+      const leaf = { side: s, rest: lf.rest, pin: !!lf.pin, angle: lf.rest, from: lf.rest, to: lf.rest, t: 1, dur: 1, sway: 0, door, c, sp, sig, hw,
+        tail: M().makeTranslation(0, 0, sig * thick / 2 - zc),
+        w: 2 * PI / (4.5 + 3.5 * hash(d.x, d.y, 1302 + (s > 0 ? 1 : 0))), ph: 2 * PI * hash(d.x, d.y, 1304 + (s > 0 ? 1 : 0)), ch, k: -1, mat: M() };
       if (!leaves.has(ch)) leaves.set(ch, []);
       leaf.k = leaves.get(ch).length; leaves.get(ch).push(leaf); door.leaves.push(leaf);
     }
@@ -733,12 +756,16 @@ function doorways(plan, kit, opts) {
   DOORS.list = doors; DOORS.res = res; DOORS.herQuiet = opts.herQuiet || null;
   return res;
 }
-const GWof = Fl => Fl.GW;
-// a leaf's instance matrices at its angle (degrees from closed): base (door + hinge), the turn, then mirror + thickness offset
-const _R = typeof THREE !== 'undefined' ? null : null;
+// a leaf's matrix at its angle (degrees from closed): x along the leaf (closed direction turned toward the swing), y up, z = x cross y
+function leafMatrix(lf, out) {
+  const a = lf.angle * DEG, ca = Math.cos(a), sa = Math.sin(a), dx = ca * lf.c[0] + sa * lf.sp[0], dz = ca * lf.c[1] + sa * lf.sp[1];
+  // (columns x = (dx, 0, dz), y = up, z = x cross y = (-dz, 0, dx): a proper rotation)
+  out.set(dx, 0, -dz, lf.hw[0], 0, 1, 0, 0, dz, 0, dx, lf.hw[1], 0, 0, 0, 1);
+  return out.multiply(lf.tail);
+}
 function place(lf) {
-  const R = new THREE.Matrix4().makeRotationY(lf.sgn * lf.angle * DEG), m = new THREE.Matrix4();
-  lf.mat.copy(lf.base).multiply(R).multiply(lf.tail);
+  const m = new THREE.Matrix4();
+  leafMatrix(lf, lf.mat);
   for (const im of lf.ims) { im.setMatrixAt(lf.k, m.multiplyMatrices(lf.mat, im.userData.rel)); im.instanceMatrix.needsUpdate = true; }
 }
 function creak(sfx, door, vol, soft) {
@@ -770,7 +797,6 @@ function updateDoors(dt, actors, sfx) {
 }
 
 /* ---------- modules (B1, B5) ---------- */
-const _v = typeof THREE !== 'undefined' ? null : null;
 function modules(plan, kit, opts) {
   const t0 = now(); opts = opts || {};
   const Fl = floorOf(plan, opts), L = Fl.L, group = new THREE.Group(); group.name = 'arch_modules';

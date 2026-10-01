@@ -285,7 +285,7 @@ def ties(mats):
 def geometry():
     t0 = time.time(); kitlib.reset()
     WOOD = kitlib.wood('rc_wood', 'beech', 'varnish', stain='#6b5038', age=1.0)
-    VEL = kitlib.fabric('rc_velvet', '#7e4650', weave=1.0, fade=0.35, velvet=True, age=1.0)
+    VEL = kitlib.fabric('rc_velvet', '#7e4650', weave=1.0, fade=0.22, velvet=True, age=1.0)
     W = [WOOD]; F = [VEL]; parts = []
     parts.append(seat(W))
     for s in (-1, 1):
