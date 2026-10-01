@@ -213,8 +213,11 @@ function evict(keep, tier) {
 }
 
 /* ---------- the pieces of a node ---------- */
-const PIVOTS = () => Object.keys(KIT.anims).filter(k => KIT.anims[k].pivot).map(k => [KIT.anims[k].pivot, KIT.anims[k]]);
-function pivotOf(name) { for (const [s, a] of PIVOTS()) if (name.endsWith(s)) return a; return null; }
+let PIV = null;               // (KIT.anims' pivot suffixes: _RockPivot, _MobilePivot, _Pendulum, _SwayPivot)
+function pivotOf(name) {
+  if (!PIV) PIV = Object.keys(KIT.anims).filter(k => KIT.anims[k].pivot).map(k => [KIT.anims[k].pivot, KIT.anims[k]]);
+  for (const [s, a] of PIV) if (name.endsWith(s)) return a; return null;
+}
 // a node's meshes in its own frame: meshes [{geo, mat, rel, role, name, morph}], emit (under <node>_emit), pivots (its animated parts:
 // left out of meshes unless still), fix (its <node>_fix empty), box (the whole node at rest, node frame)
 function primsOf(kit, name, still) {
@@ -275,7 +278,6 @@ function shared() {
   SH.sky.userData.shared = true;
   return SH;
 }
-for (const g of ['md', 'hi']) void g;
 const greyOf = tier => shared().grey[tier === 'lo' ? 'lo' : 'md'];
 const reserved = { glass: null, sky: null };
 function setReserved(o) { if (o) { if ('glass' in o) reserved.glass = o.glass; if ('sky' in o) reserved.sky = o.sky; } return reserved; }
@@ -428,7 +430,7 @@ function furnish(level, plan, opts) {
         b.parts.push({ p, m: wm, cell: p.role === 'wall' ? cellOf(x.face !== undefined ? x.face : -1) : null }); return;
       }
       if (p.morph && anim) { morphCopy(p, wm, info); return; }
-      const key = name + '|' + k + '|' + ck + (P === primsOf(kit, name, true) ? '|s' : '');
+      const key = name + '|' + k + '|' + ck;
       let b = inst.get(key); if (!b) inst.set(key, b = { p, kind, name, mount, box: P.box, list: [] });
       b.list.push({ m: wm, solid, item });
     });
@@ -629,7 +631,8 @@ function exitDoor(style, opts) {
   leaf.traverse(q => { if (!q.isMesh) return; q.castShadow = true; q.receiveShadow = true;
     if (!lockedMat) lockedMat = q.material.clone(); q.material = lockedMat; });
   pivot.add(leaf); g.add(pivot);
-  const lb = new THREE.Box3(); leaf.traverse(q => { if (q.isMesh && q.geometry.boundingBox) lb.union(q.geometry.boundingBox); });
+  const linv = new THREE.Matrix4().copy(leafT.matrixWorld).invert(), lb = new THREE.Box3();
+  leafT.traverse(q => { if (q.isMesh && q.geometry.boundingBox) lb.union(q.geometry.boundingBox.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(linv, q.matrixWorld))); });
   const swing = lb.isEmpty() || (lb.min.x + lb.max.x) / 2 >= 0 ? 1 : -1;      // (a leaf reaching +x from its hinge opens outward (-z) with +y)
   // the boards nailed across it, and the lamp above (render.js colours its material every frame)
   let boards = null, drop = 0;
@@ -637,8 +640,8 @@ function exitDoor(style, opts) {
     boards = new THREE.Object3D(); const bp = V(0, 0, 0), bq = new THREE.Quaternion(); relOf(boardsT).decompose(bp, bq, V(1, 1, 1));
     boards.position.copy(bp); boards.quaternion.copy(bq); boards.userData.kit = info;
     const bc = boardsT.clone(true); bc.position.set(0, 0, 0); bc.quaternion.identity(); mark(bc, info); boards.add(bc); g.add(boards);
-    const bb = new THREE.Box3(); bc.traverse(q => { if (q.isMesh && q.geometry.boundingBox) bb.union(q.geometry.boundingBox.clone().applyMatrix4(q.matrixWorld)); });
-    drop = bb.isEmpty() ? 0 : Math.max(0, bp.y + bb.min.y - 0.02);
+    const bb = new THREE.Box3(); boardsT.traverse(q => { if (q.isMesh && q.geometry.boundingBox) bb.union(q.geometry.boundingBox.clone().applyMatrix4(relOf(q))); });
+    drop = bb.isEmpty() ? 0 : Math.max(0, bb.min.y - 0.02);                // (down to the floor)
   }
   const lampMat = new THREE.MeshBasicMaterial({ color: 0xff3030 });
   let lamp;
