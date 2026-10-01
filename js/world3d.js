@@ -30,6 +30,9 @@ function hash(x, y, k) {
 function init3D() {
   try { renderer = new THREE.WebGLRenderer({ canvas: $('gl'), antialias: true, powerPreference: 'high-performance' }); }
   catch (e) { renderer = null; return; }
+  // (no waiting for each shader's error report: that holds the whole page, connection included, until the graphics driver has
+  // finished compiling it, which on a slow device can take seconds; the character preview, js/account.js, still checks them)
+  renderer.debug.checkShaderErrors = false;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.2;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;

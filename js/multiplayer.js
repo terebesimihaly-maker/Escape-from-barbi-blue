@@ -96,6 +96,8 @@ async function createLobby() {
   mpStatus('Creating a lobby…'); await iceReady();
   const peer = new peerjs.Peer(PEER_PREFIX + code, peerOptions()); MP.peer = peer;
   peer.on('open', id => {
+    // (after a reconnect to the matchmaking server this comes again: the lobby, and everyone in it, stays as it is)
+    if (MP.on && MP.host && MP.lobby && MP.lobby.code === code) { MP.myId = id; return; }
     Object.assign(MP, { on: true, host: true, myId: id, code, overSent: false });
     MP.lobby = { code, players: [{ id, name: myName, ready: false, look: myLook() }], count: 0, started: false,
       level: 0, diff: DIFFS[settings.difficulty] ? settings.difficulty : 'medium' };      // (the owner picks the floor and the difficulty)
