@@ -487,7 +487,7 @@ function furnish(level, plan, opts) {
       if (fx.src === 'practical' && sp && sp.fix) m = sp.fix.clone();               // (at its furniture's <node>_fix empty)
       else if (fx.originIsCentre) { const c = P.box.getCenter(V(0, 0, 0)).applyAxisAngle(UP(), fx.ry || 0); m = place(fx.ox - c.x, fx.oy - c.y, fx.oz - c.z, fx.ry); }
       else m = place(fx.ox, fx.oy, fx.oz, fx.ry);
-      put('fixture', fx.node, fx.mount, m, { fixture: k });
+      put('fixture', fx.node, fx.mount, m, { fixture: k, face: fx.face });
       const lvl = fx.state === 'dead' ? 0.03 : 1, col = (fx.color || [1, 0.8, 0.6]).map(c => c * 4 * lvl), grp = fx.state === 'flicker' ? fx.group : -1;
       P.emit.forEach((p, j) => {
         const key = fx.node + '|' + j; let b = emits.get(key); if (!b) emits.set(key, b = { p, node: fx.emitNode || fx.node + '_emit', list: [] });
