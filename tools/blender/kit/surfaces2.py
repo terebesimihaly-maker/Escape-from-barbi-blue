@@ -573,6 +573,154 @@ def wood_floor():
     return {'geo': G.build('wood_floor'), 'W': W, 'H': H, 'variants': 2, 'ao': 0.1, 'cav': 0.01, 'pom': 0.006,
             'notes': '0.13 m oak strips, 17 per tile; B: a walked path worn through the wax (kept off the tile edges)'}
 
+# ================================================================ TILE style
+def ridge(m, vec, scale, detail=5, rough=0.55, power=8.0, dist=0.0):
+    """a ridged noise: 1 on the noise's 0.5 contour, falling off fast: veins, cracks, networks"""
+    n = noise3(m, vec, scale, detail, rough, dist)
+    return m.math('POWER', m.math('SUBTRACT', 1.0, m.math('MULTIPLY', m.math('ABSOLUTE', m.math('SUBTRACT', n, 0.5)), 2.0)), power)
+
+def hardvein(m, vec, scale, width, detail=2, rough=0.45, wvar=None):
+    """a hard-edged vein along a noise's 0.5 contour, width in metres of vec: the distance to the contour is |n - 0.5| over the
+       noise's gradient (two more samples), so a vein keeps its width where the noise flattens out (no blobs). wvar: 0..1 socket
+       that widens and thins it along its way"""
+    e = 0.04 / scale
+    n0 = noise3(m, vec, scale, detail, rough); nx = noise3(m, vadd(m, vec, (e, 0.0, 0.0)), scale, detail, rough); ny = noise3(m, vadd(m, vec, (0.0, e, 0.0)), scale, detail, rough)
+    gx = m.math('SUBTRACT', nx, n0); gy = m.math('SUBTRACT', ny, n0)
+    gl = m.math('MAXIMUM', m.math('DIVIDE', m.math('SQRT', m.math('ADD', m.math('MULTIPLY', gx, gx), m.math('MULTIPLY', gy, gy))), e), 1e-4)
+    d = m.math('DIVIDE', m.math('ABSOLUTE', m.math('SUBTRACT', n0, 0.5)), gl)
+    w = width if wvar is None else m.math('MULTIPLY', m.math('ADD', 0.3, m.math('MULTIPLY', wvar, 1.4)), width)
+    return m.math('SUBTRACT', 1.0, m.math('MINIMUM', 1.0, m.math('MAXIMUM', 0.0, m.math('DIVIDE', m.math('SUBTRACT', d, m.math('MULTIPLY', w, 0.35)), m.math('MULTIPLY', w, 0.65)))))
+
+def fracvein(m, vec, scale, width, wvar=None, keep=0.5, seed=0.0):
+    """calcite in a fracture network: the edges of Voronoi cells (straight runs meeting at angles; jagged once vec is warped),
+       width in metres, only some of the edges filled (keep: the share), wvar widening and thinning them along their way"""
+    v = m.n('ShaderNodeTexVoronoi', feature='DISTANCE_TO_EDGE', i_Scale=scale, i_Randomness=1.0); m.l(vadd(m, vec, (seed, 2 * seed, 0.0)), v.inputs['Vector'])
+    d = m.math('DIVIDE', v.outputs['Distance'], scale)
+    w = width if wvar is None else m.math('MULTIPLY', m.math('ADD', 0.25, m.math('MULTIPLY', wvar, 1.5)), width)
+    ve = m.math('SUBTRACT', 1.0, m.math('MINIMUM', 1.0, m.math('MAXIMUM', 0.0, m.math('DIVIDE', m.math('SUBTRACT', d, m.math('MULTIPLY', w, 0.35)), m.math('MULTIPLY', w, 0.65)))))
+    k = m.remap(noise3(m, vadd(m, vec, (seed + 4.0, 1.0, 3.0)), scale * 0.6, 2), 0.5 - keep * 0.25, 0.52 - keep * 0.25)
+    return m.math('MULTIPLY', ve, k)
+
+def marble_mat(name, W, H, white='#dfdbd3', vein='#7f807f', black='#1d1c1b', calcite='#d8d3c8', grout='#7b766c', worn_w='#c9c2b6', worn_b='#4a4744'):
+    """an old hall's marble checker: white Carrara (soft grey clouds and feathered veins) and black Nero Marquina (crisp white
+       calcite veins in networks), every slab cut from its own part of the block ('gpos'), its veins turned its own way;
+       polished once, now yellowed, the polish dulled in etch rings and spots, scratched, dirt in the micro-pits and along the
+       arrises, a few slabs cracked ('crack'), corners chipped (geometry). Variant B: a path walked dull and grey."""
+    m = kitlib.Mat(name); T = Tor(m, W, H); g = m.attr('gpos', True); pr = m.attr('prand'); dk = m.attr('dark'); V = variant(m)
+    crk = m.attr('crack'); lp = m.attr('lpos', True)
+    pr2 = m.math('FRACT', m.math('MULTIPLY', pr, 7.31)); pr3 = m.math('FRACT', m.math('MULTIPLY', pr, 13.7))
+    warp = noise3(m, vmul(m, g, (1.3, 1.3, 1.3)), 1.0, 5, 0.6, color=True)
+    wv = m.n('ShaderNodeVectorMath', operation='MULTIPLY_ADD'); m.l(warp, wv.inputs[0]); wv.inputs[1].default_value = (0.35, 0.35, 0.35); m.l(g, wv.inputs[2])
+    pw = wv.outputs[0]
+    # --- Carrara
+    cloud = noise3(m, pw, 1.6, 6, 0.6)
+    v1 = ridge(m, m.map(pw, (1.0, 2.6, 1.0)), 2.2, 6, 0.6, 7.0)                 # (main veins, drawn out one way)
+    v2 = ridge(m, vadd(m, pw, (3.1, 7.7, 1.3)), 6.5, 5, 0.55, 14.0)               # (fine feathering)
+    v3 = ridge(m, vadd(m, pw, (9.1, 1.7, 4.3)), 18.0, 3, 0.5, 18.0)
+    vk = m.remap(pr2, 0, 1, 0.55, 1.15)                                           # (some slabs heavily veined, some nearly plain)
+    wcol = m.mix(m.remap(cloud, 0.3, 0.75, 0.0, 0.35), lin(white), m.mix(1.0, lin(white), (0.82, 0.83, 0.84), 'MULTIPLY'))
+    wcol = m.mix(m.math('MULTIPLY', m.math('MULTIPLY', v1, 0.85), vk), wcol, lin(vein))
+    wcol = m.mix(m.math('MULTIPLY', m.math('MULTIPLY', v2, 0.6), vk), wcol, m.mix(0.4, lin(white), lin(vein)))
+    wcol = m.mix(m.math('MULTIPLY', v3, 0.3), wcol, lin(vein))
+    sp = m.remap(noise3(m, vmul(m, g, (300, 300, 300)), 1.0, 2), 0.7, 0.78)          # (dark specks)
+    wcol = m.mix(m.math('MULTIPLY', sp, 0.4), wcol, m.mix(1.0, lin(vein), (0.6, 0.6, 0.6), 'MULTIPLY'))
+    # --- Nero Marquina: deep black, a few crisp white calcite fractures (smooth paths: little detail), finer branches near them,
+    #     wide plain stretches
+    mw = noise3(m, vmul(m, g, (0.9, 0.9, 0.9)), 1.0, 2, 0.5, color=True)
+    pb = m.n('ShaderNodeVectorMath', operation='MULTIPLY_ADD'); m.l(mw, pb.inputs[0]); pb.inputs[1].default_value = (0.5, 0.5, 0.5); m.l(g, pb.inputs[2]); pb = pb.outputs[0]
+    wvar = noise3(m, vmul(m, g, (6, 6, 6)), 1.0, 2, 0.5)
+    jw = noise3(m, vmul(m, pb, (9, 9, 9)), 1.0, 3, 0.6, color=True)                  # (a finer warp: the fractures go jagged)
+    pj = m.n('ShaderNodeVectorMath', operation='MULTIPLY_ADD'); m.l(jw, pj.inputs[0]); pj.inputs[1].default_value = (0.03, 0.03, 0.03); m.l(pb, pj.inputs[2]); pj = pj.outputs[0]
+    b1 = fracvein(m, pj, 3.2, 0.0024, wvar, 0.55, 0.0)
+    b1b = m.math('MULTIPLY', hardvein(m, m.map(vadd(m, pb, (5.0, 2.0, 1.0)), (1.0, 1.7, 1.0)), 1.1, 0.0016, 2, 0.45, wvar), 0.8)
+    nv = m.n('ShaderNodeTexVoronoi', feature='DISTANCE_TO_EDGE', i_Scale=3.2, i_Randomness=1.0); m.l(pj, nv.inputs['Vector'])
+    near = m.remap(m.math('DIVIDE', nv.outputs['Distance'], 3.2), 0.03, 0.0, smooth=True)
+    b2 = m.math('MULTIPLY', fracvein(m, pj, 11.0, 0.0009, wvar, 0.5, 7.0), near)
+    b3 = m.math('MULTIPLY', fracvein(m, pj, 26.0, 0.0005, None, 0.25, 13.0), m.math('MULTIPLY', near, near))
+    bmask = m.remap(noise3(m, vadd(m, g, (2.0, 0.0, 0.0)), 1.1, 2), 0.3, 0.6, 0.15, 1.0)
+    bcol = m.mix(m.remap(noise3(m, pw, 2.5, 4), 0.35, 0.7, 0.0, 0.18), lin(black), m.mix(1.0, lin(black), (1.6, 1.6, 1.65), 'MULTIPLY'))
+    bcol = m.mix(m.math('MULTIPLY', m.math('MAXIMUM', b1, m.math('MULTIPLY', b1b, 0.8)), bmask), bcol, lin(calcite))
+    bcol = m.mix(m.math('MULTIPLY', m.math('MULTIPLY', b2, 0.75), bmask), bcol, lin(calcite))
+    bcol = m.mix(m.math('MULTIPLY', m.math('MULTIPLY', b3, 0.5), bmask), bcol, m.mix(0.5, lin(calcite), lin(black)))
+    col = m.mix(dk, wcol, bcol)
+    col = m.hsv(col, 0.5, 1.0, m.remap(pr3, 0, 1, 0.95, 1.04))
+    h = m.math('MULTIPLY', m.math('ADD', v2, b2), -0.00003)                    # (the softer veins polish a hair lower)
+    # --- age: yellowed (the white more), dirt in the pits, cracks, etch rings and spots in the polish, scratches
+    col = m.mix(m.math('MULTIPLY', m.remap(T.noise(1.2, 3, 0.5), 0.3, 0.75, 0.25, 0.7), m.math('SUBTRACT', 1.0, m.math('MULTIPLY', dk, 0.6))), col, m.mix(1.0, col, (0.93, 0.87, 0.76), 'MULTIPLY'))
+    pits = m.math('MULTIPLY', m.remap(noise3(m, vmul(m, g, (700, 700, 700)), 1.0, 2), 0.68, 0.76), m.remap(T.noise(4, 3), 0.3, 0.7, 0.4, 1.0))
+    col = m.mix(m.math('MULTIPLY', pits, 0.6), col, (0.09, 0.08, 0.065))
+    lx, ly, lz = sep(m, lp)
+    cl = ridge(m, comb(m, m.math('ADD', lx, m.math('MULTIPLY', ly, 0.4)), ly, m.math('MULTIPLY', pr, 50.0)), 4.0, 4, 0.55, 400.0)
+    crack = m.math('MULTIPLY', cl, crk)
+    col = m.mix(m.math('MULTIPLY', crack, 0.9), col, (0.06, 0.05, 0.04)); h = m.math('SUBTRACT', h, m.math('MULTIPLY', crack, 0.0006))
+    rough = m.remap(T.noise(0.8, 3), 0.3, 0.7, 0.1, 0.24)
+    rough = m.math('ADD', rough, m.math('MULTIPLY', dk, 0.04))
+    st = T.voronoi(5.0, 'Distance', off=6.0); stn = T.noise(25, 3, off=4.0)
+    sd = m.math('ADD', st, m.math('MULTIPLY', m.math('SUBTRACT', stn, 0.5), 0.05))
+    sel = m.remap(T.noise(1.3, 2, off=12.0), 0.5, 0.6)
+    etch = m.math('MULTIPLY', m.math('MAXIMUM', m.math('MULTIPLY', m.remap(sd, 0.05, 0.065), m.remap(sd, 0.085, 0.07)), m.remap(sd, 0.035, 0.02, 0.0, 0.7)), sel)
+    rough = m.mixf(etch, rough, 0.5)                                            # (rings where glasses stood, spills: dull)
+    col = m.mix(m.math('MULTIPLY', etch, 0.25), col, m.mix(1.0, col, (0.85, 0.8, 0.72), 'MULTIPLY'))
+    spl = m.math('ADD', T.x, T.y); spt = comb(m, T.x, T.y, 0.0)
+    scr = None
+    for k, (rot, spc, ln, w) in enumerate(((0.3, 0.05, 0.3, 0.0011), (1.7, 0.06, 0.18, 0.0012), (2.6, 0.08, 0.2, 0.001), (-0.7, 0.05, 0.25, 0.001))):
+        l = strokes(m, vadd(m, vadd(m, g, (k * 1.3, k * 2.9, 0.0)), (0.0, 0.0, 0.0)), rot, spc, ln, w)
+        seg = noise3(m, m.map(m.map(vadd(m, g, (k * 3.1, k * 1.7, 0.0)), (1, 1, 1), rot=(0, 0, rot)), (4.0, 30.0, 1)), 1.0, 2)
+        l = m.math('MULTIPLY', l, m.math('MULTIPLY', m.remap(seg, 0.5, 0.6), m.remap(noise3(m, vadd(m, g, (k * 2.1, k * 0.7, 0.0)), 2.5, 2), 0.4, 0.6)))
+        scr = l if scr is None else m.math('MAXIMUM', scr, l)
+    mic = None
+    for k, rot in enumerate((0.1, 1.0, 1.8, 2.5)):
+        l = strokes(m, vadd(m, g, (k * 0.9, k * 1.9, 0.0)), rot, 0.008, 0.05, 0.0006)
+        mic = l if mic is None else m.math('MAXIMUM', mic, l)
+    rough = m.mixf(m.math('MULTIPLY', mic, 0.6), rough, 0.4); rough = m.mixf(m.math('MULTIPLY', scr, 0.9), rough, 0.55)
+    col = m.mix(m.math('MULTIPLY', scr, m.mixf(dk, 0.12, 0.18)), col, m.mix(dk, m.hsv(col, 0.5, 1.0, 0.85), (0.2, 0.195, 0.19)))   # (scratches on black: faint, they show in the gloss)
+    # dirt along the arrises and in the chips (the baked cavity), dust
+    cav = look(m, 'CAV', W, H); edge = look(m, 'EDGE', W, H)
+    gr = m.math('MULTIPLY', m.remap(cav, 0.95, 0.5, smooth=True), m.remap(T.noise(30, 4), 0.3, 0.7, 0.5, 1.0))
+    col = m.mix(m.math('MULTIPLY', gr, 0.85), col, (0.05, 0.045, 0.035)); rough = m.mixf(gr, rough, 0.75)
+    col = m.mix(m.math('MULTIPLY', edge, 0.15), col, m.mix(dk, m.hsv(col, 0.5, 1.0, 0.85), (0.2, 0.19, 0.18)))
+    # B: the path, walked dull and grey, dirt ground into the white
+    wear = m.math('MULTIPLY', edge_fade(m, W, H, 0.10, 0.55, T), m.remap(m.math('ADD', T.noise(0.9, 3, 0.45), m.math('MULTIPLY', T.noise(9, 3), 0.15)), 0.3, 0.62, smooth=True))
+    wear = m.math('MULTIPLY', wear, V)
+    worn = m.mix(dk, m.mix(0.4, m.hsv(col, 0.5, 0.65, 0.88), lin(worn_w)), m.mix(0.28, col, lin(worn_b)))   # (black etched grey, its veins still there)
+    worn = m.mix(m.remap(T.noise(6, 4, off=3.0), 0.4, 0.8, 0.0, 0.5), worn, m.mix(dk, m.hsv(worn, 0.5, 0.9, 0.75), worn))
+    col = m.mix(m.math('MULTIPLY', wear, 0.85), col, worn); rough = m.mixf(wear, rough, 0.5)
+    return finish(m, col, rough, h)
+
+def grout_mat(name, W, H, col='#6e685e', dirt='#2c2822'):
+    """cement grout, sandy, darkened with years of dirt, cracked in places"""
+    m = kitlib.Mat(name); T = Tor(m, W, H); n = T.noise(400, 3, 0.6); d = T.noise(6, 4, 0.55)
+    c = m.mix(m.remap(d, 0.3, 0.7, 0.3, 0.9), lin(col), lin(dirt)); c = m.mix(m.remap(n, 0.3, 0.7, 0.0, 0.3), c, m.hsv(c, 0.5, 1.0, 1.35))
+    return finish(m, c, 0.93, m.math('MULTIPLY', n, 0.0004))
+
+def tile_floor():
+    """the hall's floor: 0.28 m marble checker (8 to a tile), white Carrara and black Nero Marquina, lipped and tilted a
+       little, a few corners chipped, a couple of slabs cracked, one sunk; dirty grout"""
+    W = H = TW; n = 8; s = W / n; G = Geo(W, H)
+    M = marble_mat('tile_floor', W, H); GR = grout_mat('tile_grout', W, H)
+    for i in range(n):
+        for j in range(n):
+            gap = random.uniform(0.0018, 0.003); a = s - gap; t = 0.02
+            bm = box(a, a, t, 0.0007, 2)
+            cuts(bm, 0, [-a / 2 + a * k / 6 for k in range(1, 6)]); cuts(bm, 1, [-a / 2 + a * k / 6 for k in range(1, 6)])
+            # a chipped corner now and then: a facet cut off it, below the face
+            if random.random() < 0.08:
+                cx, cy = random.choice((-1, 1)), random.choice((-1, 1)); r = random.uniform(0.003, 0.008)
+                co = Vector((cx * a / 2, cy * a / 2, t / 2)); no = Vector((cx, cy, random.uniform(0.8, 1.6))).normalized()
+                bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=co - no * r * 0.8, plane_no=no, clear_outer=True)
+                bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary])
+            sunk = -0.0011 if random.random() < 0.025 else max(-0.0008, random.gauss(0, 0.0003))
+            rx, ry = random.gauss(0, 0.0015), random.gauss(0, 0.0015)
+            xform(bm, ((i + 0.5) * s + random.gauss(0, 0.0004), (j + 0.5) * s + random.gauss(0, 0.0004), -t / 2 + sunk), (rx, ry, random.gauss(0, 0.002)))
+            ang = random.uniform(0, math.pi); off = Vector((random.uniform(-40, 40), random.uniform(-40, 40), random.uniform(-40, 40)))
+            cx, cy = (i + 0.5) * s, (j + 0.5) * s; ca, sa = math.cos(ang), math.sin(ang)
+            G.add(bm, M, {'gpos': (lambda c, cx=cx, cy=cy, ca=ca, sa=sa, off=off: ((c.x - cx) * ca - (c.y - cy) * sa + off.x, (c.x - cx) * sa + (c.y - cy) * ca + off.y, off.z)),
+                          'lpos': (lambda c, cx=cx, cy=cy: ((c.x - cx) / s, (c.y - cy) / s, 0.0)),
+                          'prand': random.random(), 'dark': float((i + j) % 2), 'crack': 1.0 if random.random() < 0.05 else 0.0})
+    G.add(grid(-0.4, W + 0.4, -0.4, H + 0.4, 4, 4, -0.0024), GR, {'gpos': (0, 0, 0), 'lpos': (0, 0, 0), 'prand': 0.5, 'dark': 0.0, 'crack': 0.0}, wrap=False)
+    return {'geo': G.build('tile_floor'), 'W': W, 'H': H, 'variants': 2, 'ao': 0.08, 'cav': 0.01, 'pom': 0.004,
+            'notes': '0.28 m marble checker (Carrara and Nero Marquina), 8 per tile; B: a path walked dull and grey'}
+
 # ================================================================ printed patterns (drawn in Python, printed by the shader)
 def _pattern_image(name, arr):
     """a float array (h, w) or (h, w, 3), row 0 at the top -> a Non-Color Blender image (repeat)"""
@@ -961,4 +1109,5 @@ def main():
 
 if __name__ == '__main__':
     SETS['wood'] = {'floor': wood_floor, 'wall': wood_wall}
+    SETS['tile'] = {'floor': tile_floor}
     main()
