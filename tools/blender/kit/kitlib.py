@@ -380,7 +380,7 @@ def aged(m, col, rough, h, up_dust=0.5, grime=0.7, edge_wear=0.0, wear_col=None,
         w = m.math('ADD', m.math('MULTIPLY', m.attr('wear'), 1.05), m.math('MULTIPLY', m.math('POWER', m.edge(), 1.0), edge_wear))
         w = m.math('ADD', w, m.math('MULTIPLY', m.math('SUBTRACT', m.math('ADD', m.math('ADD', wn, m.math('MULTIPLY', wn2, 0.6)), m.math('MULTIPLY', wn3, 0.5)), 1.05), 0.9))
         wc = wear_col if wear_col is not None else col
-        thin = m.remap(w, 0.30, 0.46, smooth=True); worn = m.remap(w, 0.46, 0.60, smooth=True)   # (thinned first, then through)
+        thin = m.remap(w, 0.30, 0.46, smooth=True); worn = m.remap(w, 0.46, 0.68, smooth=True)   # (thinned first, then through)
         col = m.mix(m.math('MULTIPLY', thin, 0.5), col, wc); col = m.mix(worn, col, wc)
         rough = m.mixf(worn, m.mixf(thin, rough, (wear_rough + 0.4) / 2), wear_rough)
         h = m.math('SUBTRACT', h, m.math('ADD', m.math('MULTIPLY', worn, 0.25), m.math('MULTIPLY', thin, 0.08)))
@@ -450,7 +450,7 @@ def wood(name, species='beech', finish='varnish', stain=None, age=1.0, paint=Non
         vc = m.mix(m.math('MULTIPLY', sc, 0.35), vc, m.hsv(bare, 0.5, 0.7, 0.85)); vr = m.mixf(sc, vr, 0.55)
         h = m.math('SUBTRACT', m.math('MULTIPLY', h, 0.35), m.math('ADD', m.math('MULTIPLY', crack, 0.25), m.math('MULTIPLY', sc, 0.3)))
         # half worn: thinned varnish lighter and more orange, then bare (and hand-darkened) wood
-        col, rough, h, worn = aged(m, vc, vr, h, up_dust=0.55 * age, grime=0.75, edge_wear=0.7, wear_col=m.mix(0.42, m.hsv(col, 0.5, 0.62, 0.8), (0.06, 0.04, 0.026)), wear_rough=0.45)   # (bare wood, a little lighter than the varnish, greyed and darkened by hands)
+        col, rough, h, worn = aged(m, vc, vr, h, up_dust=0.55 * age, grime=0.75, edge_wear=0.7, wear_col=m.mix(0.38, m.hsv(col, 0.5, 0.78, 0.72), (0.07, 0.045, 0.028)), wear_rough=0.45)   # (bare wood, a little lighter than the varnish, greyed and darkened by hand oil)
     elif finish == 'paint':
         pc = lin(paint or '#e8dcc8')
         pn = m.noise(pos, 14, 4); pcol = m.mix(m.remap(pn, 0.3, 0.7, 0.0, 0.25), pc, (pc[0] * 0.82, pc[1] * 0.8, pc[2] * 0.74))   # (yellowed unevenly)

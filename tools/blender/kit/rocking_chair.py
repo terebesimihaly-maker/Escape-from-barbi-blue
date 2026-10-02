@@ -204,7 +204,7 @@ def arm(side, mats):
         return kitlib.rounded_rect(w, th, min(0.005, w / 2.2, th / 2.2), 2, 0.0, dz, r_top=min(0.010, w / 2.1, th / 2.05))
     def wear(k, j, p):                                      # (the hand rest's top and the knuckle, a little down the sides)
         f = k / (n - 1); top = j in (2, 3, 4, 5)
-        return min(1.0, 0.8 * smooth((f - 0.6) / 0.3) * (1.0 if top else 0.3) + 0.6 * smooth((f - 0.9) / 0.08) + 0.06)
+        return min(0.8, 0.62 * smooth((f - 0.6) / 0.3) * (1.0 if top else 0.25) + 0.35 * smooth((f - 0.9) / 0.08) + 0.06)   # (patchy: never one even cap of bare wood)
     return kitlib.sweep(f'arm{side:+d}', path, sec, wear, caps=(True, True), mats=mats)
 
 # ---------------------------------------------------------------- cushion (a tufted squab tied to the stiles)
