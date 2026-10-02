@@ -57,7 +57,7 @@ function buildLevel() {
   // the furniture you bump into (SOLIDS, js/layout.js): grey boxes of its exact size, so nothing solid is ever invisible (H5), until
   // the Blender kit's models are wired in here (js/kit.js furnishes with them when given the kit)
   if (typeof Kit !== 'undefined') Kit.furnish(level, { style: F.style, floorIdx }, { kit: null, evict: false });
-  upgradeSurfaces(F, floor.material, G);                 // (the textures baked in Blender, when they've loaded: tools/blender/map_textures.py)
+  upgradeSurfaces(F, floor.material, G, walls, faces, ceil);   // (the surfaces baked in Blender, when they've loaded: tools/blender/kit/surfaces2.py)
   buildPuzzles3D(G);                                     // the labyrinth boxes on the walls (js/puzzles.js)
   notes.forEach(n => { const o = makeNote(n); n.obj = o; G.add(o); });
   if (boardsTemplate) for (const b of creaks) G.add(makeBoard(b));    // (the loose floorboards, in 3D; otherwise painted on the floor)
@@ -65,36 +65,46 @@ function buildLevel() {
   scene.add(G);
 }
 
-/* ---------- the surfaces baked in Blender (textures/, made by tools/blender/map_textures.py) ----------
-   Colour, normal map (the relief: the gaps between boards and tiles, the grain, the wall panels) and roughness, for the floor
-   and the walls of each floor of the house. Until they've loaded (or if they can't be), the painted textures stay. */
-const SURFACES = [
-  { floor: ['floor_wood1', 'floor_wood'], wall: ['wall_paper1', 'wall_paper'] },
-  { floor: ['floor_tile2', 'floor_tile'], wall: ['wall_tile2', 'wall_tile'] },
-  { floor: ['floor_concrete3', 'floor_concrete'], wall: ['wall_brick3', 'wall_brick'] },
-  { floor: ['floor_wood4', 'floor_wood'], wall: ['wall_attic4', 'wall_attic'] },
-  { floor: ['floor_tile5', 'floor_tile'], wall: ['wall_shop5', 'wall_shop'] },
-];
+/* ---------- the surfaces baked in Blender (textures/surf/<style>/, made by tools/blender/kit/surfaces2.py) ----------
+   Per floor style: the floor (one 2.25 m tile), the wall (2.25 x 3 m; two looks side by side in one picture: A as built,
+   B damaged: stains, mould, peeling, flaking) and the ceiling, each with its colour, normal map (the relief) and orh map
+   (R ambient occlusion, G roughness, B height), in three sizes (hi, md, lo) to suit the graphics card. Until they've
+   loaded (or if they can't be), the painted textures stay; Low keeps the painted ones (lighter).
+   (The older textures/*.webp sets and surfaceSet are still used by the lobby.) */
+const SURF_STYLES = ['wood', 'tile', 'concrete', 'attic', 'workshop'];
+const surfTier = () => typeof Kit !== 'undefined' && Kit.tierFor ? Kit.tierFor(settings.quality, LOWQ) : settings.quality === 'high' ? 'hi' : 'md';
 const surfCache = new Map();
-function surfaceSet([colour, relief]) {
-  const key = colour + '|' + relief; if (surfCache.has(key)) return surfCache.get(key);
-  // (the game's three.js has no TextureLoader: a plain image, wrapped as a texture)
-  const one = (file, srgb) => new Promise(res => { const img = new Image();
+// (the game's three.js has no TextureLoader: a plain image, wrapped as a texture)
+function loadTex(src, srgb) {
+  return new Promise(res => { const img = new Image();
     img.onload = () => { const t = new THREE.CanvasTexture(img); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
       if (srgb) t.colorSpace = THREE.SRGBColorSpace; res(t); };
-    img.onerror = () => res(null); img.src = 'textures/' + file + '.webp'; });
-  const p = Promise.all([one(colour + '_color', true), one(relief + '_normal'), one(relief + '_rough')]).then(([map, normalMap, roughnessMap]) => map && normalMap ? { map, normalMap, roughnessMap } : null);
+    img.onerror = () => res(null); img.src = src; });
+}
+function surfaceSet([colour, relief]) {
+  const key = colour + '|' + relief; if (surfCache.has(key)) return surfCache.get(key);
+  const p = Promise.all([loadTex('textures/' + colour + '_color.webp', true), loadTex('textures/' + relief + '_normal.webp'), loadTex('textures/' + relief + '_rough.webp')])
+    .then(([map, normalMap, roughnessMap]) => map && normalMap ? { map, normalMap, roughnessMap } : null);
   surfCache.set(key, p); return p;
 }
-function upgradeSurfaces(F, floorMat, G) {
-  const set = SURFACES[floorIdx]; if (!set || settings.quality === 'low') return;   // (low quality: the painted ones, lighter)
-  const lv = level;
-  surfaceSet(set.floor).then(s => {
+// one part (floor, wall, ceil) of a style's baked set: {map, normalMap, orh}, or null if any of it is missing
+function bakedSet(style, part, tier) {
+  const key = style + '/' + part + '.' + tier; if (surfCache.has(key)) return surfCache.get(key);
+  const f = n => 'textures/surf/' + style + '/' + part + '_' + n + '.' + tier + '.webp';
+  const p = Promise.all([loadTex(f(part === 'floor' ? 'colorA' : 'color'), true), loadTex(f('normal')), loadTex(f('orh'))])
+    .then(([map, normalMap, orh]) => map && normalMap && orh ? { map, normalMap, orh } : null);
+  surfCache.set(key, p); return p;
+}
+function upgradeSurfaces(F, floorMat, G, walls, faces, ceil) {
+  const style = SURF_STYLES[floorIdx]; if (!style || settings.quality === 'low') return;   // (low quality: the painted ones, lighter)
+  const lv = level, tier = surfTier();
+  // (copies of the cached textures, repeated as the level needs: the level's own, disposed with it)
+  const rep = (t, x, y) => { const c = t.clone(); c.repeat.set(x, y); c.needsUpdate = true; return c; };
+  bakedSet(style, 'floor', tier).then(s => {
     if (!s || level !== lv) return;
-    // the floor: the baked boards/tiles (one texture per tile), with the painted shade, stains and words multiplied over it
-    const rep = t => { const c = t.clone(); c.repeat.set(GW, GH); c.needsUpdate = true; return c; };
+    // the floor: the baked boards/tiles (one picture per tile), with the painted shade, stains and words multiplied over it
     const ov = floorOverlay(F), painted = floorMat.map;
-    floorMat.map = rep(s.map); floorMat.normalMap = rep(s.normalMap); floorMat.roughnessMap = s.roughnessMap && rep(s.roughnessMap);
+    floorMat.map = rep(s.map, GW, GH); floorMat.normalMap = rep(s.normalMap, GW, GH); floorMat.roughnessMap = rep(s.orh, GW, GH);
     floorMat.bumpMap = null; floorMat.roughness = 1; floorMat.color.setScalar(1.25); floorMat.normalScale.set(1, 1);
     if (painted) painted.dispose();                      // (the painted floor, which was its relief too: nothing uses it any more)
     floorMat.userData.overlay = ov;
@@ -106,13 +116,26 @@ function upgradeSurfaces(F, floorMat, G) {
     };
     floorMat.customProgramCacheKey = () => 'floorOverlay'; floorMat.needsUpdate = true;
   });
-  surfaceSet(set.wall).then(s => {
+  bakedSet(style, 'wall', tier).then(s => {
     if (!s || level !== lv) return;
+    // each wall face picks look A or B: its u moves into the left or the right half of the colour picture. The normal and
+    // orh pictures hold one tile only (both looks share the relief), so they repeat twice across, which undoes the halving.
+    const uv = walls.geometry.attributes.uv, per = uv.count / faces.length;
+    faces.forEach((f, i) => { const b = hash(f.x * 3 + f.nx, f.y * 3 + f.nz, 77) < 0.35 ? 0.5 : 0;
+      for (let k = i * per; k < (i + 1) * per; k++) uv.setX(k, uv.getX(k) * 0.5 + b); });
+    uv.needsUpdate = true;
     const mats = new Set(), painted = new Set();          // (the walls and the tops of the doorways share the painted wall and its relief)
     G.traverse(o => { const m = o.material; if (m && m.userData && m.userData.wallSurface) mats.add(m); });
     for (const m of mats) { painted.add(m.map).add(m.bumpMap);
-      m.map = s.map.clone(); m.normalMap = s.normalMap.clone(); m.bumpMap = null; m.color.setScalar(1.15); m.needsUpdate = true; }   // (clones: the level's own, disposed with it)
+      const own = m === walls.material;                   // (the doorway tops keep a 0..1 u: they show look A)
+      m.map = rep(s.map, own ? 1 : 0.5, 1); m.normalMap = rep(s.normalMap, own ? 2 : 1, 1); m.bumpMap = null; m.color.setScalar(1.1); m.needsUpdate = true; }
     for (const t of painted) if (t) t.dispose();
+  });
+  bakedSet(style, 'ceil', tier).then(s => {
+    if (!s || level !== lv) return;
+    const old = ceil.material;                            // (painted and flat-shaded: now a real plaster/board ceiling that takes the flashlight)
+    ceil.material = new THREE.MeshStandardMaterial({ map: rep(s.map, GW, GH), normalMap: rep(s.normalMap, GW, GH), roughnessMap: rep(s.orh, GW, GH), roughness: 1, metalness: 0 });
+    if (old.map) old.map.dispose(); old.dispose(); ceil.receiveShadow = true;
   });
 }
 // what the painted floor adds over the baked one: shade in the corners, stains, petals, words, the loose boards (white = nothing)
