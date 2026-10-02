@@ -1209,9 +1209,10 @@ def paint_mat(name, W, H, color='#d6cbb2', under='#5f6d52', primer='#8a5a3c', wo
     gr = m.math('MULTIPLY', m.remap(cav, 0.9, 0.4, smooth=True), m.remap(T.noise(25, 4), 0.3, 0.7, 0.4, 1.0))
     col = m.mix(m.math('MULTIPLY', gr, 0.7), col, (0.08, 0.065, 0.05)); rough = m.mixf(gr, rough, 0.8)
     col = m.mix(m.remap(T.noise(1.6, 4, 0.6, off=19.0), 0.4, 0.85, 0.0, 0.4 * age), col, m.hsv(col, 0.5, 0.9, 0.78))   # (handled, smoked, dusted for a century)
-    nrm = sep(m, m.geo('Normal'))[up]
-    ledge = m.math('MULTIPLY', m.remap(nrm, 0.4, 0.9, smooth=True), m.remap(T.noise(30, 4, off=12.0), 0.3, 0.7, 0.35, 0.8))
-    col = m.mix(ledge, col, lin('#8c8478')); rough = m.mixf(ledge, rough, 0.9)
+    if up is not None:                                                 # (no ledges on a ceiling)
+        nrm = sep(m, m.geo('Normal'))[up]
+        ledge = m.math('MULTIPLY', m.remap(nrm, 0.4, 0.9, smooth=True), m.remap(T.noise(30, 4, off=12.0), 0.3, 0.7, 0.35, 0.8))
+        col = m.mix(ledge, col, lin('#8c8478')); rough = m.mixf(ledge, rough, 0.9)
     if scuff:
         low = m.remap(T.y, scuff, 0.0, smooth=True)
         kicks = m.math('MULTIPLY', low, m.remap(T.noise(28, 3, 0.5, off=21.0), 0.66, 0.74))
@@ -1323,12 +1324,12 @@ def wainscot(G, W, paint, top=0.93, pitch=0.75, stile=0.095, base=0.28, rail=(0.
     k = random.uniform(-50, 50); G.add(profile_x(prof, -0.4, W + 0.4), paint, {'gpos': (lambda c, k=k: gh(c, k)), 'prand': random.random()}, wrap=False)
     G.add(grid(-0.4, W + 0.4, -0.1, top + 0.1, 2, 2, -0.02), flatmat('wainscot_back', (0.03, 0.025, 0.02), 0.9), {'gpos': (0, 0, 0), 'prand': 0.5}, wrap=False)
 
-def plaster_grid(x0, x1, y0, y1, W, step=0.012, amp=0.0012, seed=0.0):
-    """the paper's ground: lath-and-plaster that was never quite flat (periodic across the tile, free up it)"""
+def plaster_grid(x0, x1, y0, y1, W, step=0.012, amp=0.0012, seed=0.0, H=3.0):
+    """the paper's ground: lath-and-plaster that was never quite flat (periodic across the tile, and up it every H)"""
     nx = int(round((x1 - x0) / step)); ny = int(round((y1 - y0) / step)); bm = grid(x0, x1, y0, y1, nx, ny, 0.0)
     for v in bm.verts:
         x, y = v.co.x, v.co.y
-        v.co.z = amp * (pnoise(x, y, W, 3.0, 1.1, seed) + 0.45 * pnoise(x, y, W, 3.0, 3.5, seed + 3.3) + 0.15 * pnoise(x, y, W, 3.0, 11.0, seed + 7.1))
+        v.co.z = amp * (pnoise(x, y, W, H, 1.1, seed) + 0.45 * pnoise(x, y, W, H, 3.5, seed + 3.3) + 0.15 * pnoise(x, y, W, H, 11.0, seed + 7.1))
     return bm
 
 def wood_wall():
@@ -1610,7 +1611,7 @@ def attic_wall():
             'heights': {'skirting': TRIMS['attic']['skirting']['h'], 'nail_rows': list(rows)},
             'notes': 'vertical rough-sawn pine boarding, nailed to rails at 0.45 / 1.5 / 2.6 m; B: roof-leak streaks and mould'}
 
-def distemper_mat(name, W, H, col='#b9b19c', plaster='#a89b88', repair='#c9c2b0', wv=False, y_from=0.0, grime_band=(0.85, 1.5)):
+def distemper_mat(name, W, H, col='#b9b19c', plaster='#a89b88', repair='#c9c2b0', wv=False, y_from=0.0, grime_band=(0.85, 1.5), ceiling=False):
     """lime plaster in tired distemper: broad brush marks, patchy, a few repairs in fresher plaster, map cracking and two or
        three long cracks with their edges spalled, plugged and open fixing holes, the distemper flaking in places to the
        plaster, grimy and oily round bench height, sooted toward the ceiling. Variant B: damp patches, heavy flaking, mould."""
@@ -1640,7 +1641,7 @@ def distemper_mat(name, W, H, col='#b9b19c', plaster='#a89b88', repair='#c9c2b0'
     col_ = m.mix(hole, col_, m.mix(m.remap(sep(m, T.voronoi(6.0, 'Color', off=51.0))[1], 0.4, 0.6), (0.03, 0.025, 0.02), lin('#7a5a3a')))
     h = m.math('SUBTRACT', h, m.math('MULTIPLY', hole, 0.002))
     # flaking distemper (a little on A, a lot on B with the damp)
-    damp = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(T.noise(0.8, 4, 0.55, off=61.0), 0.5, 0.7, smooth=True), V), edge_fade(m, W, H, 0.08, 0.4, T, wv=False))
+    damp = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(T.noise(0.8, 4, 0.55, off=61.0), 0.5, 0.7, smooth=True), V), edge_fade(m, W, H, 0.08, 0.4, T, wv=wv))
     fk = m.math('ADD', T.noise(12, 5, 0.65, off=33.0), m.math('MULTIPLY', damp, 0.35))
     flaked = m.remap(fk, 0.66, 0.68, smooth=True); lip = m.math('MULTIPLY', m.remap(fk, 0.62, 0.66), m.remap(fk, 0.69, 0.66))
     col_ = m.mix(flaked, col_, m.mix(m.remap(T.noise(30, 3, off=4.0), 0.3, 0.7), lin(plaster), m.hsv(m.mix(0.0, lin(plaster), lin(plaster)), 0.5, 1.0, 0.85)))
@@ -1651,12 +1652,28 @@ def distemper_mat(name, W, H, col='#b9b19c', plaster='#a89b88', repair='#c9c2b0'
     sn = T.noise(1.1, 4, 0.55, off=71.0)                                                           # (old water and tea-coloured stains)
     stn = m.remap(sn, 0.62, 0.7, smooth=True); stt = m.math('MULTIPLY', m.remap(sn, 0.6, 0.62), m.remap(sn, 0.66, 0.62))
     col_ = m.mix(m.math('MULTIPLY', stn, 0.35), col_, m.mix(1.0, col_, (0.85, 0.75, 0.58), 'MULTIPLY')); col_ = m.mix(m.math('MULTIPLY', stt, 0.45), col_, m.mix(1.0, col_, (0.7, 0.58, 0.42), 'MULTIPLY'))
-    # grime round the bench, soot toward the ceiling, dirt in every hollow
-    gb = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(y, grime_band[0], grime_band[0] + 0.15, smooth=True), m.remap(y, grime_band[1], grime_band[1] - 0.3, smooth=True)),
-                m.remap(T.noise(4, 4, off=1.0), 0.42, 0.78, 0.0, 0.7))
-    col_ = m.mix(gb, col_, m.hsv(col_, 0.5, 0.75, 0.6)); rough = m.mixf(gb, rough, 0.6)
-    soot = m.math('MULTIPLY', m.remap(y, 1.8, 3.0, smooth=True), m.remap(T.noise(1.4, 3, off=6.0), 0.3, 0.7, 0.35, 0.75))
-    col_ = m.mix(soot, col_, m.hsv(col_, 0.5, 0.6, 0.6))
+    if ceiling:
+        # a ceiling: hairline cracks along the laths, water rings, fly specks, sooted all over in clouds
+        lf = m.math('FRACT', m.math('DIVIDE', y, 0.0333)); ld = m.math('MULTIPLY', m.math('MINIMUM', lf, m.math('SUBTRACT', 1.0, lf)), 0.0333)
+        lath = m.math('MULTIPLY', m.remap(ld, 0.0004, 0.0), m.remap(m.math('ADD', T.noise(2.0, 3, off=81.0), m.math('MULTIPLY', T.noise(14, 2, off=82.0), 0.3)), 0.72, 0.78))
+        lath = m.math('MULTIPLY', lath, m.remap(m.math('FRACT', m.math('MULTIPLY', m.math('FLOOR', m.math('DIVIDE', y, 0.0333)), 0.618)), 0.6, 0.65))   # (only some laths)
+        col_ = m.mix(m.math('MULTIPLY', lath, 0.8), col_, (0.07, 0.065, 0.06)); h = m.math('SUBTRACT', h, m.math('MULTIPLY', lath, 0.0006))
+        rv = T.voronoi(2.2, 'Distance', off=84.0); rsel = m.remap(T.noise(0.9, 2, off=85.0), 0.55, 0.62)
+        rr = m.math('ADD', rv, m.math('MULTIPLY', m.math('SUBTRACT', T.noise(12, 3, off=86.0), 0.5), 0.04))
+        ring = m.math('MULTIPLY', m.math('MAXIMUM', m.math('MULTIPLY', m.remap(rr, 0.15, 0.17), m.remap(rr, 0.19, 0.17)), m.math('MULTIPLY', m.math('MULTIPLY', m.remap(rr, 0.1, 0.11), m.remap(rr, 0.125, 0.11)), 0.6)), rsel)
+        col_ = m.mix(m.math('MULTIPLY', m.math('MULTIPLY', m.remap(rr, 0.18, 0.12), rsel), 0.3), col_, m.mix(1.0, col_, (0.88, 0.8, 0.64), 'MULTIPLY'))
+        col_ = m.mix(m.math('MULTIPLY', ring, 0.8), col_, m.mix(1.0, col_, (0.6, 0.47, 0.3), 'MULTIPLY'))
+        fly = m.math('MULTIPLY', m.remap(T.voronoi(120, 'Distance', off=87.0), 0.06, 0.02, smooth=True), m.remap(T.noise(2.0, 2, off=88.0), 0.5, 0.65))
+        col_ = m.mix(m.math('MULTIPLY', fly, 0.8), col_, (0.05, 0.04, 0.03))
+        soot = m.remap(T.noise(1.0, 4, 0.55, off=6.0), 0.3, 0.8, 0.2, 0.6)
+        col_ = m.mix(soot, col_, m.hsv(col_, 0.5, 0.6, 0.66))
+    else:
+        # grime round the bench, soot toward the ceiling
+        gb = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(y, grime_band[0], grime_band[0] + 0.15, smooth=True), m.remap(y, grime_band[1], grime_band[1] - 0.3, smooth=True)),
+                    m.remap(T.noise(4, 4, off=1.0), 0.42, 0.78, 0.0, 0.7))
+        col_ = m.mix(gb, col_, m.hsv(col_, 0.5, 0.75, 0.6)); rough = m.mixf(gb, rough, 0.6)
+        soot = m.math('MULTIPLY', m.remap(y, 1.8, 3.0, smooth=True), m.remap(T.noise(1.4, 3, off=6.0), 0.3, 0.7, 0.35, 0.75))
+        col_ = m.mix(soot, col_, m.hsv(col_, 0.5, 0.6, 0.6))
     gr = m.math('MULTIPLY', m.remap(cav, 0.92, 0.5, smooth=True), m.remap(T.noise(25, 4), 0.3, 0.7, 0.5, 1.0))
     col_ = m.mix(m.math('MULTIPLY', gr, 0.7), col_, (0.06, 0.05, 0.04))
     return finish(m, col_, rough, h)
@@ -1681,6 +1698,156 @@ def workshop_wall():
     return {'geo': G.build('workshop_wall'), 'W': W, 'H': H, 'variants': 2, 'wv': False, 'ao': 0.12, 'cav': 0.012, 'pom': 0.02,
             'heights': {'dado': top, 'skirting': TRIMS['workshop']['skirting']['h'], 'boards': [0.0, top], 'plaster_from': top + 0.03},
             'notes': 'green painted V-jointed boarding to a batten at the dado height, distempered lime plaster above; B: damp, heavy flaking, mould'}
+
+# ================================================================ ceilings (the flat frame: x, y on the ceiling, z down into the room)
+def bm_of(ob):
+    """an object's mesh as a bmesh (the object is removed): for parts made by kitlib's sweep and lathe"""
+    bm = bmesh.new(); bm.from_mesh(ob.data); bm.transform(ob.matrix_world); me = ob.data; bpy.data.objects.remove(ob); bpy.data.meshes.remove(me); return bm
+
+def rib(pts, w=0.05, h=0.022, closed=False, name='rib'):
+    """a moulded plaster rib along pts [(x, y)] on the ceiling: a rounded section w wide standing h proud (its lower half
+       buried in the field)"""
+    path = []; n = len(pts)
+    for i, (x, y) in enumerate(pts):
+        a = pts[(i - 1) % n] if closed or i > 0 else pts[i]; b = pts[(i + 1) % n] if closed or i < n - 1 else pts[i]
+        t = Vector((b[0] - a[0], b[1] - a[1], 0.0)).normalized(); side = Vector((-t.y, t.x, 0.0))
+        path.append((Vector((x, y, 0.0)), side, Vector((0, 0, 1))))
+    if closed: path.append(path[0])
+    sec = kitlib.rounded_rect(w, 2 * h, min(w, h) * 0.45, 4)
+    return bm_of(kitlib.sweep(name, path, lambda k: sec, caps=(not closed, not closed)))
+
+def wood_ceil():
+    """the nursery's ceiling: lath-and-plaster in yellowed distemper, sagging a little between the joists, hairline cracks
+       along the laths, water rings, fly specks, flaking"""
+    W = H = TW; G = Geo(W, H)
+    M = distemper_mat('wood_ceil', W, H, col='#cdc6b2', plaster='#ab9f8a', repair='#d6d0c0', wv=True, ceiling=True)
+    bm = plaster_grid(0.0, W, 0.0, H, W, step=0.015, amp=0.0018, seed=21.0, H=H)
+    for v in bm.verts: v.co.z += 0.0022 * (0.5 - 0.5 * math.cos(2 * math.pi * v.co.x / 0.45))      # (sagging between joists every 0.45 m)
+    G.add(bm, M, {}, smooth=True, wrap=True)
+    return {'geo': G.build('wood_ceil'), 'W': W, 'H': H, 'variants': 1, 'ao': 0.08, 'cav': 0.01, 'pom': 0.006,
+            'notes': 'lath-and-plaster in old distemper: lath cracks, water rings, fly specks, soot, flaking'}
+
+def tile_ceil():
+    """the hall's ceiling: Jacobean strapwork in plaster (ribs along the tile's edges, a circle, a lozenge through it, small
+       circles where the lozenge meets the edges, a boss in the middle), old cream distemper, cracks along the ribs"""
+    W = H = TW; G = Geo(W, H); c = W / 2
+    M = distemper_mat('tile_ceil', W, H, col='#d2cab4', plaster='#ab9f8a', repair='#ddd6c4', wv=True, ceiling=True)
+    G.add(plaster_grid(0.0, W, 0.0, H, W, step=0.02, amp=0.0008, seed=23.0, H=H), M, {}, smooth=True, wrap=True)
+    G.add(rib([(x, 0.0) for x in np.linspace(0.0, W, 24)], 0.07, 0.026), M, {})                     # (the edge ribs: the copies make the grid)
+    G.add(rib([(0.0, y) for y in np.linspace(0.0, H, 24)], 0.07, 0.026), M, {})
+    G.add(rib([(c + 0.55 * math.cos(a), c + 0.55 * math.sin(a)) for a in np.linspace(0, 2 * math.pi, 72, endpoint=False)], 0.055, 0.022, closed=True), M, {})
+    for (a, b) in (((c, 0.0), (W, c)), ((W, c), (c, H)), ((c, H), (0.0, c)), ((0.0, c), (c, 0.0))):
+        G.add(rib([(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t) for t in np.linspace(0, 1, 20)], 0.045, 0.018), M, {})
+    for (x, y) in ((c, 0.0), (0.0, c)):
+        G.add(rib([(x + 0.17 * math.cos(a), y + 0.17 * math.sin(a)) for a in np.linspace(0, 2 * math.pi, 40, endpoint=False)], 0.04, 0.018, closed=True), M, {})
+    # the boss: a dome ringed with petals
+    for (r, z, n) in ((0.075, 0.035, 1), (0.03, 0.02, 8)):
+        for k in range(n):
+            a = 2 * math.pi * k / n; cx, cy = (c, c) if n == 1 else (c + 0.1 * math.cos(a), c + 0.1 * math.sin(a))
+            bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=12, radius=1.0)
+            for v in bm.verts: v.co = Vector((cx + v.co.x * r * (1.6 if n > 1 else 1.0), cy + v.co.y * r, max(-0.002, v.co.z * z)))
+            if n > 1: bmesh.ops.rotate(bm, verts=bm.verts, cent=Vector((cx, cy, 0)), matrix=Matrix.Rotation(a, 3, 'Z'))
+            G.add(bm, M, {}, smooth=True)
+    return {'geo': G.build('tile_ceil'), 'W': W, 'H': H, 'variants': 1, 'ao': 0.12, 'cav': 0.015, 'pom': 0.03,
+            'notes': 'Jacobean strapwork plaster ceiling in old distemper (ribs as geometry), boss at the centre'}
+
+def boardmark_mat(name, W, H, col='#8b877f', dark='#6a665f'):
+    """a slab cast against boards: each board's grain printed into the concrete (relief and a faint tone), each board strip
+       its own shade (the timber drank the water differently), fins and steps at the joints, pinholes, tie holes plugged with
+       mortar, lime runs crusting along the cracks, rust bleeding from the steel, water stains, cobweb grime in the corners"""
+    m = kitlib.Mat(name); T = Tor(m, W, H); g = m.attr('gpos', True); pr = m.attr('prand'); kind = m.attr('kind'); cav = look(m, 'CAV', W, H)
+    gx, gy, gz = sep(m, g)
+    r = m.math('ADD', vlen(m, comb(m, gx, gy, 0.0)), m.math('MULTIPLY', m.math('SUBTRACT', noise3(m, vmul(m, g, (12, 12, 0.9)), 1.0, 3, 0.5), 0.5), 0.006))
+    ring = m.math('FRACT', m.math('MULTIPLY', r, m.remap(pr, 0, 1, 120, 220))); lw = m.remap(ring, 0.6, 0.95)
+    fib = noise3(m, vmul(m, g, (300, 300, 4)), 1.0, 3, 0.6)
+    col_ = m.mix(m.remap(T.noise(1.2, 4, 0.55), 0.3, 0.75), lin(col), lin(dark))
+    col_ = m.hsv(col_, 0.5, 1.0, m.remap(pr, 0, 1, 0.88, 1.1))
+    col_ = m.mix(m.math('MULTIPLY', lw, 0.12), col_, m.hsv(col_, 0.5, 1.0, 0.85)); col_ = m.mix(m.remap(fib, 0.3, 0.7, 0.0, 0.08), col_, m.hsv(col_, 0.5, 1.0, 0.9))
+    h = m.math('ADD', m.math('MULTIPLY', lw, 0.0003), m.math('MULTIPLY', fib, 0.0001))
+    sand = T.noise(400, 3, 0.6); col_ = m.mix(m.remap(sand, 0.3, 0.7, 0.0, 0.15), col_, m.hsv(col_, 0.5, 1.0, 1.15))
+    ph = T.voronoi(110, 'Distance', off=2.0); pin = m.math('MULTIPLY', m.remap(ph, 0.07, 0.025, smooth=True), m.remap(T.noise(5, 2, off=8.0), 0.4, 0.7, 0.0, 1.0))
+    col_ = m.mix(m.math('MULTIPLY', pin, 0.7), col_, m.hsv(col_, 0.5, 1.0, 0.4)); h = m.math('SUBTRACT', h, m.math('MULTIPLY', pin, 0.0004))
+    plug = m.remap(kind, 1.5, 1.6); col_ = m.mix(plug, col_, m.mix(m.remap(sand, 0.3, 0.7), lin('#9c968a'), lin('#8a8478')))
+    ce = m.math('DIVIDE', T.vwarp(1.4, 0.07, 3.0, 'Distance', 'DISTANCE_TO_EDGE', off=11.0), 1.4); keep = m.remap(T.noise(1.0, 2, off=21.0), 0.52, 0.56)
+    crack = m.math('MULTIPLY', m.math('SUBTRACT', 1.0, m.math('MINIMUM', 1.0, m.math('DIVIDE', ce, 0.0011))), keep)
+    col_ = m.mix(m.math('MULTIPLY', crack, 0.9), col_, (0.04, 0.038, 0.035)); h = m.math('SUBTRACT', h, m.math('MULTIPLY', crack, 0.001))
+    lime = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(ce, 0.02, 0.0, smooth=True), keep), m.remap(T.noise(25, 4, off=6.0), 0.4, 0.7))
+    col_ = m.mix(m.math('MULTIPLY', lime, 0.85), col_, lin('#dcd8cd')); h = m.math('ADD', h, m.math('MULTIPLY', lime, 0.0006))
+    rs = T.noise(1.3, 4, 0.6, off=41.0); rust = m.math('MULTIPLY', m.remap(rs, 0.66, 0.74, smooth=True), m.remap(T.noise(20, 3, off=3.0), 0.3, 0.7, 0.5, 1.0))
+    col_ = m.mix(m.math('MULTIPLY', rust, 0.7), col_, m.mix(0.5, col_, lin('#7a4220')))
+    ws = T.noise(0.9, 3, 0.5, off=51.0); stain = m.remap(ws, 0.6, 0.66, smooth=True); tide = m.math('MULTIPLY', m.remap(ws, 0.585, 0.6), m.remap(ws, 0.63, 0.61))
+    col_ = m.mix(m.math('MULTIPLY', stain, 0.4), col_, m.mix(1.0, col_, (0.75, 0.7, 0.62), 'MULTIPLY')); col_ = m.mix(m.math('MULTIPLY', tide, 0.5), col_, m.mix(1.0, col_, (0.6, 0.52, 0.42), 'MULTIPLY'))
+    gr = m.math('MULTIPLY', m.remap(cav, 0.95, 0.45, smooth=True), m.remap(T.noise(25, 4), 0.3, 0.7, 0.5, 1.0))
+    col_ = m.mix(m.math('MULTIPLY', gr, 0.8), col_, (0.04, 0.036, 0.032))
+    col_ = m.mix(m.remap(T.noise(1.1, 4, 0.55, off=19.0), 0.35, 0.85, 0.1, 0.5), col_, m.hsv(col_, 0.5, 0.85, 0.72))
+    return finish(m, col_, m.remap(sand, 0.3, 0.7, 0.82, 0.95), h)
+
+def concrete_ceil():
+    """the cellar's ceiling: a slab cast against 0.15 m boards (15 to a tile), a step and a fin at each joint, butt joints in
+       the boards, tie holes every 0.75 m plugged with mortar"""
+    W = H = TW; G = Geo(W, H); n = 15; bw = H / n
+    M = boardmark_mat('concrete_ceil', W, H)
+    for r in range(n):
+        y0 = r * bw; pieces = [(0.0, W)] if random.random() < 0.5 else (lambda j: [(0.0, j), (j, W)])(random.uniform(0.5, 1.75))
+        off = random.uniform(0, W); dz = random.gauss(0, 0.0008)
+        for (a, b) in pieces:
+            L = b - a; bm = box(L - 0.0006, bw - 0.0006, 0.04, 0.0006, 1)
+            cuts(bm, 0, [-L / 2 + L * k / 12 for k in range(1, 12)])
+            xc = (off + (a + b) / 2) % W; yc = y0 + bw / 2; tilt = random.gauss(0, 0.004)
+            xform(bm, (xc, yc, -0.02 + dz), (tilt, 0, 0))
+            d0 = random.uniform(0.08, 0.25); o = random.uniform(-90, 90)
+            G.add(bm, M, {'gpos': (lambda c, yc=yc, d0=d0, o=o: (c.y - yc, d0 + c.z, c.x + o)), 'prand': random.random(), 'kind': 0.0})
+        # the fin squeezed out between this board and the next, here and there
+        if random.random() < 0.6:
+            fx = random.uniform(0, W); fl = random.uniform(0.2, 1.2)
+            fn = box(fl, 0.0025, 0.004, 0.0008, 1); xform(fn, ((fx + fl / 2) % W, y0 + bw, 0.0005 + abs(dz))); G.add(fn, M, {'gpos': (0, 0, 0), 'prand': 0.5, 'kind': 0.0})
+    for i in range(3):
+        for j in range(3):
+            pl = bmesh.new(); bmesh.ops.create_circle(pl, cap_ends=True, segments=20, radius=0.014)
+            xform(pl, ((i + 0.5) * 0.75, (j + 0.5) * 0.75, 0.0012)); G.add(pl, M, {'gpos': (0, 0, 0), 'prand': 0.5, 'kind': 2.0})
+    return {'geo': G.build('concrete_ceil'), 'W': W, 'H': H, 'variants': 1, 'ao': 0.1, 'cav': 0.012, 'pom': 0.006,
+            'notes': 'board-marked concrete slab, 0.15 m boards, fins and steps at joints, plugged tie holes every 0.75 m'}
+
+def attic_ceil():
+    """the attic's ceiling: rafters every 0.45 m (over the joists' lines) with the sarking boards between them, gaps to the
+       slates behind"""
+    W = H = TW; G = Geo(W, H); rw, rd = 0.05, 0.1
+    PR = pine_mat('attic_rafter', W, H, early='#7c6650', late='#4e3c2a', dusty=0.15, nails=False, sawn=1.0, fig=0.6, wall_rows=None)
+    PB = pine_mat('attic_sark', W, H, early='#6e5a46', late='#46362a', dusty=0.25, nails=False, sawn=0.8, fig=0.5, wall_rows=None)
+    SL = flatmat('attic_slate', (0.015, 0.016, 0.018), 0.8)
+    for k in range(5):
+        xc = (k + 0.5) * JOIST
+        bm = box(rw + random.uniform(-0.004, 0.004), H, rd, 0.003, 2); cuts(bm, 1, [-H / 2 + H * i / 30 for i in range(1, 30)])
+        xform(bm, (xc + random.gauss(0, 0.003), H / 2, -rd / 2), (0, random.gauss(0, 0.004), 0))
+        d0 = random.uniform(0.1, 0.3); o = random.uniform(-90, 90)
+        G.add(bm, PR, {'gpos': (lambda c, xc=xc, d0=d0, o=o: (c.x - xc, d0 + c.z, c.y + o)), 'prand': random.random(), 'qs': 0.0, 'bL': H, 'bw': rw,
+                       'spl': 9.0, 'bx': (lambda c, xc=xc: (c.x - xc) / (rw / 2)), 'bl': (lambda c: c.y - H / 2)})
+    widths = split_widths(H, 12, 0.15, 0.23); y = 0.0
+    for wbd in widths:
+        gap = random.uniform(0.003, 0.01); wb = wbd - gap; yc = y + wbd / 2
+        bm = box(W, wb, 0.02, 0.0015, 2); cuts(bm, 0, [W * i / 40 for i in range(1, 40)]); cuts(bm, 1, [-wb / 2 + wb * i / 6 for i in range(1, 6)])
+        xform(bm, (W / 2, yc, -rd - 0.01 + random.gauss(0, 0.0015)))
+        d0 = random.uniform(0.1, 0.3); o = random.uniform(-90, 90)
+        G.add(bm, PB, {'gpos': (lambda c, yc=yc, d0=d0, o=o: (c.y - yc, d0 + c.z, c.x + o)), 'prand': random.random(), 'qs': 0.0, 'bL': W, 'bw': wb,
+                       'spl': 9.0, 'bx': (lambda c, yc=yc, wb=wb: (c.y - yc) / (wb / 2)), 'bl': (lambda c: c.x - W / 2)})
+        y += wbd
+    G.add(grid(-0.4, W + 0.4, -0.4, H + 0.4, 4, 4, -rd - 0.05), SL, {'gpos': (0, 0, 0), 'prand': 0.5, 'qs': 0.0, 'bL': 1.0, 'bw': 0.2, 'spl': 9.0, 'bx': 0.0, 'bl': 0.0}, wrap=False)
+    return {'geo': G.build('attic_ceil'), 'W': W, 'H': H, 'variants': 1, 'ao': 0.15, 'cav': 0.015, 'pom': 0.06,
+            'notes': 'rafters every 0.45 m (along v) with rough sarking boards between them, gaps to dark slates'}
+
+def workshop_ceil():
+    """the workshop's ceiling: V-jointed boards (0.1125 m, 20 to a tile) under old limewash, flaking to the wood, sooted"""
+    W = H = TW; G = Geo(W, H); n = 20; bw = H / n
+    PAINT = paint_mat('workshop_ceil', W, H, '#c9c3b2', '#8a7c66', '#7a6650', '#8e7356', wv=True, chips=1.4, gloss=0.8, age=2.4, up=None)
+    gh = lambda c, k=0: (c.y * 0.001 + k, c.z, c.x)
+    for i in range(n):
+        y0 = i * bw; wb = bw - random.uniform(0.0005, 0.0015)
+        bm = box(W, wb, 0.018, 0.0035, 1); cuts(bm, 0, [W * k / 20 for k in range(1, 20)])
+        xform(bm, (W / 2, y0 + bw / 2, -0.009 + random.gauss(0, 0.0004)), (random.gauss(0, 0.002), 0, 0))
+        k = random.uniform(-50, 50); G.add(bm, PAINT, {'gpos': (lambda c, k=k: gh(c, k)), 'prand': random.random()})
+    G.add(grid(-0.4, W + 0.4, -0.4, H + 0.4, 2, 2, -0.02), flatmat('workshop_cback', (0.02, 0.018, 0.015), 0.9), {'gpos': (0, 0, 0), 'prand': 0.5}, wrap=False)
+    return {'geo': G.build('workshop_ceil'), 'W': W, 'H': H, 'variants': 1, 'ao': 0.1, 'cav': 0.012, 'pom': 0.012,
+            'notes': 'V-jointed ceiling boards along u under flaking limewash, sooted'}
 
 # ================================================================ running a set
 SIZES = {'floor': (2048, 2048), 'wall': (2048, 2731), 'upper': (1024, 1365), 'ceil': (1024, 1024), 'service': (1024, 1365),
@@ -1779,7 +1946,7 @@ def room_view(style, kind, entry):
        floor, a plain skirting at the style's height, daylight through a window off to the right and a warm lamp; eye 1.6 m"""
     from PIL import Image
     sc = kitlib.reset(); d = os.path.join(TMP, 'sheets', 'surf'); man = manifest_load()['styles'].get(style, {})
-    W, H = TW, FH; walls = man.get('wall') if kind != 'wall' else entry; floor = man.get('floor')
+    W, H = TW, FH; walls = man.get('wall') if kind != 'wall' else entry; floor = man.get('floor') if kind != 'floor' else entry
     if not walls: return None
     wA, wB = ship_mat('wallA', walls, 0), ship_mat('wallB', walls, 1)
     for i, mt in enumerate((wA, wB, wA)): quad(f'back{i}', (i * W, 2 * W, 0), (W, 0, 0), (0, 0, H), mat=mt)          # (faces -y)
@@ -1793,12 +1960,14 @@ def room_view(style, kind, entry):
     for (x0, y0, x1, y1) in ((0, 2 * W - sd, 3 * W, 2 * W), (0, 0, sd, 2 * W)):
         bm = box(x1 - x0, y1 - y0, sh, 0.004, 2); xform(bm, ((x0 + x1) / 2, (y0 + y1) / 2, sh / 2)); me = bpy.data.meshes.new('skirt'); bm.to_mesh(me); bm.free()
         o = kitlib.link(bpy.data.objects.new('skirt', me)); me.materials.append(skm)
-    quad('ceil', (0, 0, H), (0, 2 * W, 0), (3 * W, 0, 0), mat=flatmat('ceilm', (0.6, 0.58, 0.54), 0.9))
+    cl = entry if kind == 'ceil' else man.get('ceil')
+    quad('ceil', (0, 0, H), (0, 2 * W, 0), (3 * W, 0, 0), uv1=(2, 3), mat=ship_mat('ceilA', cl, 0) if cl else flatmat('ceilm', (0.6, 0.58, 0.54), 0.9))
     sky = sc.world; sky.use_nodes = True; bg = sky.node_tree.nodes['Background']; bg.inputs['Color'].default_value = (0.5, 0.56, 0.66, 1); bg.inputs['Strength'].default_value = 0.05
     win = lamp('window', 'AREA', 700, loc=(3 * W - 0.05, 1.0, 1.6), rot=(0, math.radians(-90), 0), size=1.2, color=(0.88, 0.93, 1.0))
     win.data.shape = 'RECTANGLE'; win.data.size = 1.3; win.data.size_y = 1.6
     lamp('lamp', 'POINT', 60, loc=(1.1, 2 * W - 0.6, 1.7), size=0.08, color=(1.0, 0.72, 0.45))
-    cam_at((3.2, 0.7, 1.6), (0.9, 2 * W - 0.3, 1.25), 22)
+    if kind == 'ceil': cam_at((3.4, 0.6, 1.5), (1.2, 2 * W - 0.6, 3.0), 20)
+    else: cam_at((3.2, 0.7, 1.6), (0.9, 2 * W - 0.3, 1.25), 22)
     out = render(os.path.join(d, f'{style}_{kind}_room.png'), 1350, 900, 256); print('room', out, flush=True); return out
 
 def sheet(style, kind, entry):
@@ -1869,7 +2038,7 @@ def sheet(style, kind, entry):
     for t in tiles: out.paste(t, (x, 30)); x += t.width
     ImageDraw.Draw(out).text((8, 8), f'{style} {kind}   {W:.2f} x {H:.2f} m   {entry["px"]["hi"]} px   pom {entry["pom"]} m   seams {json.dumps(entry["seam"].get("color"))}', fill=(230, 230, 230))
     p = os.path.join(d, f'{style}_{kind}.png'); out.save(p); print('sheet', p, f'{time.time() - t0:.0f}s', flush=True)
-    if kind in ('wall', 'floor'): room_view(style, kind, entry)
+    if kind in ('wall', 'floor', 'ceil'): room_view(style, kind, entry)
     return p
 
 # ================================================================ main
@@ -1882,9 +2051,9 @@ def main():
     print(f'surfaces2: {len(got)} sets in {time.time() - t0:.0f}s')
 
 if __name__ == '__main__':
-    SETS['wood'] = {'floor': wood_floor, 'wall': wood_wall}
-    SETS['tile'] = {'floor': tile_floor, 'wall': tile_wall}
-    SETS['concrete'] = {'floor': concrete_floor, 'wall': concrete_wall}
-    SETS['attic'] = {'floor': attic_floor, 'wall': attic_wall}
-    SETS['workshop'] = {'floor': workshop_floor, 'wall': workshop_wall}
+    SETS['wood'] = {'floor': wood_floor, 'wall': wood_wall, 'ceil': wood_ceil}
+    SETS['tile'] = {'floor': tile_floor, 'wall': tile_wall, 'ceil': tile_ceil}
+    SETS['concrete'] = {'floor': concrete_floor, 'wall': concrete_wall, 'ceil': concrete_ceil}
+    SETS['attic'] = {'floor': attic_floor, 'wall': attic_wall, 'ceil': attic_ceil}
+    SETS['workshop'] = {'floor': workshop_floor, 'wall': workshop_wall, 'ceil': workshop_ceil}
     main()

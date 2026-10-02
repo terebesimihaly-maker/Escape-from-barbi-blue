@@ -5,6 +5,76 @@
  "kit": 1,
  "styles": {
   "attic": {
+   "ceil": {
+    "ao_m": 0.15,
+    "bake_s": {
+     "ao": 1.3,
+     "cav": 1.4,
+     "colA": 1.6,
+     "col_shift": 1.6,
+     "dn_ao": 0.4,
+     "dn_cav": 0.4,
+     "height": 0.8,
+     "normal": 1.7,
+     "normal_shift": 1.7,
+     "rough": 1.6,
+     "total": 14.0,
+     "zgeo": 0.6
+    },
+    "files": {
+     "color": "attic/ceil_color",
+     "normal": "attic/ceil_normal",
+     "orh": "attic/ceil_orh"
+    },
+    "notes": "rafters every 0.45 m (along v) with rough sarking boards between them, gaps to dark slates",
+    "pom": 0.06,
+    "preview": false,
+    "px": {
+     "hi": [
+      1024,
+      1024
+     ],
+     "lo": [
+      256,
+      256
+     ],
+     "md": [
+      512,
+      512
+     ]
+    },
+    "px_per_m": 455,
+    "seam": {
+     "color": {
+      "inner_u": 0.0022,
+      "inner_v": 0.0149,
+      "u": 0.0108,
+      "v": 0.0023
+     },
+     "normal": {
+      "inner_u": 0.0124,
+      "inner_v": 0.0181,
+      "u": 0.1395,
+      "v": 0.0172
+     },
+     "orh": {
+      "inner_u": 0.0075,
+      "inner_v": 0.0129,
+      "u": 0.011,
+      "v": 0.0098
+     },
+     "shift": {
+      "color": 0.0003,
+      "normal": 0.0051
+     }
+    },
+    "size_m": [
+     2.25,
+     2.25
+    ],
+    "tiles": "uv",
+    "variants": 1
+   },
    "floor": {
     "ao_m": 0.1,
     "bake_s": {
@@ -177,6 +247,76 @@
    }
   },
   "concrete": {
+   "ceil": {
+    "ao_m": 0.1,
+    "bake_s": {
+     "ao": 1.4,
+     "cav": 1.2,
+     "colA": 1.3,
+     "col_shift": 1.4,
+     "dn_ao": 0.5,
+     "dn_cav": 0.4,
+     "height": 0.8,
+     "normal": 1.4,
+     "normal_shift": 1.3,
+     "rough": 1.4,
+     "total": 12.6,
+     "zgeo": 0.5
+    },
+    "files": {
+     "color": "concrete/ceil_color",
+     "normal": "concrete/ceil_normal",
+     "orh": "concrete/ceil_orh"
+    },
+    "notes": "board-marked concrete slab, 0.15 m boards, fins and steps at joints, plugged tie holes every 0.75 m",
+    "pom": 0.006,
+    "preview": false,
+    "px": {
+     "hi": [
+      1024,
+      1024
+     ],
+     "lo": [
+      256,
+      256
+     ],
+     "md": [
+      512,
+      512
+     ]
+    },
+    "px_per_m": 455,
+    "seam": {
+     "color": {
+      "inner_u": 0.0018,
+      "inner_v": 0.0057,
+      "u": 0.0014,
+      "v": 0.0076
+     },
+     "normal": {
+      "inner_u": 0.0011,
+      "inner_v": 0.0081,
+      "u": 0.0007,
+      "v": 0.0721
+     },
+     "orh": {
+      "inner_u": 0.0084,
+      "inner_v": 0.0187,
+      "u": 0.0094,
+      "v": 0.0582
+     },
+     "shift": {
+      "color": 0.0001,
+      "normal": 0.0007
+     }
+    },
+    "size_m": [
+     2.25,
+     2.25
+    ],
+    "tiles": "uv",
+    "variants": 1
+   },
    "floor": {
     "ao_m": 0.1,
     "bake_s": {
@@ -347,6 +487,76 @@
    }
   },
   "tile": {
+   "ceil": {
+    "ao_m": 0.12,
+    "bake_s": {
+     "ao": 7.1,
+     "cav": 4.6,
+     "colA": 2.2,
+     "col_shift": 2.0,
+     "dn_ao": 1.0,
+     "dn_cav": 0.8,
+     "height": 1.4,
+     "normal": 5.5,
+     "normal_shift": 2.1,
+     "rough": 2.0,
+     "total": 32.3,
+     "zgeo": 2.2
+    },
+    "files": {
+     "color": "tile/ceil_color",
+     "normal": "tile/ceil_normal",
+     "orh": "tile/ceil_orh"
+    },
+    "notes": "Jacobean strapwork plaster ceiling in old distemper (ribs as geometry), boss at the centre",
+    "pom": 0.03,
+    "preview": false,
+    "px": {
+     "hi": [
+      1024,
+      1024
+     ],
+     "lo": [
+      256,
+      256
+     ],
+     "md": [
+      512,
+      512
+     ]
+    },
+    "px_per_m": 455,
+    "seam": {
+     "color": {
+      "inner_u": 0.0047,
+      "inner_v": 0.0072,
+      "u": 0.003,
+      "v": 0.0025
+     },
+     "normal": {
+      "inner_u": 0.0098,
+      "inner_v": 0.0114,
+      "u": 0.0048,
+      "v": 0.0039
+     },
+     "orh": {
+      "inner_u": 0.0104,
+      "inner_v": 0.0105,
+      "u": 0.0082,
+      "v": 0.0061
+     },
+     "shift": {
+      "color": 0.0008,
+      "normal": 0.0019
+     }
+    },
+    "size_m": [
+     2.25,
+     2.25
+    ],
+    "tiles": "uv",
+    "variants": 1
+   },
    "floor": {
     "ao_m": 0.08,
     "bake_s": {
@@ -524,6 +734,76 @@
    }
   },
   "wood": {
+   "ceil": {
+    "ao_m": 0.08,
+    "bake_s": {
+     "ao": 1.3,
+     "cav": 1.4,
+     "colA": 1.7,
+     "col_shift": 1.7,
+     "dn_ao": 0.4,
+     "dn_cav": 0.4,
+     "height": 1.2,
+     "normal": 1.8,
+     "normal_shift": 1.7,
+     "rough": 1.7,
+     "total": 15.1,
+     "zgeo": 0.9
+    },
+    "files": {
+     "color": "wood/ceil_color",
+     "normal": "wood/ceil_normal",
+     "orh": "wood/ceil_orh"
+    },
+    "notes": "lath-and-plaster in old distemper: lath cracks, water rings, fly specks, soot, flaking",
+    "pom": 0.006,
+    "preview": false,
+    "px": {
+     "hi": [
+      1024,
+      1024
+     ],
+     "lo": [
+      256,
+      256
+     ],
+     "md": [
+      512,
+      512
+     ]
+    },
+    "px_per_m": 455,
+    "seam": {
+     "color": {
+      "inner_u": 0.0013,
+      "inner_v": 0.0014,
+      "u": 0.0025,
+      "v": 0.0022
+     },
+     "normal": {
+      "inner_u": 0.0043,
+      "inner_v": 0.0045,
+      "u": 0.0047,
+      "v": 0.004
+     },
+     "orh": {
+      "inner_u": 0.0071,
+      "inner_v": 0.0063,
+      "u": 0.0081,
+      "v": 0.0066
+     },
+     "shift": {
+      "color": 0.0003,
+      "normal": 0.0014
+     }
+    },
+    "size_m": [
+     2.25,
+     2.25
+    ],
+    "tiles": "uv",
+    "variants": 1
+   },
    "floor": {
     "ao_m": 0.1,
     "bake_s": {
@@ -697,6 +977,76 @@
    }
   },
   "workshop": {
+   "ceil": {
+    "ao_m": 0.1,
+    "bake_s": {
+     "ao": 1.3,
+     "cav": 1.2,
+     "colA": 1.1,
+     "col_shift": 1.1,
+     "dn_ao": 0.4,
+     "dn_cav": 0.4,
+     "height": 0.7,
+     "normal": 1.1,
+     "normal_shift": 1.1,
+     "rough": 1.1,
+     "total": 10.8,
+     "zgeo": 0.5
+    },
+    "files": {
+     "color": "workshop/ceil_color",
+     "normal": "workshop/ceil_normal",
+     "orh": "workshop/ceil_orh"
+    },
+    "notes": "V-jointed ceiling boards along u under flaking limewash, sooted",
+    "pom": 0.012,
+    "preview": false,
+    "px": {
+     "hi": [
+      1024,
+      1024
+     ],
+     "lo": [
+      256,
+      256
+     ],
+     "md": [
+      512,
+      512
+     ]
+    },
+    "px_per_m": 455,
+    "seam": {
+     "color": {
+      "inner_u": 0.004,
+      "inner_v": 0.0156,
+      "u": 0.012,
+      "v": 0.0489
+     },
+     "normal": {
+      "inner_u": 0.0025,
+      "inner_v": 0.0138,
+      "u": 0.2245,
+      "v": 0.2381
+     },
+     "orh": {
+      "inner_u": 0.0017,
+      "inner_v": 0.017,
+      "u": 0.0123,
+      "v": 0.0637
+     },
+     "shift": {
+      "color": 0.0005,
+      "normal": 0.001
+     }
+    },
+    "size_m": [
+     2.25,
+     2.25
+    ],
+    "tiles": "uv",
+    "variants": 1
+   },
    "floor": {
     "ao_m": 0.08,
     "bake_s": {
