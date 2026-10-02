@@ -5,7 +5,9 @@
 # positions over. Boxes come back in Blender axes (z up, the front -y), like defs.py's.
 import json, os, struct, subprocess
 import numpy as np
-GLTFT = '/tmp/claude-0/gltft'
+_REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+GLTFT = os.environ.get('EFBB_GLTFT') or next((p for p in (os.path.join(_REPO, 'tools', 'gltf'), '/tmp/claude-0/gltft')
+                                              if os.path.isdir(os.path.join(p, 'node_modules'))), os.path.join(_REPO, 'tools', 'gltf'))   # (as kitlib.GLTFT)
 
 def b2g(p): return (p[0], p[2], -p[1])                     # Blender (z up) -> glTF (y up)
 def g2b_box(lo, hi): return [[lo[0], -hi[2], lo[1]], [hi[0], -lo[2], hi[1]]]

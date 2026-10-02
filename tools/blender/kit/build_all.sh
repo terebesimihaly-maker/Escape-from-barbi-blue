@@ -7,12 +7,13 @@
 #   (PY=... to use another Blender Python; --sheets also renders contact sheets of every real asset)
 set -e
 cd "$(dirname "$0")/../../.."
-PY=${PY:-/tmp/claude-0/bpyenv/bin/python}
+PY=${PY:-$( [ -x /tmp/claude-0/bpyenv/bin/python ] && echo /tmp/claude-0/bpyenv/bin/python || command -v python3 || echo python )}
+NICE=$(command -v nice >/dev/null && echo 'nice -n 19' || echo '')   # (no nice on Windows)
 K=tools/blender/kit
 LOG=/tmp/efbb-kit/build.log; mkdir -p /tmp/efbb-kit
 SHEETS=0; ARGS=""
 for a in "$@"; do if [ "$a" = "--sheets" ]; then SHEETS=1; else ARGS="$ARGS $a"; fi; done
-run() { echo "== $(date +%H:%M:%S) $*" | tee -a "$LOG"; nice -n 19 "$PY" "$@" >> "$LOG" 2>&1 || { echo "FAILED: $* (see $LOG)"; exit 1; }; }
+run() { echo "== $(date +%H:%M:%S) $*" | tee -a "$LOG"; $NICE "$PY" "$@" >> "$LOG" 2>&1 || { echo "FAILED: $* (see $LOG)"; exit 1; }; }
 start=$(date +%s)
 run $K/placeholder.py $(echo "$ARGS" | sed 's/--only [^ ]*//')
 # the asset scripts, in the order of the spec's work packages (B13) (when two provide the same node, pack.py takes the newer build)
@@ -21,7 +22,7 @@ for s in surfaces2 trims doors windows modules wardrobes fixtures furn_wood furn
   if [ -f $K/$s.py ]; then run $K/$s.py $ARGS; fi
 done
 run $K/pack.py all all --if-stale
-if nice -n 19 "$PY" $K/check_kit.py --quiet > /tmp/efbb-kit/check.txt 2>&1; then ok=1; else ok=0; fi
+if $NICE "$PY" $K/check_kit.py --quiet > /tmp/efbb-kit/check.txt 2>&1; then ok=1; else ok=0; fi
 tee -a "$LOG" < /tmp/efbb-kit/check.txt
 [ $ok = 1 ] || { echo "FAILED: check_kit"; exit 1; }
 if [ $SHEETS = 1 ]; then

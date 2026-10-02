@@ -13,7 +13,10 @@ import bpy, bmesh
 import numpy as np
 from mathutils import Vector, Matrix, noise
 import common, defs
-REPO = defs.REPO; TMP = '/tmp/efbb-kit'; KITDIR = os.path.join(REPO, 'models', 'kit'); GLTFT = '/tmp/claude-0/gltft'
+REPO = defs.REPO; TMP = '/tmp/efbb-kit'; KITDIR = os.path.join(REPO, 'models', 'kit')
+# node tools (gltf-transform + meshopt): EFBB_GLTFT if set, else tools/gltf once "npm install" ran there, else the old cloud path
+GLTFT = os.environ.get('EFBB_GLTFT') or next((p for p in (os.path.join(REPO, 'tools', 'gltf'), '/tmp/claude-0/gltft')
+                                              if os.path.isdir(os.path.join(p, 'node_modules'))), os.path.join(REPO, 'tools', 'gltf'))
 TIERS = {'hi': 1, 'md': 2, 'lo': 4}                         # (texture size divisor per tier)
 os.makedirs(TMP, exist_ok=True)
 
@@ -777,7 +780,7 @@ def export_glb(objs, path):
     return path
 
 def node_script(src, name):
-    """a copy of a node script next to /tmp/claude-0/gltft's node_modules (node looks for packages beside the script, not
+    """a copy of a node script next to GLTFT's node_modules (node looks for packages beside the script, not
        in the working directory), refreshed when the original changes. src is a path or the script's text."""
     text = open(src).read() if os.path.exists(src) else src; dst = os.path.join(GLTFT, name)
     if not os.path.exists(dst) or open(dst).read() != text: open(dst, 'w').write(text)
