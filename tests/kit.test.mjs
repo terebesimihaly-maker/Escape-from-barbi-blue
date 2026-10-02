@@ -28,7 +28,8 @@ async function inject(p) {
           if (o.isInstancedMesh && Array.isArray(k.solid)) {
             if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
             k.solid.forEach((s, j) => { if (s < 0) return; o.getMatrixAt(j, m); m.premultiply(o.matrixWorld); boxes[s].union(b.copy(o.geometry.boundingBox).applyMatrix4(m)); hits[s]++; });
-          } else if (!o.isInstancedMesh && o.parent === R.group && typeof k.solid === 'number' && k.solid >= 0) { boxes[k.solid].union(new THREE.Box3().setFromObject(o)); hits[k.solid]++; }
+          // (precise: an animated copy is measured where its vertices are, not as its turned bounding box, which pokes through the floor)
+          } else if (!o.isInstancedMesh && o.parent === R.group && typeof k.solid === 'number' && k.solid >= 0) { boxes[k.solid].union(new THREE.Box3().setFromObject(o, true)); hits[k.solid]++; }
         });
         return boxes.map((x, i) => ({ hits: hits[i], min: x.min.toArray(), max: x.max.toArray() }));
       },
