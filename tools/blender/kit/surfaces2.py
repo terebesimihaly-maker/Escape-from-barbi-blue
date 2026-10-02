@@ -1638,7 +1638,7 @@ def attic_wall():
             'heights': {'skirting': TRIMS['attic']['skirting']['h'], 'nail_rows': list(rows)},
             'notes': 'vertical rough-sawn pine boarding, nailed to rails at 0.45 / 1.5 / 2.6 m; B: roof-leak streaks and mould'}
 
-def distemper_mat(name, W, H, col='#b9b19c', plaster='#a89b88', repair='#c9c2b0', wv=False, y_from=0.0, grime_band=(0.85, 1.5), ceiling=False):
+def distemper_mat(name, W, H, col='#b9b19c', plaster='#a89b88', repair='#c9c2b0', wv=False, y_from=0.0, grime_band=(0.85, 1.5), ceiling=False, holes=True):
     """lime plaster in tired distemper: broad brush marks, patchy, a few repairs in fresher plaster, map cracking and two or
        three long cracks with their edges spalled, plugged and open fixing holes, the distemper flaking in places to the
        plaster, grimy and oily round bench height, sooted toward the ceiling. Variant B: damp patches, heavy flaking, mould."""
@@ -1664,7 +1664,7 @@ def distemper_mat(name, W, H, col='#b9b19c', plaster='#a89b88', repair='#c9c2b0'
     h = m.math('SUBTRACT', h, m.math('ADD', m.math('MULTIPLY', crack, 0.0012), m.math('MULTIPLY', spall, 0.0005)))
     # fixing holes: open ones and wooden plugs
     hv = T.voronoi(6.0, 'Distance', off=51.0); hsel = m.remap(sep(m, T.voronoi(6.0, 'Color', off=51.0))[0], 0.8, 0.82)
-    hole = m.math('MULTIPLY', m.remap(hv, 0.025, 0.015, smooth=True), hsel)
+    hole = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(hv, 0.025, 0.015, smooth=True), hsel), 1.0 if holes else 0.0)
     col_ = m.mix(hole, col_, m.mix(m.remap(sep(m, T.voronoi(6.0, 'Color', off=51.0))[1], 0.4, 0.6), (0.03, 0.025, 0.02), lin('#7a5a3a')))
     h = m.math('SUBTRACT', h, m.math('MULTIPLY', hole, 0.002))
     # flaking distemper (a little on A, a lot on B with the damp)

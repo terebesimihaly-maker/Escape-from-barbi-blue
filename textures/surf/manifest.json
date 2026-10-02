@@ -322,6 +322,66 @@
     "tiles": "uv",
     "variants": 2
    },
+   "trim": {
+    "bake_s": {
+     "ao": 0.6,
+     "cav": 0.6,
+     "col": 0.4,
+     "edge": 0.6,
+     "normal": 0.5,
+     "rough": 0.4,
+     "total": 4.4
+    },
+    "bands": {
+     "cornice": [
+      0.55,
+      0.85
+     ],
+     "dado": [
+      0.4,
+      0.55
+     ],
+     "pictureRail": [
+      0.85,
+      1.0
+     ],
+     "skirting": [
+      0.0,
+      0.4
+     ]
+    },
+    "files": {
+     "color": "attic/trim_color",
+     "normal": "attic/trim_normal",
+     "orh": "attic/trim_orh"
+    },
+    "notes": "u = metres along / 2.25, v = arc length along each profile inside its band; orh B unused (1)",
+    "preview": false,
+    "profiles": "textures/arch/attic.profiles.json",
+    "px": {
+     "hi": [
+      2048,
+      256
+     ],
+     "lo": [
+      512,
+      64
+     ],
+     "md": [
+      1024,
+      128
+     ]
+    },
+    "seam": {
+     "color": {
+      "inner_u": 0.0011,
+      "inner_v": 0.0132,
+      "u": 0.0016,
+      "v": 0.4539
+     }
+    },
+    "tiles": "u"
+   },
    "upper": {
     "ao_m": 0.12,
     "bake_s": {
@@ -781,6 +841,66 @@
     "tiles": "uv",
     "variants": 2
    },
+   "trim": {
+    "bake_s": {
+     "ao": 0.7,
+     "cav": 0.7,
+     "col": 0.8,
+     "edge": 0.7,
+     "normal": 0.8,
+     "rough": 0.8,
+     "total": 5.7
+    },
+    "bands": {
+     "cornice": [
+      0.55,
+      0.85
+     ],
+     "dado": [
+      0.4,
+      0.55
+     ],
+     "pictureRail": [
+      0.85,
+      1.0
+     ],
+     "skirting": [
+      0.0,
+      0.4
+     ]
+    },
+    "files": {
+     "color": "concrete/trim_color",
+     "normal": "concrete/trim_normal",
+     "orh": "concrete/trim_orh"
+    },
+    "notes": "u = metres along / 2.25, v = arc length along each profile inside its band; orh B unused (1)",
+    "preview": false,
+    "profiles": "textures/arch/concrete.profiles.json",
+    "px": {
+     "hi": [
+      2048,
+      256
+     ],
+     "lo": [
+      512,
+      64
+     ],
+     "md": [
+      1024,
+      128
+     ]
+    },
+    "seam": {
+     "color": {
+      "inner_u": 0.0017,
+      "inner_v": 0.0089,
+      "u": 0.0017,
+      "v": 0.4369
+     }
+    },
+    "tiles": "u"
+   },
    "upper": {
     "ao_m": 0.08,
     "bake_s": {
@@ -1166,6 +1286,66 @@
     ],
     "tiles": "uv",
     "variants": 2
+   },
+   "trim": {
+    "bake_s": {
+     "ao": 1.0,
+     "cav": 1.0,
+     "col": 1.0,
+     "edge": 0.9,
+     "normal": 1.0,
+     "rough": 0.9,
+     "total": 7.2
+    },
+    "bands": {
+     "cornice": [
+      0.55,
+      0.85
+     ],
+     "dado": [
+      0.4,
+      0.55
+     ],
+     "pictureRail": [
+      0.85,
+      1.0
+     ],
+     "skirting": [
+      0.0,
+      0.4
+     ]
+    },
+    "files": {
+     "color": "tile/trim_color",
+     "normal": "tile/trim_normal",
+     "orh": "tile/trim_orh"
+    },
+    "notes": "u = metres along / 2.25, v = arc length along each profile inside its band; orh B unused (1)",
+    "preview": false,
+    "profiles": "textures/arch/tile.profiles.json",
+    "px": {
+     "hi": [
+      2048,
+      256
+     ],
+     "lo": [
+      512,
+      64
+     ],
+     "md": [
+      1024,
+      128
+     ]
+    },
+    "seam": {
+     "color": {
+      "inner_u": 0.0074,
+      "inner_v": 0.0338,
+      "u": 0.0065,
+      "v": 0.3089
+     }
+    },
+    "tiles": "u"
    },
    "upper": {
     "ao_m": 0.1,
@@ -1559,6 +1739,66 @@
     ],
     "tiles": "uv",
     "variants": 2
+   },
+   "trim": {
+    "bake_s": {
+     "ao": 0.9,
+     "cav": 0.9,
+     "col": 0.9,
+     "edge": 0.9,
+     "normal": 0.9,
+     "rough": 0.8,
+     "total": 7.0
+    },
+    "bands": {
+     "cornice": [
+      0.55,
+      0.85
+     ],
+     "dado": [
+      0.4,
+      0.55
+     ],
+     "pictureRail": [
+      0.85,
+      1.0
+     ],
+     "skirting": [
+      0.0,
+      0.4
+     ]
+    },
+    "files": {
+     "color": "wood/trim_color",
+     "normal": "wood/trim_normal",
+     "orh": "wood/trim_orh"
+    },
+    "notes": "u = metres along / 2.25, v = arc length along each profile inside its band; orh B unused (1)",
+    "preview": false,
+    "profiles": "textures/arch/wood.profiles.json",
+    "px": {
+     "hi": [
+      2048,
+      256
+     ],
+     "lo": [
+      512,
+      64
+     ],
+     "md": [
+      1024,
+      128
+     ]
+    },
+    "seam": {
+     "color": {
+      "inner_u": 0.0022,
+      "inner_v": 0.0247,
+      "u": 0.0037,
+      "v": 0.3319
+     }
+    },
+    "tiles": "u"
    },
    "upper": {
     "ao_m": 0.08,
@@ -2093,6 +2333,66 @@
     ],
     "tiles": "uv",
     "variants": 2
+   },
+   "trim": {
+    "bake_s": {
+     "ao": 0.8,
+     "cav": 0.8,
+     "col": 0.7,
+     "edge": 0.8,
+     "normal": 0.7,
+     "rough": 0.7,
+     "total": 5.9
+    },
+    "bands": {
+     "cornice": [
+      0.55,
+      0.85
+     ],
+     "dado": [
+      0.4,
+      0.55
+     ],
+     "pictureRail": [
+      0.85,
+      1.0
+     ],
+     "skirting": [
+      0.0,
+      0.4
+     ]
+    },
+    "files": {
+     "color": "workshop/trim_color",
+     "normal": "workshop/trim_normal",
+     "orh": "workshop/trim_orh"
+    },
+    "notes": "u = metres along / 2.25, v = arc length along each profile inside its band; orh B unused (1)",
+    "preview": false,
+    "profiles": "textures/arch/workshop.profiles.json",
+    "px": {
+     "hi": [
+      2048,
+      256
+     ],
+     "lo": [
+      512,
+      64
+     ],
+     "md": [
+      1024,
+      128
+     ]
+    },
+    "seam": {
+     "color": {
+      "inner_u": 0.001,
+      "inner_v": 0.0151,
+      "u": 0.0018,
+      "v": 0.3836
+     }
+    },
+    "tiles": "u"
    },
    "upper": {
     "ao_m": 0.12,
