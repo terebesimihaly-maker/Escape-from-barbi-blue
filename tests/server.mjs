@@ -44,6 +44,12 @@ function fakeRpc(fn, a) {
     case 'efbb_me': { const n = who(a.p_token), p = n && P(n); return p ? { username: p.username, look: p.look } : { error: 'bad_session' }; }
     case 'efbb_save_look': { const n = who(a.p_token), p = n && P(n); if (!p) return { error: 'bad_session' };
       if (!a.p_look || typeof a.p_look !== 'object' || Array.isArray(a.p_look)) return { error: 'bad_look' }; p.look = a.p_look; return { ok: true }; }
+    case 'efbb_rename': { const n = who(a.p_token), p = n && P(n); if (!p) return { error: 'bad_session' };
+      if (!/^[A-Za-z0-9_]{3,16}$/.test(a.p_username || '')) return { error: 'bad_username' };
+      const to = a.p_username.toLowerCase(); if (to !== n && P(to)) return { error: 'taken' };
+      fake.players.delete(n); p.username = a.p_username; fake.players.set(to, p);
+      for (const [k, v] of fake.sessions) if (v === n) fake.sessions.set(k, to);      // (every device signed in as this player follows)
+      return { ok: true, username: a.p_username }; }
     case 'efbb_sign_out': fake.sessions.delete(sha(a.p_token || '')); return { ok: true };
   }
   return null;
