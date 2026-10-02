@@ -165,6 +165,12 @@ class Tor:
         m = s.m; nz = m.n('ShaderNodeTexNoise', noise_dimensions='4D', i_Scale=scale, i_Detail=detail, i_Roughness=rough, i_Distortion=dist, i_Lacunarity=lac)
         m.l(s.v, nz.inputs['Vector']); m.l(m.math('ADD', s.w, off) if off else s.w, nz.inputs['W'])
         return nz.outputs['Color' if color else 'Fac']
+    def vwarp(s, scale, amp, freq, out='Distance', feature='F1', off=0.0):
+        """Voronoi of the torus point pushed about by a periodic noise (amp metres, freq per metre): cell edges that wander"""
+        m = s.m; nc = m.n('ShaderNodeTexNoise', noise_dimensions='4D', i_Scale=freq, i_Detail=3, i_Roughness=0.55); m.l(s.v, nc.inputs['Vector']); m.l(m.math('ADD', s.w, off + 3.7), nc.inputs['W'])
+        dv = m.n('ShaderNodeVectorMath', operation='MULTIPLY_ADD'); m.l(nc.outputs['Color'], dv.inputs[0]); dv.inputs[1].default_value = (amp, amp, amp); m.l(s.v, dv.inputs[2])
+        v = m.n('ShaderNodeTexVoronoi', voronoi_dimensions='4D', feature=feature, i_Scale=scale, i_Randomness=1.0)
+        m.l(dv.outputs[0], v.inputs['Vector']); m.l(m.math('ADD', m.math('ADD', s.w, m.math('MULTIPLY', nc.outputs['Fac'], amp)), off), v.inputs['W']); return v.outputs[out]
     def voronoi(s, scale, out='Distance', feature='F1', rand=1.0, off=0.0):
         m = s.m; v = m.n('ShaderNodeTexVoronoi', voronoi_dimensions='4D', feature=feature, i_Scale=scale, i_Randomness=rand)
         m.l(s.v, v.inputs['Vector']); m.l(m.math('ADD', s.w, off) if off else s.w, v.inputs['W']); return v.outputs[out]
@@ -721,6 +727,120 @@ def tile_floor():
     return {'geo': G.build('tile_floor'), 'W': W, 'H': H, 'variants': 2, 'ao': 0.08, 'cav': 0.01, 'pom': 0.004,
             'notes': '0.28 m marble checker (Carrara and Nero Marquina), 8 per tile; B: a path walked dull and grey'}
 
+# ================================================================ CONCRETE style
+def concrete_mat(name, W, H, base='#87837b', dark='#625e57', agg=('#9b958a', '#6f6a62', '#b8b2a6', '#7d6f60'), worn='#6c6861'):
+    """an old cellar slab, hand trowelled: cement paste with sand in it (grains of their own tone), patchy mottling, faint
+       trowel arcs and burnish, shallow pinholes, a few wandering shrinkage cracks packed with dirt and finer crazing, damp
+       patches with white salt along the open cracks, water stains with tide lines, oil blots (darker, glossier), rust rings
+       where tins stood, dirt in everything low. Variant B: a path where the cement skin has worn off, the fine aggregate
+       showing, grime ground in, a little polished by feet."""
+    m = kitlib.Mat(name); T = Tor(m, W, H); V = variant(m)
+    cav = look(m, 'CAV', W, H); edge = look(m, 'EDGE', W, H)
+    # the paste and its sand
+    mott = T.noise(1.3, 5, 0.6); mott2 = T.noise(5.5, 6, 0.65); grit = T.noise(60, 4, 0.6); fine = T.noise(260, 2, 0.5)
+    col = m.mix(m.remap(mott, 0.35, 0.68), lin(base), lin(dark))
+    col = m.mix(m.remap(mott2, 0.42, 0.62, 0.0, 0.45), col, m.mix(1.0, col, (0.8, 0.79, 0.77), 'MULTIPLY'))
+    col = m.mix(m.remap(T.noise(0.6, 3, 0.5, off=3.0), 0.35, 0.7, 0.0, 0.3), col, m.mix(1.0, col, (1.05, 1.0, 0.9), 'MULTIPLY'))   # (warm and cool batches)
+    gc = T.voronoi(300, 'Color', off=71.0); gr_, gg_, gb_ = sep(m, gc); gd = T.voronoi(300, 'Distance', off=71.0)
+    grain = m.math('MULTIPLY', m.remap(gd, 0.5, 0.2), m.remap(T.noise(12, 3, off=9.0), 0.3, 0.7, 0.4, 1.0))
+    col = m.mix(m.math('MULTIPLY', grain, 0.5), col, m.mix(m.remap(gr_, 0.0, 1.0), m.hsv(col, 0.5, 0.85, 0.78), m.hsv(col, 0.5, 0.9, 1.25)))
+    col = m.mix(m.remap(grit, 0.3, 0.7, 0.0, 0.3), col, m.hsv(col, 0.5, 1.0, 0.82))
+    col = m.mix(m.remap(fine, 0.25, 0.75), m.hsv(col, 0.5, 1.0, 0.9), m.hsv(col, 0.5, 1.0, 1.1))      # (grit at two or three pixels: it survives the WebP)
+    h = m.math('ADD', m.math('MULTIPLY', mott2, 0.0005), m.math('ADD', m.math('MULTIPLY', grain, 0.00015), m.math('MULTIPLY', grit, 0.0001)))
+    rough = m.remap(mott2, 0.3, 0.7, 0.74, 0.9)
+    # trowel arcs: sweeps of the float round random centres, burnished a little
+    tv = T.vwarp(2.0, 0.05, 3.0, 'Distance', off=1.0)
+    arcs = m.math('POWER', m.math('ADD', m.math('MULTIPLY', m.math('SINE', m.math('ADD', m.math('MULTIPLY', tv, 2 * math.pi * 22.0), m.math('MULTIPLY', T.noise(6, 2, off=4.0), 6.0))), 0.5), 0.5), 6.0)
+    arcs = m.math('MULTIPLY', arcs, m.remap(T.noise(4, 3, off=5.0), 0.5, 0.7, 0.0, 1.0))
+    rough = m.math('SUBTRACT', rough, m.math('MULTIPLY', arcs, 0.08)); col = m.mix(m.math('MULTIPLY', arcs, 0.06), col, m.hsv(col, 0.5, 1.0, 0.9))
+    # pinholes: shallow, sparse, dark
+    ph = T.voronoi(110, 'Distance', off=2.0); pin = m.math('MULTIPLY', m.remap(ph, 0.06, 0.025, smooth=True), m.remap(T.noise(5, 2, off=8.0), 0.45, 0.7, 0.0, 1.0))
+    col = m.mix(m.math('MULTIPLY', pin, 0.75), col, m.hsv(col, 0.5, 1.0, 0.4)); h = m.math('SUBTRACT', h, m.math('MULTIPLY', pin, 0.00025))
+    # cracks: a few wandering shrinkage cracks (only some edges of a warped network open), crazing finer still
+    ce = m.math('DIVIDE', T.vwarp(1.5, 0.06, 2.5, 'Distance', 'DISTANCE_TO_EDGE', off=11.0), 1.5)
+    keep = m.remap(T.noise(1.0, 2, off=21.0), 0.5, 0.55)
+    cw = m.math('MULTIPLY', m.remap(T.noise(8, 2, off=4.0), 0.3, 0.7, 0.3, 1.3), 0.0012)
+    crack = m.math('MULTIPLY', m.math('SUBTRACT', 1.0, m.math('MINIMUM', 1.0, m.math('DIVIDE', ce, cw))), keep)
+    spall = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(ce, 0.006, 0.0), keep), m.remap(T.noise(20, 3, off=14.0), 0.5, 0.7))
+    craze = m.math('MULTIPLY', m.remap(m.math('DIVIDE', T.vwarp(22, 0.004, 30, 'Distance', 'DISTANCE_TO_EDGE', off=13.0), 22.0), 0.0006, 0.0), m.remap(T.noise(2.5, 2, off=17.0), 0.52, 0.66, 0.0, 0.6))
+    col = m.mix(m.math('MULTIPLY', crack, 0.9), col, (0.04, 0.038, 0.035)); col = m.mix(m.math('MULTIPLY', craze, 0.4), col, m.hsv(col, 0.5, 1.0, 0.72))
+    col = m.mix(m.math('MULTIPLY', spall, 0.5), col, m.hsv(col, 0.5, 1.0, 0.75))
+    h = m.math('SUBTRACT', h, m.math('ADD', m.math('MULTIPLY', crack, 0.0015), m.math('ADD', m.math('MULTIPLY', craze, 0.0001), m.math('MULTIPLY', spall, 0.0008))))
+    # damp, and salt only along the open cracks where it's damp
+    dn = T.noise(0.9, 4, 0.55, off=31.0)
+    damp = m.remap(dn, 0.52, 0.68, smooth=True)
+    tide = m.math('MULTIPLY', m.remap(dn, 0.5, 0.52), m.remap(dn, 0.55, 0.53))
+    col = m.mix(m.math('MULTIPLY', damp, 0.5), col, m.mix(1.0, col, (0.64, 0.64, 0.64), 'MULTIPLY')); rough = m.mixf(m.math('MULTIPLY', damp, 0.35), rough, 0.6)
+    col = m.mix(m.math('MULTIPLY', tide, 0.5), col, m.mix(1.0, col, (0.7, 0.66, 0.6), 'MULTIPLY'))
+    near = m.math('MULTIPLY', m.remap(ce, 0.012, 0.0, smooth=True), keep)
+    salt = m.math('MULTIPLY', m.math('MULTIPLY', near, m.remap(T.noise(30, 4, 0.6, off=6.0), 0.5, 0.72)), m.math('ADD', 0.15, damp))
+    col = m.mix(m.math('MULTIPLY', salt, 0.6), col, lin('#d6d3c9')); rough = m.mixf(salt, rough, 0.95); h = m.math('ADD', h, m.math('MULTIPLY', salt, 0.0001))
+    # oil blots and rust rings
+    ob = T.noise(1.1, 4, 0.6, off=41.0); oil = m.math('MULTIPLY', m.remap(ob, 0.67, 0.73, smooth=True), m.remap(T.noise(12, 3, off=2.0), 0.3, 0.7, 0.6, 1.0))
+    col = m.mix(m.math('MULTIPLY', oil, 0.8), col, m.mix(1.0, col, (0.3, 0.28, 0.26), 'MULTIPLY')); rough = m.mixf(oil, rough, 0.42)
+    rv = T.voronoi(3.5, 'Distance', off=51.0); rsel = m.remap(T.noise(1.0, 2, off=55.0), 0.62, 0.7)
+    ring = m.math('MULTIPLY', m.remap(rv, 0.035, 0.045), m.remap(rv, 0.058, 0.048))
+    rust = m.math('MULTIPLY', m.math('ADD', ring, m.math('MULTIPLY', m.remap(rv, 0.05, 0.0), 0.35)), m.remap(T.noise(40, 3, off=7.0), 0.3, 0.7, 0.4, 1.0))
+    rust = m.math('MULTIPLY', rust, rsel)
+    col = m.mix(m.math('MULTIPLY', rust, 0.7), col, m.mix(0.5, col, lin('#6e3c1c')))
+    # dirt in everything low: the joints, the spalls (the baked cavity)
+    gr = m.math('MULTIPLY', m.remap(cav, 0.93, 0.45, smooth=True), m.remap(T.noise(25, 4), 0.3, 0.7, 0.5, 1.0))
+    col = m.mix(m.math('MULTIPLY', gr, 0.85), col, (0.045, 0.04, 0.035)); rough = m.mixf(gr, rough, 0.9)
+    col = m.mix(m.math('MULTIPLY', edge, 0.2), col, m.hsv(col, 0.5, 1.0, 1.12))            # (the joint arrises knocked pale)
+    # B: the cement skin worn away along the path: fine aggregate, grime, a little polish
+    wear = m.math('MULTIPLY', edge_fade(m, W, H, 0.10, 0.55, T), m.remap(m.math('ADD', T.noise(0.9, 3, 0.45), m.math('MULTIPLY', T.noise(9, 3), 0.15)), 0.3, 0.62, smooth=True))
+    wear = m.math('MULTIPLY', wear, V)
+    # the aggregate: angular stones (Voronoi cells, a seam of paste between them) at two sizes, close to the paste in tone
+    def stones(scale, off):
+        ed = m.math('DIVIDE', T.vwarp(scale, 0.3 / scale, scale * 0.6, 'Distance', 'DISTANCE_TO_EDGE', off=off), scale)
+        cid = T.vwarp(scale, 0.3 / scale, scale * 0.6, 'Color', 'F1', off=off); cr, cg, cb = sep(m, cid)
+        face = m.remap(ed, 0.12 / scale, 0.22 / scale)                                 # (inside the stone, off the paste seam)
+        tone = m.mix(m.remap(cr, 0.0, 1.0), lin(agg[0]), lin(agg[1])); tone = m.mix(m.math('MULTIPLY', m.remap(cg, 0.75, 0.9), 0.5), tone, lin(agg[2]))
+        tone = m.mix(m.remap(cb, 0.7, 0.95), tone, lin(agg[3])); tone = m.mix(0.45, tone, col)
+        sel = m.remap(m.math('FRACT', m.math('MULTIPLY', cr, 7.7)), 0.25, 0.3)         # (not every cell is a stone: some are paste)
+        return m.math('MULTIPLY', face, sel), tone
+    s1, t1 = stones(70.0, 61.0); s2, t2 = stones(190.0, 67.0)
+    reveal = m.remap(m.math('ADD', m.math('ADD', wear, 0.05), m.math('MULTIPLY', m.math('SUBTRACT', grit, 0.5), 0.5)), 0.45, 0.75)
+    e1 = m.math('MULTIPLY', s1, reveal); e2 = m.math('MULTIPLY', s2, m.math('MULTIPLY', reveal, 0.8))
+    wc = m.mix(0.5, col, lin(worn)); wc = m.mix(m.remap(T.noise(6, 4, off=3.0), 0.4, 0.8, 0.0, 0.6), wc, m.hsv(wc, 0.5, 1.0, 0.72))
+    col = m.mix(m.math('MULTIPLY', wear, 0.8), col, wc); col = m.mix(e2, col, t2); col = m.mix(e1, col, t1)
+    rough = m.mixf(m.math('MULTIPLY', wear, 0.8), rough, 0.58); rough = m.mixf(m.math('MAXIMUM', e1, e2), rough, 0.45)
+    h = m.math('ADD', h, m.math('MULTIPLY', m.math('MAXIMUM', e1, e2), 0.00025))
+    return finish(m, col, rough, h)
+
+def concrete_floor():
+    """the cellar's floor: a hand-trowelled slab in 2.25 m bays, tooled joints along the tile's edges (rounded, spalled here and
+       there, packed with dirt), the surface undulating a millimetre or two"""
+    W = H = TW; g = 0.004; r = 0.004; G = Geo(W, H)
+    M = concrete_mat('concrete_floor', W, H); D = gapdirt_mat('concrete_joint', W, H, '#2a2724')
+    # grid lines: dense near the slab's edges (the rounded arris), 1 cm in the field
+    edge_pts = [0.0, 0.0004, 0.001, 0.0018, 0.0028, 0.004, 0.0055, 0.0075, 0.010, 0.014, 0.02]
+    field = list(np.arange(0.03, W - 2 * g - 0.03, 0.01)); L = W - 2 * g
+    xs = sorted(set([round(x, 6) for x in edge_pts + field + [L - x for x in edge_pts]]))
+    bm = bmesh.new(); V = [[bm.verts.new((g + x, g + y, 0.0)) for x in xs] for y in xs]
+    for j in range(len(xs) - 1):
+        for i in range(len(xs) - 1): bm.faces.new((V[j][i], V[j][i + 1], V[j + 1][i + 1], V[j + 1][i]))
+    # the skirt round it, down into the joint
+    ring = [V[0][i] for i in range(len(xs))] + [V[j][-1] for j in range(1, len(xs))] + [V[-1][i] for i in range(len(xs) - 2, -1, -1)] + [V[j][0] for j in range(len(xs) - 2, 0, -1)]
+    low = [bm.verts.new((v.co.x, v.co.y, -0.03)) for v in ring]
+    for k in range(len(ring)):
+        a, b = ring[k], ring[(k + 1) % len(ring)]; c, d = low[(k + 1) % len(ring)], low[k]
+        bm.faces.new((a, d, c, b))
+    seeds = [random.uniform(0, 50) for _ in range(4)]
+    for v in bm.verts:
+        if v.co.z < -0.01: continue
+        x, y = v.co.x, v.co.y
+        und = (pnoise(x, y, W, H, 1.2, seeds[0]) * 0.0016 + pnoise(x, y, W, H, 4.0, seeds[1]) * 0.0005)
+        d = min(x - g, W - g - x, y - g, H - g - y)
+        z = und - (r - math.sqrt(max(0.0, r * r - (r - d) ** 2)) if d < r else 0.0)
+        sp = pnoise(x, y, W, H, 14.0, seeds[2]) + 0.5 * pnoise(x, y, W, H, 40.0, seeds[3])            # (spalls along the arris)
+        if d < 0.03 and sp > 0.25: z -= (sp - 0.25) * 0.012 * (1 - d / 0.03) ** 1.5
+        v.co.z = z
+    G.add(bm, M, {}, wrap=True)
+    G.add(grid(-0.4, W + 0.4, -0.4, H + 0.4, 4, 4, -0.011), D, {}, wrap=False)
+    return {'geo': G.build('concrete_floor'), 'W': W, 'H': H, 'variants': 2, 'ao': 0.1, 'cav': 0.015, 'pom': 0.008,
+            'notes': 'hand-trowelled slab, tooled joints along the tile edges; B: the cement skin worn off along a path'}
+
 # ================================================================ printed patterns (drawn in Python, printed by the shader)
 def _pattern_image(name, arr):
     """a float array (h, w) or (h, w, 3), row 0 at the top -> a Non-Color Blender image (repeat)"""
@@ -1110,4 +1230,5 @@ def main():
 if __name__ == '__main__':
     SETS['wood'] = {'floor': wood_floor, 'wall': wood_wall}
     SETS['tile'] = {'floor': tile_floor}
+    SETS['concrete'] = {'floor': concrete_floor}
     main()

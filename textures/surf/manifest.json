@@ -4,6 +4,83 @@
  "faceH": 3.0,
  "kit": 1,
  "styles": {
+  "concrete": {
+   "floor": {
+    "ao_m": 0.1,
+    "bake_s": {
+     "ao": 4.2,
+     "cav": 4.4,
+     "colA": 8.1,
+     "colB": 8.5,
+     "col_shift": 8.1,
+     "dn_ao": 1.4,
+     "dn_cav": 1.5,
+     "height": 4.1,
+     "normal": 8.1,
+     "normal_shift": 8.3,
+     "rough": 8.1,
+     "total": 70.3,
+     "zgeo": 2.1
+    },
+    "files": {
+     "colorA": "concrete/floor_colorA",
+     "colorB": "concrete/floor_colorB",
+     "normal": "concrete/floor_normal",
+     "orh": "concrete/floor_orh"
+    },
+    "notes": "hand-trowelled slab, tooled joints along the tile edges; B: the cement skin worn off along a path",
+    "pom": 0.008,
+    "preview": false,
+    "px": {
+     "hi": [
+      2048,
+      2048
+     ],
+     "lo": [
+      512,
+      512
+     ],
+     "md": [
+      1024,
+      1024
+     ]
+    },
+    "px_per_m": 910,
+    "seam": {
+     "AB": 0.0039,
+     "AB_v": 0.0038,
+     "BA": 0.0039,
+     "color": {
+      "inner_u": 0.0048,
+      "inner_v": 0.0048,
+      "u": 0.0039,
+      "v": 0.0038
+     },
+     "normal": {
+      "inner_u": 0.0073,
+      "inner_v": 0.0073,
+      "u": 0.0112,
+      "v": 0.0114
+     },
+     "orh": {
+      "inner_u": 0.0018,
+      "inner_v": 0.0018,
+      "u": 0.0093,
+      "v": 0.0088
+     },
+     "shift": {
+      "color": 0.0001,
+      "normal": 0.0004
+     }
+    },
+    "size_m": [
+     2.25,
+     2.25
+    ],
+    "tiles": "uv",
+    "variants": 2
+   }
+  },
   "tile": {
    "floor": {
     "ao_m": 0.08,
