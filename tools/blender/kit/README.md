@@ -43,6 +43,9 @@ Before each push: `git pull --rebase origin claude/elegant-babbage-h8btki`, then
 1. WP2.1 surface sets (`surfaces2.py`): floors, walls (A/B variants), ceilings, upper bands, trim sheets, beams, detail tiles.
 2. WP2.2 architecture: trims and profiles, doors (frame, leaf, closed door), windows with cloth curtains and sky planes,
    exits, fireplaces, wall holes, peeling paper, niches, ceiling pieces.
+   Built by `trims.py`, `doors.py`, `windows.py` and `modules.py` (each header says what it makes and how).
+   Cut-outs (lace, holed sacking): a material's node named `ALPHA` is baked into the albedo's alpha channel by
+   `kitlib.bake_set`; `kitlib.baked_material(..., alpha='blend')` exports it as glTF BLEND (a veil), `alpha=True` as MASK.
 3. WP2.3 wardrobes (5 styles, exact hinge contract), WP2.4 light fixtures + emission profiles.
 4. WP2.6 decals atlas, WP2.7 sky panorama, env maps, glass, window cookies, AO profiles.
 5. WP2.5 furniture and island sets per style (3 islands + 6 solids per style first, then the rest).

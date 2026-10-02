@@ -617,12 +617,15 @@ def denoise_image(src, dst):
 def to_srgb(a):
     a = np.clip(a, 0, 1); return np.where(a <= 0.0031308, a * 12.92, 1.055 * np.power(a, 1 / 2.4) - 0.055)
 
-def to_webp(a, path, quality=86, srgb=False, normal=False, tiers=True):
+def to_webp(a, path, quality=86, srgb=False, normal=False, tiers=True, rgba=False):
     """float pixels (h, w, 3 or 4; row 0 at the top) -> WebP via Pillow, plus the tier copies <name>.md.webp (half) and
-       <name>.lo.webp (quarter) when path ends in .hi.webp. Normal maps are renormalised after shrinking."""
+       <name>.lo.webp (quarter) when path ends in .hi.webp. Normal maps are renormalised after shrinking. rgba: keep the 4th
+       channel as (linear) alpha"""
     from PIL import Image
+    al = np.clip(a[..., 3:4], 0, 1) if rgba else None
     a = a[..., :3]; a = to_srgb(a) if srgb else np.clip(a, 0, 1)
-    img = Image.fromarray((a * 255 + 0.5).astype(np.uint8), 'RGB'); out = [path]
+    if rgba: a = np.concatenate([a, al], axis=-1)
+    img = Image.fromarray((a * 255 + 0.5).astype(np.uint8), 'RGBA' if rgba else 'RGB'); out = [path]
     img.save(path, 'WEBP', quality=quality, method=6)
     if tiers and path.endswith('.hi.webp'):
         for t, k in TIERS.items():
@@ -649,6 +652,25 @@ def _metal_to_emit(objs):
             em = nt.nodes.new('ShaderNodeEmission'); src = b.inputs['Metallic']
             if src.is_linked: nt.links.new(src.links[0].from_socket, em.inputs['Color'])
             else: v = src.default_value; em.inputs['Color'].default_value = (v, v, v, 1)
+            old = out.inputs['Surface'].links[0].from_socket if out.inputs['Surface'].is_linked else None
+            nt.links.new(em.outputs[0], out.inputs['Surface']); undo.append((nt, em, out, old))
+    def back():
+        for nt, em, out, old in undo:
+            if old: nt.links.new(old, out.inputs['Surface'])
+            nt.nodes.remove(em)
+    return back
+
+def _alpha_to_emit(objs):
+    """like the metalness trick: each material's 'ALPHA' node (cut-out cloth, lace: data, not wired to the BSDF while baking)
+       through an Emission shader, 1 where a material has none. Returns a function that puts the materials back."""
+    undo = []
+    for o in objs:
+        for slot in o.material_slots:
+            m = slot.material; nt = m.node_tree; out = nt.nodes.get('Material Output')
+            if not out: continue
+            em = nt.nodes.new('ShaderNodeEmission'); a = nt.nodes.get('ALPHA')
+            if a: nt.links.new(a.outputs[0], em.inputs['Color'])
+            else: em.inputs['Color'].default_value = (1, 1, 1, 1)
             old = out.inputs['Surface'].links[0].from_socket if out.inputs['Surface'].is_linked else None
             nt.links.new(em.outputs[0], out.inputs['Surface']); undo.append((nt, em, out, old))
     def back():
@@ -717,6 +739,9 @@ def bake_set(objs, name, px=2048, samples=64, high=None, cage=0.02, cavity=0.05,
         if src: m_.node_tree.links.new(src, inp)
     rough = _bake_image(f'{name}_rough', px); bake('ROUGHNESS', rough, 4); save_exr(rough, exr('rough'))
     met = _bake_image(f'{name}_metal', px); back = _metal_to_emit(objs); bake('EMIT', met, 4); back(); save_exr(met, exr('metal'))
+    has_alpha = any(sl.material and sl.material.node_tree.nodes.get('ALPHA') for o in objs for sl in o.material_slots)
+    if has_alpha:                                           # (cut-outs: the albedo's alpha channel, a mask)
+        alp = _bake_image(f'{name}_alpha', px); back = _alpha_to_emit(objs); bake('EMIT', alp, 8); back(); save_exr(alp, exr('alpha'))
     nrm = _bake_image(f'{name}_normal', px); bake('NORMAL', nrm, 4, normal_space='TANGENT')
     if high:                                                # (sculpted sources baked over their low parts, the rest kept)
         sc.render.bake.use_selected_to_active = True; sc.render.bake.use_clear = False; sc.render.bake.cage_extrusion = cage
@@ -729,7 +754,8 @@ def bake_set(objs, name, px=2048, samples=64, high=None, cage=0.02, cavity=0.05,
     # albedo = colour x cavity grime (0.6 + 0.4 AO at 5 cm): contact shading that shows under the flashlight too
     c = load_exr(exr('col')); cv = load_exr(exr('cav')); ao = load_exr(exr('ao'))
     alb = c[..., :3] * (0.6 + 0.4 * np.clip(cv[..., :1], 0, 1))
-    files = {'albedo': to_webp(alb, os.path.join(out_dir, 'albedo.hi.webp'), 86, srgb=True)[0],
+    if has_alpha: alb = np.concatenate([alb, load_exr(exr('alpha'))[..., :1]], axis=-1)
+    files = {'albedo': to_webp(alb, os.path.join(out_dir, 'albedo.hi.webp'), 86, srgb=True, rgba=has_alpha)[0], 'alpha': has_alpha,
              'normal': to_webp(load_exr(exr('normal')), os.path.join(out_dir, 'normal.hi.webp'), 92, normal=True)[0],
              'orm': to_webp(pack_orm(np.clip(ao, 0, 1), load_exr(exr('rough')), load_exr(exr('metal'))), os.path.join(out_dir, 'orm.hi.webp'), 86)[0]}
     for o, h in shown.items(): o.hide_render = h
@@ -744,7 +770,7 @@ def _gltf_output_group():
     g.interface.new_socket('Occlusion', socket_type='NodeSocketFloat'); g.interface.new_socket('Thickness', socket_type='NodeSocketFloat')
     g.nodes.new('NodeGroupOutput'); g.nodes.new('NodeGroupInput'); return g
 
-def baked_material(name, files, double=False):
+def baked_material(name, files, double=False, alpha=None):
     """the material that ships (single-sided unless double): plain Principled with the baked albedo (sRGB), normal map and ORM (R occlusion through the
        glTF output group, G roughness, B metalness), every map one image file the exporter passes through unchanged"""
     old = bpy.data.materials.get(name)
@@ -756,6 +782,15 @@ def baked_material(name, files, double=False):
         t.image.name = f'{name}_{key}'                     # (unique: every asset's files are called albedo.hi.webp...)
         t.image.colorspace_settings.name = 'sRGB' if srgb else 'Non-Color'; return t
     a = tex('albedo', True); nt.links.new(a.outputs['Color'], b.inputs['Base Color'])
+    alpha = files.get('alpha') if alpha is None else alpha
+    if alpha == 'blend':                                     # (a veil: lace, net; glTF BLEND)
+        nt.links.new(a.outputs['Alpha'], b.inputs['Alpha'])
+        try: m.surface_render_method = 'BLENDED'
+        except Exception: pass
+    elif alpha:                                             # (a cut-out: alpha clipped at 0.5, exported as glTF MASK)
+        rd = nt.nodes.new('ShaderNodeMath'); rd.operation = 'ROUND'; nt.links.new(a.outputs['Alpha'], rd.inputs[0]); nt.links.new(rd.outputs[0], b.inputs['Alpha'])
+        try: m.surface_render_method = 'DITHERED'
+        except Exception: pass
     n = tex('normal', False); nm = nt.nodes.new('ShaderNodeNormalMap'); nt.links.new(n.outputs['Color'], nm.inputs['Color']); nt.links.new(nm.outputs['Normal'], b.inputs['Normal'])
     o = tex('orm', False); sep = nt.nodes.new('ShaderNodeSeparateColor'); nt.links.new(o.outputs['Color'], sep.inputs['Color'])
     nt.links.new(sep.outputs['Green'], b.inputs['Roughness']); nt.links.new(sep.outputs['Blue'], b.inputs['Metallic'])
