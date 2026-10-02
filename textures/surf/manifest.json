@@ -1,0 +1,91 @@
+{
+ "L": 2.25,
+ "common": {},
+ "faceH": 3.0,
+ "kit": 1,
+ "styles": {
+  "wood": {
+   "floor": {
+    "ao_m": 0.1,
+    "bake_s": {
+     "ao": 4.1,
+     "cav": 4.2,
+     "colA": 7.3,
+     "colB": 7.6,
+     "col_shift": 7.4,
+     "dn_ao": 1.5,
+     "dn_cav": 1.5,
+     "height": 2.7,
+     "normal": 7.5,
+     "normal_shift": 7.6,
+     "rough": 7.4,
+     "total": 63.4,
+     "zgeo": 1.4
+    },
+    "files": {
+     "colorA": "wood/floor_colorA",
+     "colorB": "wood/floor_colorB",
+     "normal": "wood/floor_normal",
+     "orh": "wood/floor_orh"
+    },
+    "notes": "0.13 m oak strips, 17 per tile; B: a walked path worn through the wax (kept off the tile edges)",
+    "pom": 0.006,
+    "preview": false,
+    "px": {
+     "hi": [
+      2048,
+      2048
+     ],
+     "lo": [
+      512,
+      512
+     ],
+     "md": [
+      1024,
+      1024
+     ]
+    },
+    "px_per_m": 910,
+    "seam": {
+     "AB": 0.0028,
+     "AB_v": 0.0036,
+     "BA": 0.0028,
+     "color": {
+      "inner_u": 0.0035,
+      "inner_v": 0.0154,
+      "u": 0.0028,
+      "v": 0.0036
+     },
+     "normal": {
+      "inner_u": 0.0048,
+      "inner_v": 0.013,
+      "u": 0.0041,
+      "v": 0.0114
+     },
+     "orh": {
+      "inner_u": 0.0089,
+      "inner_v": 0.0214,
+      "u": 0.0075,
+      "v": 0.0157
+     },
+     "shift": {
+      "color": 0.0004,
+      "normal": 0.0014
+     }
+    },
+    "size_m": [
+     2.25,
+     2.25
+    ],
+    "tiles": "uv",
+    "variants": 2
+   }
+  }
+ },
+ "tiers": {
+  "hi": 1,
+  "lo": 4,
+  "md": 2
+ },
+ "version": 1
+}
