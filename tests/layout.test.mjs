@@ -17,7 +17,7 @@ const avg = a => a.reduce((s, v) => s + v, 0) / Math.max(1, a.length);
 
 const b = await launch();
 const p = await solo(b, 'low', 480, 300);
-const C = await p.evaluate(() => ({ BOARD_LEN, BOARD_MID_LEN, BOARD_ACROSS, plan: HALL_PLAN.map(f => f.length) }));
+const C = await p.evaluate(() => ({ BOARD_LEN, BOARD_MID_LEN, BOARD_ACROSS, plan: HALL_PLAN.map(f => f.length), cells: HALL_TEMPLATE_IDS.map(id => HALL_TEMPLATES[id].cells) }));
 
 /* ---------- this test's own model of a house ---------- */
 function model(d) {
@@ -38,7 +38,12 @@ function model(d) {
     for (let k = 0; k < q.length; k++) { const [x, y] = q[k]; for (const [dx, dy] of DIRS) { const nx = x + dx, ny = y + dy, key = nx + ',' + ny;
       if (!wall(nx, ny) && !dist.has(key) && !(useCuts && blockedStep(x, y, dx, dy))) { dist.set(key, dist.get(x + ',' + y) + 1); q.push([nx, ny]); } } }
     return dist; };
-  return { rows, W, H, wall, boxes, islands, hit, band, cut, tiles };
+  // (the same over typed arrays, for the many searches of the detour check)
+  const steps = (sx, sy) => { const d = new Int16Array(W * H).fill(-1), q = [sy * W + sx]; d[q[0]] = 0;
+    for (let h = 0; h < q.length; h++) { const k = q[h], x = k % W, y = (k - x) / W;
+      for (const [dx, dy] of DIRS) { const j = k + dx + dy * W; if (!wall(x + dx, y + dy) && d[j] < 0 && !blockedStep(x, y, dx, dy)) { d[j] = d[k] + 1; q.push(j); } } }
+    return d; };
+  return { rows, W, H, wall, boxes, islands, hit, band, cut, tiles, steps };
 }
 // walking: a 5 u flood fill for a body of radius r (walls by its corners, boxes, and for you the wardrobes' fronts as game.js has them)
 function walker(m, r, closets) {
@@ -82,6 +87,15 @@ function slotProblem(o, m, rooms) {
 function prove(d, navCut) {
   const bad = [], add = s => { if (!bad.includes(s)) bad.push(s); }, m = model(d), { W, H, wall, boxes } = m, mid = c => [c[0] * T + T / 2, c[1] * T + T / 2];
   const deadEnd = (x, y) => DIRS.filter(([dx, dy]) => !wall(x + dx, y + dy)).length === 1;
+  // the halls themselves (slots are judged against them): on cells, open, off the start, a tile apart, their template's size
+  d.rooms.forEach(([t, x0, y0, x1, y1], j) => {
+    const cells = C.cells[t], w = (x1 - x0 + 2) / 2, h = (y1 - y0 + 2) / 2;
+    if (![x0, y0, x1, y1].every(v => v % 2 === 1) || x1 < x0 || y1 < y0) add('a hall not on cells');
+    if (!cells || !((w === cells[0] && h === cells[1]) || (w === cells[1] && h === cells[0]))) add("a hall not its template's size");
+    if (x0 <= 5 && y0 <= 5) add('a hall at the start');
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (wall(x, y)) add('a hall with a wall tile in it');
+    for (const [, a0, b0, a1, b1] of d.rooms.slice(j + 1)) if (x0 - 1 <= a1 && x1 + 1 >= a0 && y0 - 1 <= b1 && y1 + 1 >= b0) add('two halls less than a tile apart');
+  });
   // invariants
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { if (!/[01]/.test(m.rows[y][x])) add('rows hold something other than 0/1');
     if ((x % 2 && y % 2 && wall(x, y))) add('a cell is closed'); if ((x === 0 || y === 0 || x === W - 1 || y === H - 1) && !wall(x, y)) add('the border is open'); }
@@ -114,6 +128,13 @@ function prove(d, navCut) {
   if (navCut) for (let k = 0; k < W * H; k++) if (navCut[k] !== m.cut[k]) { add("the game's cuts differ from the bands boxes cross"); break; }
   let open = 0; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!wall(x, y) && !m.islands.has(x + ',' + y)) open++;
   for (const [sx, sy] of d.spawns) if (m.tiles(Math.floor(sx / T), Math.floor(sy / T)).size !== open) add('the cut graph does not reach every open tile from a spawn');
+  // and no cut step (between two tiles that aren't islands) sends her more than 8 steps round: a gap you both fit through is no
+  // shortcut only you can take
+  let detour = 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) for (const [dx, dy, bit] of [[1, 0, 1], [0, 1, 2]]) {
+    if (!(m.cut[y * W + x] & bit) || wall(x, y) || wall(x + dx, y + dy) || m.islands.has(x + ',' + y) || m.islands.has((x + dx) + ',' + (y + dy))) continue;
+    const k = m.steps(x, y)[(y + dy) * W + x + dx]; detour = Math.max(detour, k < 0 ? 999 : k); }
+  if (detour > 8) add('a cut step with a long way round (' + detour + ' steps)');
   // walking: from every spawn (radius 11) to the exit, notes, puzzles (with a sight line past walls and tall boxes) and wardrobes
   const sight = (ax, ay, bx, by) => { const n = Math.ceil(Math.hypot(bx - ax, by - ay) / 3); for (let k = 1; k < n; k++) { const x = ax + (bx - ax) * k / n, y = ay + (by - ay) * k / n;
     if (wall(Math.floor(x / T), Math.floor(y / T)) || boxes.some(o => o.tall && x > o.x0 && x < o.x1 && y > o.y0 && y < o.y1)) return false; } return true; };
@@ -148,12 +169,12 @@ function prove(d, navCut) {
         (x === d.exit[0] && y === d.exit[1]) || (x === d.exit[0] + eo[0] && y === d.exit[1] + eo[1])) add('a servant run through a wardrobe, the exit or a puzzle');
       if (hz ? !(wall(x, y - 1) && wall(x, y + 1)) : !(wall(x - 1, y) && wall(x + 1, y))) j++; }
     if (j > 2) add('a servant run open to the side at more than 2 tiles'); }
-  return { bad, maxD, cuts: [...m.cut].reduce((s, v) => s + (v & 1) + (v >> 1), 0), lane };
+  return { bad, maxD, cuts: [...m.cut].reduce((s, v) => s + (v & 1) + (v >> 1), 0), lane, detour };
 }
 
 /* ---------- 1. 1,800 houses: completable (the game's check, then this test's proof) ---------- */
 console.log('== 1,800 houses (5 floors x 1-4 players x 3 difficulties x 30 seeds), checked by the game and by this test');
-const stats = [], failures = [], gameBad = []; let classicN = 0, msAll = 0, nAll = 0;
+const stats = [], failures = [], gameBad = [], placed = Object.fromEntries(KIT.solidIds.map(id => [id, 0])); let classicN = 0, msAll = 0, nAll = 0, detourMax = 0;
 for (let i = 0; i < 5; i++) {
   const seeds = []; for (let n = 1; n <= 4; n++) for (let di = 0; di < 3; di++) for (let s = 0; s < SEEDS; s++) seeds.push([n, DIFFS[di], seedOf(i, n, di, s)]);
   const r = await p.evaluate(({ i, seeds }) => {
@@ -173,7 +194,7 @@ for (let i = 0; i < 5; i++) {
   for (const { d, bad, cut, plain } of r.out) {
     if (d.classic) classicN++;
     if (bad.length) gameBad.push('F' + (i + 1) + ' ' + d.n + 'p ' + d.diff + ' seed ' + d.seed + ': ' + bad.join('; '));
-    const pr = prove(d, cut);
+    const pr = prove(d, cut); detourMax = Math.max(detourMax, pr.detour); for (const q of d.solids) placed[KIT.solidIds[q[0]]]++;
     if (pr.bad.length) failures.push('F' + (i + 1) + ' ' + d.n + 'p ' + d.diff + ' seed ' + d.seed + ': ' + pr.bad.join('; '));
     let open = 0, inHall = 0; for (let y = 0; y < d.rows.length; y++) for (let x = 0; x < d.rows[0].length; x++) if (d.rows[y][x] === '0') { open++; if (d.rooms.some(([, x0, y0, x1, y1]) => x >= x0 && x <= x1 && y >= y0 && y <= y1)) inHall++; }
     // today's longest way: plain search over the same seed's maze
@@ -192,6 +213,8 @@ check(failures.length === 0, "this test's own proof agrees: every house completa
 console.log('  floor | halls placed/planned | islands | boxes | cut steps | coverage | servant runs | longest way (all; 1 player) | today, same seeds (all; 1 player) | ms per house');
 for (const s of stats) console.log(`  ${s.floor}    | ${s.halls.toFixed(2)} / ${s.planned} | ${s.islands.toFixed(1)} | ${s.boxes.toFixed(1)} | ${s.cuts.toFixed(1)} | ${(100 * s.coverage).toFixed(1)}% | ${s.runs.toFixed(2)} | ` +
   `${avg(s.maxD).toFixed(1)}; ${avg(s.maxD1).toFixed(1)} | ${avg(s.today).toFixed(1)}; ${avg(s.today1).toFixed(1)} | ${s.ms.toFixed(2)}`);
+console.log(`  the longest way round a cut step: ${detourMax} steps`);
+check(KIT.solidIds.every(id => placed[id] > 0), 'every KIT piece you bump into turns up in some house (no dead content)', KIT.solidIds.filter(id => !placed[id]));
 check(stats.every(s => s.coverage >= 0.30), 'on every floor at least 30% of the open tiles are in halls (average)', stats.map(s => +s.coverage.toFixed(3)));
 
 console.log('== the hall templates');

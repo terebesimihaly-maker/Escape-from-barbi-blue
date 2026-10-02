@@ -54,6 +54,9 @@ function buildLevel() {
   const wt = wardrobeMaterials();
   for (const c of closets) G.add(makeWardrobe(c, wt));
   makeExit(G);
+  // the furniture you bump into (SOLIDS, js/layout.js): grey boxes of its exact size, so nothing solid is ever invisible (H5), until
+  // the Blender kit's models are wired in here (js/kit.js furnishes with them when given the kit)
+  if (typeof Kit !== 'undefined') Kit.furnish(level, { style: F.style, floorIdx }, { kit: null, evict: false });
   upgradeSurfaces(F, floor.material, G);                 // (the textures baked in Blender, when they've loaded: tools/blender/map_textures.py)
   buildPuzzles3D(G);                                     // the labyrinth boxes on the walls (js/puzzles.js)
   notes.forEach(n => { const o = makeNote(n); n.obj = o; G.add(o); });

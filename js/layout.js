@@ -20,7 +20,7 @@
 
 const LAYOUT_VERSION = 2, LAYOUT_REJECTS = [];      // (rejects: houses validateFloor turned down; the tests expect none)
 let LAYOUT_FORCE_CLASSIC = false;                 // (tests: build the plain maze, as the last fallback does)
-const R_NAV = 13, BOX_GAP = 26, SERVANT_CEIL = 2.55;
+const R_NAV = 13, BOX_GAP = 26, SERVANT_CEIL = 2.55, DETOUR = 8;
 
 /* ---------- hall templates ----------
    style, cells [w, h] (turned at random when stamped), kind room or hallway (wall decor only), ceil (m; a gable roof rises from eave to
@@ -148,6 +148,16 @@ function addCuts(cut, s, W, H, wall) {
     if (!wall[k + 1] && s.x1 > cx - R_NAV && s.x0 < cx + T + R_NAV && s.y1 > cy - R_NAV && s.y0 < cy + R_NAV) cut[k] |= 1;
     if (!wall[k + W] && s.x1 > cx - R_NAV && s.x0 < cx + R_NAV && s.y1 > cy - R_NAV && s.y0 < cy + T + R_NAV) cut[k] |= 2; }
 }
+// the longest way round for a step cut in c2 but not in c0 (islands' own tiles aside): the nav steps between its two tiles. A box
+// the others can't see past must not turn a gap you both fit through (26 u at least) into a walk round the house for her: two wall
+// pieces cutting the ring of tiles round an island would split it, and only you would take the short way.
+function detourOf(W, H, wall, c0, c2, islT) {
+  let worst = 0;
+  for (let k = 0; k < W * H; k++) { const nb = c2[k] & ~(c0 ? c0[k] : 0); if (!nb) continue;
+    for (const [b, j] of [[1, k + 1], [2, k + W]]) { if (!(nb & b) || wall[j] || islT[k] || islT[j]) continue;
+      const dd = navDist(W, H, wall, c2, k % W, (k - k % W) / W)[j]; worst = Math.max(worst, dd < 0 ? 1e9 : dd); } }
+  return worst;
+}
 function cutsFrom(solids, W = GW, H = GH, wall = gridFlat()) { const cut = new Uint8Array(W * H); for (const s of solids) addCuts(cut, s, W, H, wall); return cut; }
 // a puzzle box can go on a wall face only if no box stands within 20 u in front of it, 20 u either side of its middle
 function faceClear(solids, x, y, dx, dy) {
@@ -248,7 +258,7 @@ function pickClosets(quota, exit) {
 // the furniture you bump into: islands first (the even tiles in the middle of a hall), then each template's slots. A box is kept only
 // if it passes every rule (A8.2 of the build spec). Returns the boxes and the cuts they make.
 function furnishHalls(rooms, prot) {
-  const W = GW, H = GH, wall = gridFlat(), open = countOpen(wall), solids = [];
+  const W = GW, H = GH, wall = gridFlat(), open = countOpen(wall), solids = [], islT = new Uint8Array(W * H);
   let cut = new Uint8Array(W * H), nIsl = 0;
   const pickOf = a => a[Math.random() * a.length | 0];
   // a box for KIT piece id, turned by rot, placed by at(ex, ey) (its size along x and y) -> its edges
@@ -265,6 +275,8 @@ function furnishHalls(rooms, prot) {
     for (const o of solids) if (boxOverlap(s, o, BOX_GAP)) return false;                                                     // 26 u from the others
     const c2 = cut.slice(); addCuts(c2, s, W, H, wall);                                                                      // and still all connected
     if (reachCount(W, H, wall, c2, 1, 1) !== open - nIsl - (s.isl ? 1 : 0)) return false;
+    if (s.isl) islT[s.isl[1] * W + s.isl[0]] = 1;
+    if (detourOf(W, H, wall, cut, c2, islT) > DETOUR) { if (s.isl) islT[s.isl[1] * W + s.isl[0]] = 0; return false; }   // (no long way round a gap)
     solids.push(s); cut = c2; if (s.isl) nIsl++; return true;
   };
   for (const r of rooms) {
@@ -274,7 +286,9 @@ function furnishHalls(rooms, prot) {
     for (let Y = r.ty0 + 1; Y <= r.ty1; Y++) for (let X = r.tx0 + 1; X <= r.tx1; X++) { corners.push([X, Y]); free.add(X + ',' + Y); }
     for (let y = r.ty0 + 1; y < r.ty1; y++) for (let x = r.tx0 + 1; x < r.tx1; x++) if (!(x & 1) && !(y & 1)) isl.push([x, y]);
     const use = (X, Y) => free.delete(X + ',' + Y), isFree = ([X, Y]) => free.has(X + ',' + Y);
-    if (t.mode === 'islands') for (const [x, y] of shuffle(isl).slice(0, t.islands.max)) {
+    // (max islands, or one fewer half the time: with every island tile filled, each corner point of a 2x2 or 2x3 hall touches an
+    // island, and its pocket and bar pieces would never appear)
+    if (t.mode === 'islands') for (const [x, y] of shuffle(isl).slice(0, t.islands.max - (Math.random() < 0.5 ? 1 : 0))) {
       const s = mk(pickOf(t.islands.pick), Math.random() * 4 | 0, (ex, ey) => ({ x0: x * T + (T - ex) / 2, y0: y * T + (T - ey) / 2, x1: x * T + (T + ex) / 2, y1: y * T + (T + ey) / 2, isl: [x, y] }));
       if (add(s)) { use(x, y); use(x + 1, y); use(x, y + 1); use(x + 1, y + 1); }
     }
@@ -348,7 +362,8 @@ function runLegal([kind, x0, y0, x1, y1], W, H, isW, rooms, keep) {
 
 /* ---------- on every client: nav, ceilings ---------- */
 // NAV: cut (as above), bucket (per tile: the boxes within 14 u of it, for solidAt), isl (1 on island tiles),
-// occ (a 10 u raster for losSight: bit 0 a tall box, bit 1 a low one; a cell counts if its centre is 2 u inside the box)
+// occ (a 10 u raster for losSight: bit 0 a tall box, bit 1 a low one; a cell counts if it overlaps the box shrunk by 2 u. Not 'its
+// centre inside': a 13 u rack centred on a tile edge falls between the cell centres and would hide nobody)
 function buildNav(solids) {
   const W = GW, H = GH, n = W * H, NX = W * 5, nav = { cut: cutsFrom(solids, W, H, gridFlat()), bucket: new Array(n).fill(null), isl: new Uint8Array(n), occ: new Uint8Array(n * 25) };
   solids.forEach((s, i) => {
@@ -357,7 +372,7 @@ function buildNav(solids) {
     if (s.isl) nav.isl[s.isl[1] * W + s.isl[0]] = 1;
     const bit = s.occ === 'tall' ? 1 : s.occ === 'low' ? 2 : 0;
     if (bit) for (let b = Math.floor(s.y0 / 10); b * 10 < s.y1; b++) for (let a = Math.floor(s.x0 / 10); a * 10 < s.x1; a++)
-      if (a * 10 + 5 > s.x0 + 2 && a * 10 + 5 < s.x1 - 2 && b * 10 + 5 > s.y0 + 2 && b * 10 + 5 < s.y1 - 2) nav.occ[b * NX + a] |= bit;
+      if (a * 10 + 10 > s.x0 + 2 && a * 10 < s.x1 - 2 && b * 10 + 10 > s.y0 + 2 && b * 10 < s.y1 - 2) nav.occ[b * NX + a] |= bit;
   });
   return nav;
 }
@@ -495,6 +510,7 @@ function validateFloor(d) {
   const cut = cutsFrom(solids, W, H, wall); let want = 0; for (let k = 0; k < n; k++) if (!wall[k] && !islT[k]) want++;
   for (const t of new Set(d.spawns.map(([sx, sy]) => Math.floor(sx / T) + ',' + Math.floor(sy / T)))) { const [tx, ty] = t.split(',').map(Number);
     if (reachCount(W, H, wall, cut, tx, ty) !== want) add('an open tile unreachable (nav graph)'); }
+  if (detourOf(W, H, wall, null, cut, islT) > DETOUR) add('a cut step with a long way round');
   // (g) you (radius 11; walls, boxes, wardrobes), from the first spawn: the exit, notes, puzzles (with a sight line past walls and tall
   // boxes), wardrobes and the other spawns
   const P = flood5(W, H, bodyRaster(W, H, isW, solids, 11, d.closets), d.spawns[0][0], d.spawns[0][1]), tall = solids.filter(s => s.occ === 'tall');

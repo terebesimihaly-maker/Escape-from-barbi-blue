@@ -176,16 +176,43 @@ check(table.length >= 2, 'found houses with a table (a bar piece she can see ove
 check(table.every(r => r.los && !r.clear), 'each time: no wall between you (los), but the table is in her way (clearLine false)', table);
 check(table.every(r => r.caught >= 0 && r.caught <= 12 && !r.inside && !r.stalls), 'she goes round the table and catches you within 12 s (never inside it, never stuck)', table);
 
+console.log('== close by: you stand still somewhere (by a doorway corner, a box), she starts 2-3 tiles away');
+// (running straight at you can clip a wall corner her body doesn't fit past: she must go round, not stand there pressing into it)
+const close = await p.evaluate(() => {
+  const out = { hunts: 0, caught: 0, frozen: [] };
+  for (let i = 0; i < 5; i++) for (let h = 0; h < 5; h++) {
+    const seed = 6100 + i * 100 + h, d = generateFloor(i, 1 + h % 4, ['easy', 'medium', 'hard'][h % 3], seed); applyFloor(d, 0); state = 'walk';
+    let rs = seed; const rand = () => { rs = (Math.imul(rs, 1664525) + 1013904223) >>> 0; return rs / 4294967296; };
+    const P = player, m = monster; scares.next = 1e9; notes.forEach(z => z.read = true);
+    const real = downPlayer; let caught = -1, t = 0; downPlayer = () => { if (caught < 0) caught = t; };
+    try { for (let c = 0; c < 10; c++) {
+      let x, y; do { x = rand() * GW * T; y = rand() * GH * T; } while (blocked(x, y, 11) || closetBlocked(x, y, 11));
+      const dd = bfsDist(Math.floor(x / T), Math.floor(y / T)), cand = [];
+      for (let ty = 0; ty < GH; ty++) for (let tx = 0; tx < GW; tx++) { const k = dd[idx(tx, ty)]; if (k >= 2 && k <= 3) cand.push([tx, ty]); }
+      if (!cand.length) continue; const s0 = center(cand[rand() * cand.length | 0]);
+      Object.assign(P, { x, y, moving: false, hidden: false, down: false, crouching: rand() < 0.3, inv: 0 });
+      Object.assign(m, { x: s0.x, y: s0.y, px: s0.x, py: s0.y, active: true, spawnT: 0, state: 'hunt', target: null, path: [], repath: 0, screamT: 0, huntT: 1e9, last: null, ti: null,
+        seenT: 99, stalls: 0, stall: 0, noDirect: 0, kc: null, knowsCloset: false, fakeCool: 1e9 });
+      caught = -1; t = 0; out.hunts++; let lx = m.x, ly = m.y, lm = 0, still = 0;
+      while (t < 20 && caught < 0) { m.screamT = 0; updateMonster(1 / 60); t += 1 / 60; if (Math.hypot(m.x - lx, m.y - ly) > 2) { lx = m.x; ly = m.y; lm = t; } still = Math.max(still, t - lm); }
+      if (caught >= 0) out.caught++;
+      if (still >= 3) out.frozen.push({ floor: i + 1, seed, you: [Math.round(x), Math.round(y)], her: [Math.round(m.x), Math.round(m.y)], state: m.state, still: +still.toFixed(1) });
+    } } finally { downPlayer = real; m.active = false; m.huntT = 0; state = 'walk'; }
+  }
+  return out;
+});
+console.log(`  ${close.hunts} hunts: caught ${close.caught}, stood still 3 s or more ${close.frozen.length}`);
+check(close.hunts >= 200 && close.caught === close.hunts && !close.frozen.length, 'she catches you every time within 20 s, never standing still for 3 s', close.frozen.slice(0, 4));
+
 console.log('== breaking her sight: behind tall and low furniture');
 const sight = await p.evaluate(() => {
   const out = {};
   // she and you on either side of a piece (on a corner point, or in the middle of a room), 14 units from it: does she see you?
-  // (pieces under 14 units across are left out: they can fall between the cells of the 10-unit sight raster, js/layout.js buildNav)
   const look = (crouch) => { const m = monster; m.seenT = 0; m.state = 'wander'; player.crouching = crouch;
     for (let k = 0; k < 20; k++) updateMonster(1 / 60); return { chase: m.state === 'chase', seenT: +m.seenT.toFixed(3) }; };
   for (const occ of ['tall', 'low']) for (const i of [3, 1, 2, 4, 0]) for (let s = 101; s < 141 && !out[occ]; s++) withSeed(s, () => {
     const d = generateFloor(i, 1, 'medium', s); applyFloor(d, 0);
-    for (const bx of SOLIDS.filter(q => q.occ === occ && (q.kind === 'pocket' || q.kind === 'island') && Math.min(q.x1 - q.x0, q.y1 - q.y0) >= 14)) {
+    for (const bx of SOLIDS.filter(q => q.occ === occ && (q.kind === 'pocket' || q.kind === 'island'))) {
       const X = (bx.x0 + bx.x1) / 2, Y = (bx.y0 + bx.y1) / 2;
       for (const [dx, dy] of DIRS) { const o = (dx ? bx.x1 - bx.x0 : bx.y1 - bx.y0) / 2 + 14, h = { x: X - dx * o, y: Y - dy * o }, q = { x: X + dx * o, y: Y + dy * o };
         if (blocked(h.x, h.y, 12) || blocked(q.x, q.y, 11) || !los(h.x, h.y, q.x, q.y)) continue;
@@ -205,6 +232,22 @@ check(tl && !tl.stand.chase && !tl.crouch.chase && tl.stand.seenT > 0.3, 'and sh
 check(lw && lw.los && lw.standing && !lw.crouching, 'behind a low piece: losSight false only while you crouch', lw);
 check(lw && !lw.crouch.chase && lw.crouch.seenT > 0.3, 'crouching behind it: she doesn\'t see you', lw);
 check(lw && lw.stand.chase && lw.stand.seenT === 0, 'standing up: she sees you (and comes for you)', lw);
+
+// every tall and low piece, however narrow (a 13 u rack on a tile edge too): a line straight across its middle, 14 u out each side
+const across = await p.evaluate(() => {
+  const out = { lines: 0, through: [] };
+  for (let i = 0; i < 5; i++) for (let s = 0; s < 40; s++) withSeed(9000 + s, () => {
+    const d = generateFloor(i, 1 + s % 4, 'medium', 9000 + i * 97 + s); applyFloor(d, 0);
+    for (const bx of SOLIDS) { if (bx.occ !== 'tall' && bx.occ !== 'low') continue;
+      const X = (bx.x0 + bx.x1) / 2, Y = (bx.y0 + bx.y1) / 2;
+      for (const [dx, dy] of [[1, 0], [0, 1]]) { const o = (dx ? bx.x1 - bx.x0 : bx.y1 - bx.y0) / 2 + 14, ax = X - dx * o, ay = Y - dy * o, bx2 = X + dx * o, by2 = Y + dy * o;
+        if (!los(ax, ay, bx2, by2)) continue; out.lines++;
+        if (losSight(ax, ay, bx2, by2, true) || (bx.occ === 'tall' && losSight(ax, ay, bx2, by2, false))) out.through.push([i + 1, bx.id, Math.round(bx.x1 - bx.x0), Math.round(bx.y1 - bx.y0)]); } }
+    state = 'walk';
+  });
+  return out;
+});
+check(across.lines > 500 && !across.through.length, `no sight line straight across a tall or low piece gets through it (${across.lines} lines, 200 houses)`, across.through.slice(0, 8));
 
 console.log('== the start room together (4 players)');
 const room = await p.evaluate(() => {

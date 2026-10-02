@@ -67,6 +67,7 @@ function stepAlongPath(m, target, spd, dt) {
     else { if (Math.hypot(m.x - bx, m.y - by) < st - 1e-6) break; left -= st; }   // (bumped into something: that's all for this frame)
   }
   const mx = m.x - x0, my = m.y - y0, mv = Math.hypot(mx, my);
+  m.arrived = arrived;                                          // (as close as she gets: wander, search and leave take it as there)
   if (mv > 1e-3) m.ang = lerpAngle(m.ang, Math.atan2(my, mx), Math.min(1, dt * 8));
   // the stall guard
   m.stall = arrived || mv >= 0.05 * spd * dt ? 0 : (m.stall || 0) + dt;
@@ -197,7 +198,7 @@ function updateMonster(dt) {
     if (hid && m.fakeCool <= 0 && Math.random() < D.fake && startFakeLeave(m, hid)) { /* (she's "leaving") */ }
     else if (m.searchT <= 0) { m.state = 'wander'; m.target = null; m.plan = []; m.checked.clear(); }
     else {
-      if (!m.target || Math.hypot(m.x - m.target.x, m.y - m.target.y) < 8) {
+      if (!m.target || Math.hypot(m.x - m.target.x, m.y - m.target.y) < 8 || m.arrived) { m.arrived = false;
         const done = m.target && m.target.closet !== undefined ? m.target : null;
         if (done) { m.state = 'check'; m.checking = done.closet; m.checkT = 1.8; m.target = null; spd = 0; }
         else {
@@ -210,7 +211,7 @@ function updateMonster(dt) {
     } }
   if (m.state === 'leave') {                              // "leaving": walking off, sounding further and further away
     spd = 30 * spdMul; target = m.target; m.fakeT -= dt; m.quiet = Math.min(1, m.quiet + dt / 4);
-    if (m.fakeT <= 0 || Math.hypot(m.x - m.target.x, m.y - m.target.y) < 10) { m.state = 'lurk'; m.fakeT = rnd(9, 14); m.quiet = 1; }
+    if (m.fakeT <= 0 || Math.hypot(m.x - m.target.x, m.y - m.target.y) < 10 || m.arrived) { m.arrived = false; m.state = 'lurk'; m.fakeT = rnd(9, 14); m.quiet = 1; }
   }
   if (m.state === 'lurk') {                               // ...and waiting around the corner, silent
     spd = 0; target = m; m.fakeT -= dt;
@@ -221,15 +222,19 @@ function updateMonster(dt) {
   }
   if (m.state !== 'leave' && m.state !== 'lurk' && m.quiet > 0) m.quiet = Math.max(0, m.quiet - dt / 1.5);
   if (m.state === 'wander') {
-    if (!m.target || Math.hypot(m.x - m.target.x, m.y - m.target.y) < 8) m.target = center(CELLS[Math.random() * CELLS.length | 0]);
+    if (!m.target || Math.hypot(m.x - m.target.x, m.y - m.target.y) < 8 || m.arrived) { m.arrived = false; m.target = center(CELLS[Math.random() * CELLS.length | 0]); }
     target = m.target; }
 
+  if (m.noDirect > 0) m.noDirect -= dt;
   const tq = seen || kq, tdx = tq ? tq.x - m.x : Math.cos(m.ang), tdy = tq ? tq.y - m.y : Math.sin(m.ang);
   if (m.screamT > 0) {                      // she stops to scream (the animation plays)
     m.screamT -= dt; m.stall = 0; if (tq) m.ang = lerpAngle(m.ang, Math.atan2(tdy, tdx), Math.min(1, dt * 3));
-  } else if (seen && sd < T * 2.2 && clearLine(m.x, m.y, seen.x, seen.y, 12)) {   // close, nothing in the way: straight at you
-    const a = Math.atan2(tdy, tdx); m.ang = lerpAngle(m.ang, a, Math.min(1, dt * 8));
-    moveEntity(m, Math.cos(a) * spd * dt, Math.sin(a) * spd * dt, 12); m.path = []; m.repath = 0; m.stall = 0;
+  } else if (seen && sd < T * 2.2 && !(m.noDirect > 0) && clearLine(m.x, m.y, seen.x, seen.y, 12)) {   // close, nothing in the way: straight at you
+    const a = Math.atan2(tdy, tdx), bx = m.x, by = m.y; m.ang = lerpAngle(m.ang, a, Math.min(1, dt * 8));
+    moveEntity(m, Math.cos(a) * spd * dt, Math.sin(a) * spd * dt, 12); m.path = []; m.repath = 0;
+    // (the straight line can clip a wall corner her body doesn't fit past: hardly moving for 0.25 s, she goes round along her path for 1 s)
+    m.stall = Math.hypot(m.x - bx, m.y - by) >= 0.05 * spd * dt ? 0 : (m.stall || 0) + dt;
+    if (m.stall >= 0.25) { m.stall = 0; m.noDirect = 1; }
   } else if (spd > 0) stepAlongPath(m, target, spd, dt);   // (furniture between you: round it, along her path to where you are)
   else m.stall = 0;
   m.anim += dt * spd * 0.05;

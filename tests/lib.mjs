@@ -30,14 +30,14 @@ export async function launch() {
   return chromium.launch({ executablePath: exe,
     args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
 }
-export async function player(b, name, w = 480, h = 300) {
+export async function player(b, name, w = 480, h = 300, wait = 120000) {
   const ctx = await b.newContext({ viewport: { width: w, height: h } });
   await ctx.addInitScript(n => { try { localStorage.setItem('bb_settings', JSON.stringify({ sens: 1, vol: 0.5, quality: 'low' })); localStorage.setItem('bb_name', n); } catch (e) {} }, name);
   const p = await ctx.newPage(); p.pname = name;
   p.on('pageerror', e => { console.log(`  [${name}] pageerror:`, e.message); pageErrors.push(e.message); });
   p.on('console', m => { if (m.type() === 'error' && !/404|AudioContext/.test(m.text())) console.log(`  [${name}] console:`, m.text()); });
-  await p.goto(URL, { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await p.waitForFunction(() => !document.getElementById('play').disabled, null, { timeout: 120000, polling: 500 });
+  await p.goto(URL, { waitUntil: 'domcontentloaded', timeout: wait });
+  await p.waitForFunction(() => !document.getElementById('play').disabled, null, { timeout: wait, polling: 500 });
   return p;
 }
 export const visible = (p, id) => p.evaluate(id => !document.getElementById(id).classList.contains('hidden'), id);

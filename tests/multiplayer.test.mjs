@@ -27,7 +27,8 @@ const names = await D.evaluate(() => [...document.querySelectorAll('#lbList li:n
 check(names.some(n => n.includes('Alice')) && names.some(n => n.includes('Dan')), 'a joiner sees everyone by name', names);
 await A.screenshot({ timeout: 120000, path: OUT + '/lobby_host.png' });
 console.log('== full lobby');
-const E = await player(b, 'Eve'); await openMp(E); await fill(E, '#mpCode', code); await click(E, '#mpJoin');
+// (a 5th page loading while four others draw on the CPU: give it 5 minutes rather than the usual 2)
+const E = await player(b, 'Eve', 480, 300, 300000); await openMp(E); await fill(E, '#mpCode', code); await click(E, '#mpJoin');
 check(await until(E, () => /full/i.test(document.getElementById('mpStatus').textContent), null, 60000), '5th player is told the lobby is full', await text(E, 'mpStatus'));
 await E.context().close();
 console.log('== kick');

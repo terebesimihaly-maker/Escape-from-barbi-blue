@@ -101,6 +101,20 @@ await p.evaluate(() => { let best = null; for (const q of bb.CELLS()) { let n = 
   bb.player.x = (best[0] + 0.5) * bb.T; bb.player.y = (best[1] + 0.5) * bb.T; bb.player.ang = 0; bb.player.pitch = 0; });
 await p.waitForTimeout(2500); await p.screenshot({ path: OUT + '/floor4.png' });
 check(await p.evaluate(() => bb.level && bb.level.house && (bb.level.house.group.children.length > 5 || bb.level.house.kitCount > 20)), 'the attic is dressed (lamps, sheets, trunks, cobwebs)');
+// every box you bump into is drawn: something in the level covers at least 85% of its width, depth and height (H5)
+const drawn = await p.evaluate(() => {
+  const U = 0.045, n = SOLIDS.length, boxes = Array.from({ length: n }, () => new THREE.Box3()), m = new THREE.Matrix4(), bx = new THREE.Box3();
+  bb.level.group.updateMatrixWorld(true);
+  bb.level.group.traverse(o => { const k = o.userData.kit; if (!o.isInstancedMesh || !k || !Array.isArray(k.solid)) return;
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    k.solid.forEach((s, j) => { if (s < 0 || s >= n) return; o.getMatrixAt(j, m); m.premultiply(o.matrixWorld); boxes[s].union(bx.copy(o.geometry.boundingBox).applyMatrix4(m)); }); });
+  const short = SOLIDS.map((s, i) => { const b = boxes[i]; if (b.isEmpty()) return s.id + ' not drawn';
+    const cov = (a0, a1, c0, c1) => Math.max(0, Math.min(a1, c1) - Math.max(a0, c0)) / (c1 - c0);
+    const c = [cov(b.min.x, b.max.x, s.x0 * U, s.x1 * U), cov(b.min.z, b.max.z, s.y0 * U, s.y1 * U), cov(b.min.y, b.max.y, 0, Math.min(s.h, WALL_H))];
+    return c.every(v => v >= 0.85) ? null : s.id + ' ' + c.map(v => v.toFixed(2)).join('/'); }).filter(Boolean);
+  return { n, short };
+});
+check(drawn.n > 0 && !drawn.short.length, `every piece of furniture you bump into is drawn, at its size (${drawn.n} on the attic floor)`, drawn.short.slice(0, 5));
 await p.evaluate(() => { bb.fuses.forEach((f, k) => bb.applyFuse(k)); const m = bb.monster; m.active = false; m.spawnT = 1e9; bb.player.x = bb.exit.x; bb.player.y = bb.exit.y; });
 check(await until(p, () => bb.state === 'trans'), 'floor 4 escaped');
 await click(p, '#tGo');
