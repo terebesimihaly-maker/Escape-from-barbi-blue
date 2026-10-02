@@ -10,7 +10,8 @@ cd "$(dirname "$0")/../../.."
 PY=${PY:-$( [ -x /tmp/claude-0/bpyenv/bin/python ] && echo /tmp/claude-0/bpyenv/bin/python || command -v python3 || echo python )}
 NICE=$(command -v nice >/dev/null && echo 'nice -n 19' || echo '')   # (no nice on Windows)
 K=tools/blender/kit
-LOG=/tmp/efbb-kit/build.log; mkdir -p /tmp/efbb-kit
+WORK=${EFBB_WORK:-$( [ -d ../renders ] && (cd ../renders && pwd) || echo /tmp/efbb-kit )}   # (as defs.py: a 'renders' folder beside the repo)
+LOG=$WORK/build.log; mkdir -p "$WORK"
 SHEETS=0; ARGS=""
 for a in "$@"; do if [ "$a" = "--sheets" ]; then SHEETS=1; else ARGS="$ARGS $a"; fi; done
 run() { echo "== $(date +%H:%M:%S) $*" | tee -a "$LOG"; $NICE "$PY" "$@" >> "$LOG" 2>&1 || { echo "FAILED: $* (see $LOG)"; exit 1; }; }
@@ -22,8 +23,8 @@ for s in surfaces2 trims doors windows modules wardrobes fixtures furn_wood furn
   if [ -f $K/$s.py ]; then run $K/$s.py $ARGS; fi
 done
 run $K/pack.py all all --if-stale
-if $NICE "$PY" $K/check_kit.py --quiet > /tmp/efbb-kit/check.txt 2>&1; then ok=1; else ok=0; fi
-tee -a "$LOG" < /tmp/efbb-kit/check.txt
+if $NICE "$PY" $K/check_kit.py --quiet > "$WORK/check.txt" 2>&1; then ok=1; else ok=0; fi
+tee -a "$LOG" < "$WORK/check.txt"
 [ $ok = 1 ] || { echo "FAILED: check_kit"; exit 1; }
 if [ $SHEETS = 1 ]; then
   for f in wood tile concrete attic workshop common; do run $K/contact_sheets.py --file $f --real; done

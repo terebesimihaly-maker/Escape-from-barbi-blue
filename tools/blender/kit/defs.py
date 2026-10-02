@@ -8,6 +8,9 @@
 import json, os
 HERE = os.path.dirname(os.path.abspath(__file__)); REPO = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 SRC = os.path.join(REPO, 'js', 'kitdefs.js')
+# the kit's work folder (bake intermediates, .blend files, contact sheets, renders): EFBB_WORK when set, else a 'renders' folder
+# beside the repository when there is one (the PC keeps it on a big drive), else /tmp/efbb-kit
+WORK = os.environ.get('EFBB_WORK') or next((p for p in (os.path.join(os.path.dirname(REPO), 'renders'),) if os.path.isdir(p)), '/tmp/efbb-kit')
 RESERVED = ('WallSurface', 'Glass', 'SkyPlane', 'Emit')        # material names the game's loader swaps for its own
 
 def load(path=SRC):

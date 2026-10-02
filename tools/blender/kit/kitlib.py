@@ -13,7 +13,7 @@ import bpy, bmesh
 import numpy as np
 from mathutils import Vector, Matrix, noise
 import common, defs
-REPO = defs.REPO; TMP = '/tmp/efbb-kit'; KITDIR = os.path.join(REPO, 'models', 'kit')
+REPO = defs.REPO; TMP = defs.WORK; KITDIR = os.path.join(REPO, 'models', 'kit')
 # node tools (gltf-transform + meshopt): EFBB_GLTFT if set, else tools/gltf once "npm install" ran there, else the old cloud path
 GLTFT = os.environ.get('EFBB_GLTFT') or next((p for p in (os.path.join(REPO, 'tools', 'gltf'), '/tmp/claude-0/gltft')
                                               if os.path.isdir(os.path.join(p, 'node_modules'))), os.path.join(REPO, 'tools', 'gltf'))

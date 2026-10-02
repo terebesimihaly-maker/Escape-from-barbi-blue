@@ -1,10 +1,106 @@
 {
  "L": 2.25,
- "common": {},
+ "common": {
+  "detail": {
+   "channel": "R",
+   "files": {
+    "dust_detail": "common/dust_detail",
+    "grime_detail": "common/grime_detail",
+    "wet_edge": "common/wet_edge"
+   },
+   "notes": "dust_detail averages 0.5 (matlib packs R dust, G wet edge); grime_detail for walls and props",
+   "px": {
+    "hi": [
+     512,
+     512
+    ],
+    "lo": [
+     256,
+     256
+    ],
+    "md": [
+     512,
+     512
+    ]
+   },
+   "tiles": "uv"
+  }
+ },
  "faceH": 3.0,
  "kit": 1,
  "styles": {
   "attic": {
+   "beam": {
+    "ao_m": 0.05,
+    "bake_s": {
+     "ao": 1.3,
+     "cav": 1.4,
+     "colA": 1.1,
+     "col_shift": 1.2,
+     "dn_ao": 0.4,
+     "dn_cav": 0.4,
+     "height": 0.8,
+     "normal": 1.2,
+     "normal_shift": 1.2,
+     "rough": 1.1,
+     "total": 11.8,
+     "zgeo": 0.7
+    },
+    "files": {
+     "color": "attic/beam_color",
+     "normal": "attic/beam_normal",
+     "orh": "attic/beam_orh"
+    },
+    "notes": "attic beam",
+    "perimeter": "v once round the section (arch.js)",
+    "pom": 0.006,
+    "preview": false,
+    "px": {
+     "hi": [
+      2048,
+      512
+     ],
+     "lo": [
+      512,
+      128
+     ],
+     "md": [
+      1024,
+      256
+     ]
+    },
+    "px_per_m": 910,
+    "seam": {
+     "color": {
+      "inner_u": 0.0017,
+      "inner_v": 0.0157,
+      "u": 0.0012,
+      "v": 0.0143
+     },
+     "normal": {
+      "inner_u": 0.0071,
+      "inner_v": 0.0073,
+      "u": 0.0079,
+      "v": 0.0121
+     },
+     "orh": {
+      "inner_u": 0.0048,
+      "inner_v": 0.0114,
+      "u": 0.0067,
+      "v": 0.0117
+     },
+     "shift": {
+      "color": 0.0006,
+      "normal": 0.0043
+     }
+    },
+    "size_m": [
+     2.25,
+     0.5625
+    ],
+    "tiles": "uv",
+    "variants": 1
+   },
    "ceil": {
     "ao_m": 0.15,
     "bake_s": {
@@ -150,6 +246,152 @@
     "tiles": "uv",
     "variants": 2
    },
+   "service": {
+    "ao_m": 0.08,
+    "bake_s": {
+     "ao": 1.5,
+     "cav": 1.6,
+     "colA": 1.7,
+     "colB": 1.8,
+     "col_shift": 1.7,
+     "dn_ao": 0.5,
+     "dn_cav": 0.5,
+     "height": 1.2,
+     "normal": 1.8,
+     "normal_shift": 1.8,
+     "rough": 1.7,
+     "total": 17.8,
+     "zgeo": 0.8
+    },
+    "files": {
+     "color": "attic/service_color",
+     "normal": "attic/service_normal",
+     "orh": "attic/service_orh"
+    },
+    "heights": {
+     "line": 1.2
+    },
+    "notes": "servants' passage: #6b5a48 oil paint to 1.2 m with a black line, #cbc4b2 distemper above, repeating every 3 m",
+    "pom": 0.004,
+    "preview": false,
+    "px": {
+     "hi": [
+      1024,
+      1365
+     ],
+     "lo": [
+      256,
+      341
+     ],
+     "md": [
+      512,
+      682
+     ]
+    },
+    "px_per_m": 455,
+    "seam": {
+     "AB": 0.0013,
+     "BA": 0.0013,
+     "color": {
+      "inner_u": 0.0008,
+      "inner_v": 0.0014,
+      "u": 0.0013,
+      "v": 0.3047
+     },
+     "normal": {
+      "inner_u": 0.0025,
+      "inner_v": 0.0025,
+      "u": 0.0027,
+      "v": 0.0045
+     },
+     "orh": {
+      "inner_u": 0.0042,
+      "inner_v": 0.0043,
+      "u": 0.0073,
+      "v": 0.1344
+     },
+     "shift": {
+      "color": 0.0005,
+      "normal": 0.0008
+     }
+    },
+    "size_m": [
+     2.25,
+     3.0
+    ],
+    "tiles": "uv",
+    "variants": 2
+   },
+   "upper": {
+    "ao_m": 0.12,
+    "bake_s": {
+     "ao": 1.6,
+     "cav": 1.6,
+     "colA": 1.9,
+     "col_shift": 1.9,
+     "dn_ao": 0.5,
+     "dn_cav": 0.5,
+     "height": 1.0,
+     "normal": 2.0,
+     "normal_shift": 2.0,
+     "rough": 1.9,
+     "total": 16.7,
+     "zgeo": 0.7
+    },
+    "files": {
+     "color": "attic/upper_color",
+     "normal": "attic/upper_normal",
+     "orh": "attic/upper_orh"
+    },
+    "notes": "rough-sawn vertical boarding, tiling every 3 m",
+    "pom": 0.012,
+    "preview": false,
+    "px": {
+     "hi": [
+      1024,
+      1365
+     ],
+     "lo": [
+      256,
+      341
+     ],
+     "md": [
+      512,
+      682
+     ]
+    },
+    "px_per_m": 455,
+    "seam": {
+     "color": {
+      "inner_u": 0.0162,
+      "inner_v": 0.0015,
+      "u": 0.0008,
+      "v": 0.0008
+     },
+     "normal": {
+      "inner_u": 0.0142,
+      "inner_v": 0.0092,
+      "u": 0.0,
+      "v": 0.0
+     },
+     "orh": {
+      "inner_u": 0.023,
+      "inner_v": 0.002,
+      "u": 0.0089,
+      "v": 0.0089
+     },
+     "shift": {
+      "color": 0.0003,
+      "normal": 0.004
+     }
+    },
+    "size_m": [
+     2.25,
+     3.0
+    ],
+    "tiles": "uv",
+    "variants": 1
+   },
    "wall": {
     "ao_m": 0.12,
     "bake_s": {
@@ -247,6 +489,77 @@
    }
   },
   "concrete": {
+   "beam": {
+    "ao_m": 0.05,
+    "bake_s": {
+     "ao": 1.3,
+     "cav": 1.3,
+     "colA": 1.2,
+     "col_shift": 1.3,
+     "dn_ao": 0.4,
+     "dn_cav": 0.4,
+     "height": 0.9,
+     "normal": 1.3,
+     "normal_shift": 1.3,
+     "rough": 1.3,
+     "total": 12.4,
+     "zgeo": 0.7
+    },
+    "files": {
+     "color": "concrete/beam_color",
+     "normal": "concrete/beam_normal",
+     "orh": "concrete/beam_orh"
+    },
+    "notes": "concrete beam",
+    "perimeter": "v once round the section (arch.js)",
+    "pom": 0.006,
+    "preview": false,
+    "px": {
+     "hi": [
+      2048,
+      512
+     ],
+     "lo": [
+      512,
+      128
+     ],
+     "md": [
+      1024,
+      256
+     ]
+    },
+    "px_per_m": 910,
+    "seam": {
+     "color": {
+      "inner_u": 0.0048,
+      "inner_v": 0.0099,
+      "u": 0.0056,
+      "v": 0.009
+     },
+     "normal": {
+      "inner_u": 0.0046,
+      "inner_v": 0.0086,
+      "u": 0.0045,
+      "v": 0.0104
+     },
+     "orh": {
+      "inner_u": 0.0026,
+      "inner_v": 0.0078,
+      "u": 0.0045,
+      "v": 0.0072
+     },
+     "shift": {
+      "color": 0.0003,
+      "normal": 0.0029
+     }
+    },
+    "size_m": [
+     2.25,
+     0.5625
+    ],
+    "tiles": "uv",
+    "variants": 1
+   },
    "ceil": {
     "ao_m": 0.1,
     "bake_s": {
@@ -391,6 +704,152 @@
     ],
     "tiles": "uv",
     "variants": 2
+   },
+   "service": {
+    "ao_m": 0.08,
+    "bake_s": {
+     "ao": 1.5,
+     "cav": 1.5,
+     "colA": 1.7,
+     "colB": 1.8,
+     "col_shift": 1.7,
+     "dn_ao": 0.5,
+     "dn_cav": 0.5,
+     "height": 1.1,
+     "normal": 1.7,
+     "normal_shift": 1.7,
+     "rough": 1.7,
+     "total": 17.4,
+     "zgeo": 0.8
+    },
+    "files": {
+     "color": "concrete/service_color",
+     "normal": "concrete/service_normal",
+     "orh": "concrete/service_orh"
+    },
+    "heights": {
+     "line": 1.2
+    },
+    "notes": "servants' passage: #2e2b28 oil paint to 1.2 m with a black line, #bdb7a8 distemper above, repeating every 3 m",
+    "pom": 0.004,
+    "preview": false,
+    "px": {
+     "hi": [
+      1024,
+      1365
+     ],
+     "lo": [
+      256,
+      341
+     ],
+     "md": [
+      512,
+      682
+     ]
+    },
+    "px_per_m": 455,
+    "seam": {
+     "AB": 0.001,
+     "BA": 0.001,
+     "color": {
+      "inner_u": 0.0007,
+      "inner_v": 0.001,
+      "u": 0.001,
+      "v": 0.4352
+     },
+     "normal": {
+      "inner_u": 0.0025,
+      "inner_v": 0.0025,
+      "u": 0.0027,
+      "v": 0.0045
+     },
+     "orh": {
+      "inner_u": 0.0042,
+      "inner_v": 0.0043,
+      "u": 0.0073,
+      "v": 0.1344
+     },
+     "shift": {
+      "color": 0.0003,
+      "normal": 0.0008
+     }
+    },
+    "size_m": [
+     2.25,
+     3.0
+    ],
+    "tiles": "uv",
+    "variants": 2
+   },
+   "upper": {
+    "ao_m": 0.08,
+    "bake_s": {
+     "ao": 1.5,
+     "cav": 1.6,
+     "colA": 1.3,
+     "col_shift": 1.3,
+     "dn_ao": 0.5,
+     "dn_cav": 0.5,
+     "height": 1.2,
+     "normal": 1.4,
+     "normal_shift": 1.3,
+     "rough": 1.3,
+     "total": 14.0,
+     "zgeo": 1.0
+    },
+    "files": {
+     "color": "concrete/upper_color",
+     "normal": "concrete/upper_normal",
+     "orh": "concrete/upper_orh"
+    },
+    "notes": "rough cement render, cracks, damp, grime",
+    "pom": 0.006,
+    "preview": false,
+    "px": {
+     "hi": [
+      1024,
+      1365
+     ],
+     "lo": [
+      256,
+      341
+     ],
+     "md": [
+      512,
+      682
+     ]
+    },
+    "px_per_m": 455,
+    "seam": {
+     "color": {
+      "inner_u": 0.0081,
+      "inner_v": 0.0081,
+      "u": 0.0069,
+      "v": 0.0078
+     },
+     "normal": {
+      "inner_u": 0.0157,
+      "inner_v": 0.0157,
+      "u": 0.0141,
+      "v": 0.015
+     },
+     "orh": {
+      "inner_u": 0.0084,
+      "inner_v": 0.0083,
+      "u": 0.0104,
+      "v": 0.01
+     },
+     "shift": {
+      "color": 0.0005,
+      "normal": 0.0031
+     }
+    },
+    "size_m": [
+     2.25,
+     3.0
+    ],
+    "tiles": "uv",
+    "variants": 1
    },
    "wall": {
     "ao_m": 0.12,
@@ -631,6 +1090,152 @@
     ],
     "tiles": "uv",
     "variants": 2
+   },
+   "service": {
+    "ao_m": 0.08,
+    "bake_s": {
+     "ao": 1.7,
+     "cav": 1.7,
+     "colA": 1.8,
+     "colB": 2.1,
+     "col_shift": 1.8,
+     "dn_ao": 0.6,
+     "dn_cav": 0.5,
+     "height": 1.2,
+     "normal": 1.8,
+     "normal_shift": 2.0,
+     "rough": 1.9,
+     "total": 19.3,
+     "zgeo": 0.9
+    },
+    "files": {
+     "color": "tile/service_color",
+     "normal": "tile/service_normal",
+     "orh": "tile/service_orh"
+    },
+    "heights": {
+     "line": 1.2
+    },
+    "notes": "servants' passage: #3f4a3a oil paint to 1.2 m with a black line, #cfc6ae distemper above, repeating every 3 m",
+    "pom": 0.004,
+    "preview": false,
+    "px": {
+     "hi": [
+      1024,
+      1365
+     ],
+     "lo": [
+      256,
+      341
+     ],
+     "md": [
+      512,
+      682
+     ]
+    },
+    "px_per_m": 455,
+    "seam": {
+     "AB": 0.0012,
+     "BA": 0.0012,
+     "color": {
+      "inner_u": 0.0008,
+      "inner_v": 0.0012,
+      "u": 0.0012,
+      "v": 0.4007
+     },
+     "normal": {
+      "inner_u": 0.0025,
+      "inner_v": 0.0025,
+      "u": 0.0027,
+      "v": 0.0045
+     },
+     "orh": {
+      "inner_u": 0.0042,
+      "inner_v": 0.0043,
+      "u": 0.0073,
+      "v": 0.1344
+     },
+     "shift": {
+      "color": 0.0004,
+      "normal": 0.0008
+     }
+    },
+    "size_m": [
+     2.25,
+     3.0
+    ],
+    "tiles": "uv",
+    "variants": 2
+   },
+   "upper": {
+    "ao_m": 0.1,
+    "bake_s": {
+     "ao": 1.8,
+     "cav": 1.9,
+     "colA": 2.5,
+     "col_shift": 2.5,
+     "dn_ao": 0.6,
+     "dn_cav": 0.5,
+     "height": 1.4,
+     "normal": 2.4,
+     "normal_shift": 2.4,
+     "rough": 2.3,
+     "total": 20.4,
+     "zgeo": 1.0
+    },
+    "files": {
+     "color": "tile/upper_color",
+     "normal": "tile/upper_normal",
+     "orh": "tile/upper_orh"
+    },
+    "notes": "plaster frieze of moulded panels (4 x 4 per tile) in old distemper",
+    "pom": 0.012,
+    "preview": false,
+    "px": {
+     "hi": [
+      1024,
+      1365
+     ],
+     "lo": [
+      256,
+      341
+     ],
+     "md": [
+      512,
+      682
+     ]
+    },
+    "px_per_m": 455,
+    "seam": {
+     "color": {
+      "inner_u": 0.0095,
+      "inner_v": 0.0068,
+      "u": 0.0018,
+      "v": 0.0023
+     },
+     "normal": {
+      "inner_u": 0.0113,
+      "inner_v": 0.0101,
+      "u": 0.0042,
+      "v": 0.005
+     },
+     "orh": {
+      "inner_u": 0.0178,
+      "inner_v": 0.0143,
+      "u": 0.0086,
+      "v": 0.0093
+     },
+     "shift": {
+      "color": 0.0004,
+      "normal": 0.0014
+     }
+    },
+    "size_m": [
+     2.25,
+     3.0
+    ],
+    "tiles": "uv",
+    "variants": 1
    },
    "wall": {
     "ao_m": 0.12,
@@ -879,6 +1484,155 @@
     "tiles": "uv",
     "variants": 2
    },
+   "service": {
+    "ao_m": 0.08,
+    "bake_s": {
+     "ao": 1.6,
+     "cav": 1.7,
+     "colA": 1.8,
+     "colB": 2.0,
+     "col_shift": 2.0,
+     "dn_ao": 0.6,
+     "dn_cav": 0.6,
+     "height": 1.2,
+     "normal": 1.9,
+     "normal_shift": 2.0,
+     "rough": 1.8,
+     "total": 19.3,
+     "zgeo": 0.9
+    },
+    "files": {
+     "color": "wood/service_color",
+     "normal": "wood/service_normal",
+     "orh": "wood/service_orh"
+    },
+    "heights": {
+     "line": 1.2
+    },
+    "notes": "servants' passage: #5a4636 oil paint to 1.2 m with a black line, #c9c0a8 distemper above, repeating every 3 m",
+    "pom": 0.004,
+    "preview": false,
+    "px": {
+     "hi": [
+      1024,
+      1365
+     ],
+     "lo": [
+      256,
+      341
+     ],
+     "md": [
+      512,
+      682
+     ]
+    },
+    "px_per_m": 455,
+    "seam": {
+     "AB": 0.0012,
+     "BA": 0.0012,
+     "color": {
+      "inner_u": 0.0007,
+      "inner_v": 0.0012,
+      "u": 0.0012,
+      "v": 0.3563
+     },
+     "normal": {
+      "inner_u": 0.0025,
+      "inner_v": 0.0025,
+      "u": 0.0027,
+      "v": 0.0045
+     },
+     "orh": {
+      "inner_u": 0.0042,
+      "inner_v": 0.0043,
+      "u": 0.0073,
+      "v": 0.1344
+     },
+     "shift": {
+      "color": 0.0004,
+      "normal": 0.0008
+     }
+    },
+    "size_m": [
+     2.25,
+     3.0
+    ],
+    "tiles": "uv",
+    "variants": 2
+   },
+   "upper": {
+    "ao_m": 0.08,
+    "bake_s": {
+     "ao": 1.6,
+     "cav": 1.8,
+     "colA": 0.9,
+     "colB": 1.0,
+     "col_shift": 0.9,
+     "dn_ao": 0.6,
+     "dn_cav": 0.5,
+     "height": 1.0,
+     "normal": 1.1,
+     "normal_shift": 1.1,
+     "rough": 1.0,
+     "total": 13.6,
+     "zgeo": 0.9
+    },
+    "files": {
+     "color": "wood/upper_color",
+     "normal": "wood/upper_normal",
+     "orh": "wood/upper_orh"
+    },
+    "notes": "painted embossed (Anaglypta-like) relief paper, 8 x 10 cells per tile; B: water-stained",
+    "pom": 0.004,
+    "preview": false,
+    "px": {
+     "hi": [
+      1024,
+      1365
+     ],
+     "lo": [
+      256,
+      341
+     ],
+     "md": [
+      512,
+      682
+     ]
+    },
+    "px_per_m": 455,
+    "seam": {
+     "AB": 0.0005,
+     "BA": 0.0005,
+     "color": {
+      "inner_u": 0.0012,
+      "inner_v": 0.0011,
+      "u": 0.0005,
+      "v": 0.0001
+     },
+     "normal": {
+      "inner_u": 0.0114,
+      "inner_v": 0.0107,
+      "u": 0.007,
+      "v": 0.0063
+     },
+     "orh": {
+      "inner_u": 0.0097,
+      "inner_v": 0.0091,
+      "u": 0.0017,
+      "v": 0.0007
+     },
+     "shift": {
+      "color": 0.0,
+      "normal": 0.0005
+     }
+    },
+    "size_m": [
+     2.25,
+     3.0
+    ],
+    "tiles": "uv",
+    "variants": 2
+   },
    "wall": {
     "ao_m": 0.12,
     "bake_s": {
@@ -977,6 +1731,77 @@
    }
   },
   "workshop": {
+   "beam": {
+    "ao_m": 0.05,
+    "bake_s": {
+     "ao": 1.3,
+     "cav": 1.4,
+     "colA": 1.3,
+     "col_shift": 1.3,
+     "dn_ao": 0.4,
+     "dn_cav": 0.5,
+     "height": 0.8,
+     "normal": 1.2,
+     "normal_shift": 1.2,
+     "rough": 1.2,
+     "total": 12.2,
+     "zgeo": 0.7
+    },
+    "files": {
+     "color": "workshop/beam_color",
+     "normal": "workshop/beam_normal",
+     "orh": "workshop/beam_orh"
+    },
+    "notes": "workshop beam",
+    "perimeter": "v once round the section (arch.js)",
+    "pom": 0.006,
+    "preview": false,
+    "px": {
+     "hi": [
+      2048,
+      512
+     ],
+     "lo": [
+      512,
+      128
+     ],
+     "md": [
+      1024,
+      256
+     ]
+    },
+    "px_per_m": 910,
+    "seam": {
+     "color": {
+      "inner_u": 0.0013,
+      "inner_v": 0.0148,
+      "u": 0.0008,
+      "v": 0.0141
+     },
+     "normal": {
+      "inner_u": 0.0045,
+      "inner_v": 0.0094,
+      "u": 0.0045,
+      "v": 0.0108
+     },
+     "orh": {
+      "inner_u": 0.0038,
+      "inner_v": 0.0134,
+      "u": 0.0056,
+      "v": 0.0129
+     },
+     "shift": {
+      "color": 0.0004,
+      "normal": 0.0028
+     }
+    },
+    "size_m": [
+     2.25,
+     0.5625
+    ],
+    "tiles": "uv",
+    "variants": 1
+   },
    "ceil": {
     "ao_m": 0.1,
     "bake_s": {
@@ -1121,6 +1946,223 @@
     ],
     "tiles": "uv",
     "variants": 2
+   },
+   "ibeam": {
+    "ao_m": 0.05,
+    "bake_s": {
+     "ao": 1.2,
+     "cav": 1.3,
+     "colA": 1.0,
+     "col_shift": 1.0,
+     "dn_ao": 0.4,
+     "dn_cav": 0.4,
+     "height": 0.8,
+     "normal": 1.0,
+     "normal_shift": 1.1,
+     "rough": 1.0,
+     "total": 10.6,
+     "zgeo": 0.6
+    },
+    "files": {
+     "color": "workshop/ibeam_color",
+     "normal": "workshop/ibeam_normal",
+     "orh": "workshop/ibeam_orh"
+    },
+    "notes": "workshop ibeam",
+    "perimeter": "v once round the section (arch.js)",
+    "pom": 0.006,
+    "preview": false,
+    "px": {
+     "hi": [
+      2048,
+      512
+     ],
+     "lo": [
+      512,
+      128
+     ],
+     "md": [
+      1024,
+      256
+     ]
+    },
+    "px_per_m": 910,
+    "seam": {
+     "color": {
+      "inner_u": 0.0011,
+      "inner_v": 0.0012,
+      "u": 0.0016,
+      "v": 0.0011
+     },
+     "normal": {
+      "inner_u": 0.0009,
+      "inner_v": 0.0013,
+      "u": 0.0001,
+      "v": 0.0005
+     },
+     "orh": {
+      "inner_u": 0.0012,
+      "inner_v": 0.0013,
+      "u": 0.0018,
+      "v": 0.001
+     },
+     "shift": {
+      "color": 0.0001,
+      "normal": 0.0012
+     }
+    },
+    "size_m": [
+     2.25,
+     0.5625
+    ],
+    "tiles": "uv",
+    "variants": 1
+   },
+   "service": {
+    "ao_m": 0.08,
+    "bake_s": {
+     "ao": 1.5,
+     "cav": 1.6,
+     "colA": 1.7,
+     "colB": 1.8,
+     "col_shift": 1.7,
+     "dn_ao": 0.5,
+     "dn_cav": 0.5,
+     "height": 1.2,
+     "normal": 1.8,
+     "normal_shift": 1.8,
+     "rough": 1.7,
+     "total": 17.7,
+     "zgeo": 0.9
+    },
+    "files": {
+     "color": "workshop/service_color",
+     "normal": "workshop/service_normal",
+     "orh": "workshop/service_orh"
+    },
+    "heights": {
+     "line": 1.2
+    },
+    "notes": "servants' passage: #3d4b3c oil paint to 1.2 m with a black line, #bfb8a3 distemper above, repeating every 3 m",
+    "pom": 0.004,
+    "preview": false,
+    "px": {
+     "hi": [
+      1024,
+      1365
+     ],
+     "lo": [
+      256,
+      341
+     ],
+     "md": [
+      512,
+      682
+     ]
+    },
+    "px_per_m": 455,
+    "seam": {
+     "AB": 0.0011,
+     "BA": 0.0011,
+     "color": {
+      "inner_u": 0.0007,
+      "inner_v": 0.0011,
+      "u": 0.0011,
+      "v": 0.3531
+     },
+     "normal": {
+      "inner_u": 0.0025,
+      "inner_v": 0.0025,
+      "u": 0.0027,
+      "v": 0.0045
+     },
+     "orh": {
+      "inner_u": 0.0042,
+      "inner_v": 0.0043,
+      "u": 0.0073,
+      "v": 0.1344
+     },
+     "shift": {
+      "color": 0.0004,
+      "normal": 0.0008
+     }
+    },
+    "size_m": [
+     2.25,
+     3.0
+    ],
+    "tiles": "uv",
+    "variants": 2
+   },
+   "upper": {
+    "ao_m": 0.12,
+    "bake_s": {
+     "ao": 1.7,
+     "cav": 1.9,
+     "colA": 1.2,
+     "col_shift": 1.1,
+     "dn_ao": 0.6,
+     "dn_cav": 0.6,
+     "height": 1.3,
+     "normal": 1.3,
+     "normal_shift": 1.2,
+     "rough": 1.2,
+     "total": 14.3,
+     "zgeo": 1.3
+    },
+    "files": {
+     "color": "workshop/upper_color",
+     "normal": "workshop/upper_normal",
+     "orh": "workshop/upper_orh"
+    },
+    "notes": "limewashed stretcher-bond brick, flaking",
+    "pom": 0.02,
+    "preview": false,
+    "px": {
+     "hi": [
+      1024,
+      1365
+     ],
+     "lo": [
+      256,
+      341
+     ],
+     "md": [
+      512,
+      682
+     ]
+    },
+    "px_per_m": 455,
+    "seam": {
+     "color": {
+      "inner_u": 0.0145,
+      "inner_v": 0.0257,
+      "u": 0.0078,
+      "v": 0.0076
+     },
+     "normal": {
+      "inner_u": 0.0151,
+      "inner_v": 0.0304,
+      "u": 0.0105,
+      "v": 0.012
+     },
+     "orh": {
+      "inner_u": 0.0099,
+      "inner_v": 0.0248,
+      "u": 0.009,
+      "v": 0.0142
+     },
+     "shift": {
+      "color": 0.0005,
+      "normal": 0.0014
+     }
+    },
+    "size_m": [
+     2.25,
+     3.0
+    ],
+    "tiles": "uv",
+    "variants": 1
    },
    "wall": {
     "ao_m": 0.12,

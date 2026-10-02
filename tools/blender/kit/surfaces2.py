@@ -187,6 +187,7 @@ def vadd(m, a, b):
 def vlen(m, v):
     n = m.n('ShaderNodeVectorMath', operation='LENGTH'); m.l(v, n.inputs[0]); return n.outputs['Value']
 
+UVLOOK = False
 def look(m, key, W, H):
     """the baked map key ('CAV' cavity 1 open .. 0 deep, 'EDGE' 1 on outside edges) at this point of the tile (it was baked
        looking straight down: what shows from the front is what was baked)"""
@@ -194,7 +195,8 @@ def look(m, key, W, H):
     if t is None:
         x, y, z = sep(m, m.geo('Position'))
         t = m.n('ShaderNodeTexImage', name=key, label=key, extension='REPEAT', interpolation='Linear')
-        t.image = kitlib._white() if key == 'CAV' else kitlib._flat('kit_black', 0.0); m.l(comb(m, m.math('DIVIDE', x, W), m.math('DIVIDE', y, H), 0.0), t.inputs['Vector'])
+        t.image = kitlib._white() if key == 'CAV' else kitlib._flat('kit_black', 0.0)
+        if not UVLOOK: m.l(comb(m, m.math('DIVIDE', x, W), m.math('DIVIDE', y, H), 0.0), t.inputs['Vector'])   # (UVLOOK: baked onto the part's own UVs, as trims.py does)
     s = m.n('ShaderNodeSeparateColor'); m.l(t.outputs['Color'], s.inputs[0]); return s.outputs[0]
 
 def variant(m):
@@ -267,6 +269,21 @@ def save_float(a, path):
     c = a if a.ndim == 3 else np.repeat(a[..., None], 3, -1); rgba = np.concatenate([c[..., :3], np.ones((h, w, 1), np.float32)], -1)[::-1]
     im.pixels.foreach_set(rgba.astype(np.float32).ravel()); kitlib.save_exr(im, path); bpy.data.images.remove(im); return path
 
+def no_metal(mats):
+    """metalness off for a colour bake (Cycles' diffuse colour pass is black where a surface is metal); returns the undo"""
+    undo = []
+    for m in mats:
+        pb = m.node_tree.nodes.get('Principled BSDF') if m and m.node_tree else None
+        if not pb: continue
+        inp = pb.inputs['Metallic']; src = inp.links[0].from_socket if inp.is_linked else None; val = inp.default_value
+        if src: m.node_tree.links.remove(inp.links[0])
+        inp.default_value = 0.0; undo.append((m, inp, src, val))
+    def back():
+        for m, inp, src, val in undo:
+            inp.default_value = val
+            if src: m.node_tree.links.new(src, inp)
+    return back
+
 def bake(name, geo, W, H, px, py, variants=1, ao=0.12, cav=0.03, edge=0.004, pom=0.012, spp_ao=256, spp=16, wv=True):
     """bake geo (one mesh in the flat frame) onto the W x H tile at px x py: returns the float maps (row 0 at the top) and the
        times. Cavity and edges first (the materials read them back), then AO, normal, height, roughness, colour per variant."""
@@ -313,6 +330,7 @@ def bake(name, geo, W, H, px, py, variants=1, ao=0.12, cav=0.03, edge=0.004, pom
     back = _height_mats(geo); p_h = run('EMIT', 'height', spp); back()
     p_r = run('ROUGHNESS', 'rough', spp)
     b.use_pass_direct = b.use_pass_indirect = False; b.use_pass_color = True; cols = []
+    undo_metal = no_metal(geo.data.materials)                          # (a metal has no diffuse colour: the albedo is its base colour)
     for k in range(variants):
         for m in geo.data.materials:
             v = m.node_tree.nodes.get('VARIANT')
@@ -328,11 +346,15 @@ def bake(name, geo, W, H, px, py, variants=1, ao=0.12, cav=0.03, edge=0.004, pom
             if v: v.outputs[0].default_value = 0.0
     rx = round(0.25 * px / W); ry = round(0.25 * py / H) if wv else 0                # (a quarter metre on, whole pixels: inside the wrapped copies)
     tgt.location = (rx * W / px, ry * H / py, 0)
-    cs = kitlib.load_exr(run('DIFFUSE', 'col_shift', spp))[..., :3]; ns = kitlib.load_exr(run('NORMAL', 'normal_shift', spp, normal_space='TANGENT'))[..., :3]
+    cs = kitlib.load_exr(run('DIFFUSE', 'col_shift', spp))[..., :3]; undo_metal()
+    ns = kitlib.load_exr(run('NORMAL', 'normal_shift', spp, normal_space='TANGENT'))[..., :3]
     roll = lambda a: np.roll(np.roll(a, -rx, axis=1), ry, axis=0)
     out['seam_shift'] = {'color': round(float(np.abs(kitlib.to_srgb(roll(out['col'][0])) - kitlib.to_srgb(cs)).mean()), 4),
                          'normal': round(float(np.abs(roll(out['normal']) - ns).mean()), 4)}
     bpy.data.objects.remove(tgt); times['total'] = round(time.time() - t0, 1); out['times'] = times; out['px'] = (px, py)
+    for im in list(bpy.data.images):                                   # (the float images and the EXRs behind them: ~1 GB a set)
+        if im.name.startswith(name + '_') or im.filepath.startswith(d): bpy.data.images.remove(im)
+    import shutil; shutil.rmtree(d, ignore_errors=True)
     print(f'  baked {name} {px}x{py}: ' + json.dumps(times), flush=True)
     return out
 
@@ -921,7 +943,7 @@ def pine_mat(name, W, H, early='#9a7550', late='#4c2f17', dust='#837e74', dusty=
             run = st if run is None else m.math('MAXIMUM', run, st); head = hd if head is None else m.math('MAXIMUM', head, hd)
         col = m.mix(m.math('MULTIPLY', head, 0.85), col, m.mix(0.6, m.hsv(col, 0.5, 1.1, 0.45), lin('#4a2410')))
         col = m.mix(m.math('MINIMUM', 1.0, m.math('MULTIPLY', run, 1.2)), col, m.mix(0.55, m.hsv(col, 0.5, 1.25, 0.42), lin('#3e1c0a')))
-        col = m.mix(m.math('MULTIPLY', m.remap(T.y, 1.4, 3.0), 0.55), col, m.hsv(col, 0.5, 0.8, 0.6))   # (darker toward the roof)
+        if not wv: col = m.mix(m.math('MULTIPLY', m.remap(T.y, 1.4, 3.0), 0.55), col, m.hsv(col, 0.5, 0.8, 0.6))   # (darker toward the roof)
     # whitewash splashes, a roof-leak stain with its tide line
     ws = m.math('MULTIPLY', m.remap(T.voronoi(9.0, 'Distance', off=81.0), 0.06, 0.03, smooth=True), m.remap(T.noise(0.8, 2, off=83.0), 0.62, 0.68))
     ws = m.math('MULTIPLY', ws, m.remap(T.noise(60, 3, off=84.0), 0.3, 0.6))
@@ -1175,7 +1197,7 @@ def damask(px=1024, seed=7, strip=0.5625, rep=0.6):
     return np.stack([two, two_l, rim], -1)
 
 # ================================================================ painted wood (wainscot, skirting, frames)
-def paint_mat(name, W, H, color='#d6cbb2', under='#5f6d52', primer='#8a5a3c', wood='#9c774c', wv=True, chips=1.0, gloss=0.32, scuff=0.0, age=1.0, stain=0.0, up=1):
+def paint_mat(name, W, H, color='#d6cbb2', under='#5f6d52', primer='#8a5a3c', wood='#9c774c', wv=True, chips=1.0, gloss=0.32, scuff=0.0, age=1.0, stain=0.0, up=1, band=None):
     """old oil paint, coat over coat, on wood: brush ridges along each piece (the 'gpos' attribute, z along the grain), its
        edges softened by the coats, yellowed unevenly, crazed in patches; chipped in clusters where things knocked it (on the
        edges there, and ragged flakes off the faces) through an older green coat and the red-brown primer to the wood; grime
@@ -1187,6 +1209,9 @@ def paint_mat(name, W, H, color='#d6cbb2', under='#5f6d52', primer='#8a5a3c', wo
     col = m.mix(m.remap(T.noise(2.5, 4, 0.55), 0.3, 0.75, 0.0, 0.45 * age), c, (c[0] * 0.9, c[1] * 0.83, c[2] * 0.64))      # (yellowed unevenly)
     col = m.mix(m.remap(brush2, 0.3, 0.7, 0.0, 0.1), col, m.hsv(col, 0.5, 1.0, 0.92)); col = m.mix(m.remap(brush, 0.3, 0.7, 0.0, 0.06), col, m.hsv(col, 0.5, 1.0, 0.94))
     col = m.hsv(col, 0.5, 1.0, m.remap(pr, 0, 1, 0.97, 1.03))
+    if band:                                                           # (a painted line, hand-ruled)
+        yl = m.math('ADD', T.y, m.math('MULTIPLY', m.math('SUBTRACT', T.noise(6, 2, off=44.0), 0.5), 0.002))
+        col = m.mix(m.math('MULTIPLY', m.remap(yl, band[0] - 0.0005, band[0] + 0.0005), m.remap(yl, band[1] + 0.0005, band[1] - 0.0005)), col, (0.02, 0.02, 0.018))
     h = m.math('ADD', m.math('MULTIPLY', brush, 0.0001), m.math('MULTIPLY', brush2, 0.00005))
     rough = m.math('ADD', m.remap(T.noise(10, 3), 0.3, 0.7, gloss, gloss + 0.14), m.math('MULTIPLY', brush, 0.08))
     alli = T.voronoi(150, 'Distance', 'DISTANCE_TO_EDGE', off=2.0)                                 # (crazing, in patches)
@@ -1452,7 +1477,7 @@ def tile_wall():
             'heights': {'dado': top, 'skirting': TRIMS['tile']['skirting']['h'], 'border': [4 * s, 5 * s], 'capping': [5.5 * s, top + 0.034], 'paper_from': top + 0.03},
             'notes': 'bottle-green glazed tile dado with a transfer-printed border and moulded capping at the dado height, red damask above; B: water on the paper, salt on the tiles'}
 
-def brick_mat(name, W, H, reds=('#743c2b', '#663427', '#80472f', '#5a3329', '#463029', '#8a5638'), wv=False):
+def brick_mat(name, W, H, reds=('#743c2b', '#663427', '#80472f', '#5a3329', '#463029', '#8a5638'), wv=False, wash=0.0, damp=True):
     """old handmade clamp bricks: each brick its own firing (reds, browns, purples, a few overburnt near black, a pale
        replacement now and then), sandy, creased from the mould, frost-spalled faces with pits, edges worn; rising damp
        darkening the wall up to about 0.8 m with a white salt tide line above it and green algae at the foot. Variant B:
@@ -1481,31 +1506,32 @@ def brick_mat(name, W, H, reds=('#743c2b', '#663427', '#80472f', '#5a3329', '#46
     col = m.mix(m.remap(T.noise(5, 4, 0.6, off=10.0), 0.45, 0.8, 0.0, 0.35), col, m.hsv(col, 0.5, 0.8, 0.7))
     # rising damp, its salt tide line, algae at the foot
     dl = m.math('ADD', 0.78, m.math('ADD', m.math('MULTIPLY', m.math('SUBTRACT', T.noise(0.9, 3, 0.5, off=3.0), 0.5), 0.9), m.math('MULTIPLY', m.math('SUBTRACT', T.noise(4.0, 3, off=4.0), 0.5), 0.2)))
-    wet = m.remap(m.math('SUBTRACT', y, dl), 0.05, -0.15, smooth=True)
+    wet = m.math('MULTIPLY', m.remap(m.math('SUBTRACT', y, dl), 0.05, -0.15, smooth=True), 1.0 if damp else 0.0)
     col = m.mix(m.math('MULTIPLY', wet, 0.8), col, m.mix(1.0, col, (0.45, 0.45, 0.47), 'MULTIPLY')); rough = m.mixf(m.math('MULTIPLY', wet, 0.4), rough, 0.6)
-    tdl = m.math('MULTIPLY', m.remap(m.math('SUBTRACT', y, dl), 0.0, 0.035), m.remap(m.math('SUBTRACT', y, dl), 0.13, 0.035))
+    tdl = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(m.math('SUBTRACT', y, dl), 0.0, 0.035), m.remap(m.math('SUBTRACT', y, dl), 0.13, 0.035)), 1.0 if damp else 0.0)
     salt = m.math('MULTIPLY', tdl, m.math('MULTIPLY', m.remap(T.noise(30, 5, 0.65, off=6.0), 0.45, 0.75), m.remap(T.noise(3, 3, off=16.0), 0.3, 0.7, 0.2, 1.0)))
     salt = m.math('MAXIMUM', salt, m.math('MULTIPLY', m.math('MULTIPLY', m.remap(cav, 0.9, 0.6), tdl), 0.22))
     salt = m.math('ADD', salt, m.math('MULTIPLY', m.math('MULTIPLY', wet, m.remap(T.noise(45, 4, off=26.0), 0.62, 0.78)), 0.6))   # (crust spots in the damp)
     col = m.mix(m.math('MULTIPLY', salt, 0.7), col, lin('#d2cec3')); rough = m.mixf(salt, rough, 0.95); h = m.math('ADD', h, m.math('MULTIPLY', salt, 0.0002))
-    alg = m.math('MULTIPLY', m.remap(y, 0.35, 0.0, smooth=True), m.remap(T.noise(4, 4, 0.6, off=12.0), 0.45, 0.75))
+    alg = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(y, 0.35, 0.0, smooth=True), m.remap(T.noise(4, 4, 0.6, off=12.0), 0.45, 0.75)), 1.0 if damp else 0.0)
     col = m.mix(m.math('MULTIPLY', alg, 0.6), col, m.mix(0.5, col, lin('#3c4a2a')))
     # B: limewash, thin on the arrises, flaking in patches
     lw_ = m.mix(m.remap(T.noise(8, 4, off=31.0), 0.3, 0.7), lin('#cdc8bb'), lin('#b5ad9c'))
     lw_ = m.mix(m.remap(T.noise(1.5, 4, 0.6, off=32.0), 0.35, 0.8, 0.1, 0.55), lw_, m.hsv(lw_, 0.5, 1.2, 0.72))   # (grimed)
     lw_ = m.mix(m.math('MULTIPLY', wet, 0.5), lw_, m.mix(1.0, lw_, (0.72, 0.72, 0.68), 'MULTIPLY'))           # (the damp greys it)
     lw_ = m.mix(m.math('MULTIPLY', gr, 0.6), lw_, m.hsv(lw_, 0.5, 1.0, 0.55))
-    fk = m.math('ADD', T.noise(9, 5, 0.65, off=33.0), m.math('MULTIPLY', m.remap(y, 1.2, 0.0), 0.25))
-    fk = m.math('ADD', fk, m.math('MULTIPLY', m.math('SUBTRACT', 1.0, edge_fade(m, W, H, 0.04, 0.7, T, wv=False)), 0.6))   # (off the tile's edges in flakes, not a fade)
-    fk = m.math('ADD', fk, m.math('MULTIPLY', m.math('SUBTRACT', T.noise(0.9, 3, 0.5, off=35.0), 0.5), 0.5))                # (the remains of an old wash, in big patches)
+    fk = m.math('ADD', T.noise(9, 5, 0.65, off=33.0), m.math('MULTIPLY', m.remap(y, 1.2, 0.0), 0.25 if damp else 0.0))   # (more flaking low down: not on a band that repeats)
+    if not wash:
+        fk = m.math('ADD', fk, m.math('MULTIPLY', m.math('SUBTRACT', 1.0, edge_fade(m, W, H, 0.04, 0.7, T, wv=False)), 0.6))   # (off the tile's edges in flakes, not a fade)
+        fk = m.math('ADD', fk, m.math('MULTIPLY', m.math('SUBTRACT', T.noise(0.9, 3, 0.5, off=35.0), 0.5), 0.5))                # (the remains of an old wash, in big patches)
     keepw = m.remap(fk, 0.62, 0.58, smooth=True)                                                    # (1 where the wash still holds)
     thin = m.math('MULTIPLY', edge, 0.6)
-    cover = m.math('MULTIPLY', m.math('MULTIPLY', keepw, m.math('SUBTRACT', 1.0, thin)), m.math('MULTIPLY', V, edge_fade(m, W, H, 0.0, 0.03, T, wv=False)))
+    cover = m.math('MULTIPLY', m.math('MULTIPLY', keepw, m.math('SUBTRACT', 1.0, thin)), m.val(wash) if wash else m.math('MULTIPLY', V, edge_fade(m, W, H, 0.0, 0.03, T, wv=False)))
     col = m.mix(m.math('MULTIPLY', cover, 0.92), col, lw_); rough = m.mixf(cover, rough, 0.92)
-    col = m.mix(m.math('MULTIPLY', m.math('MULTIPLY', m.remap(fk, 0.6, 0.57), m.remap(fk, 0.54, 0.57)), V), col, m.hsv(col, 0.5, 1.0, 0.6))   # (the flake's edge)
+    col = m.mix(m.math('MULTIPLY', m.math('MULTIPLY', m.remap(fk, 0.6, 0.57), m.remap(fk, 0.54, 0.57)), m.val(wash) if wash else V), col, m.hsv(col, 0.5, 1.0, 0.6))   # (the flake's edge)
     return finish(m, col, rough, h)
 
-def mortar_mat(name, W, H, col='#7d7466', cement='#6f6d68', wv=False):
+def mortar_mat(name, W, H, col='#7d7466', cement='#6f6d68', wv=False, wash=0.0, damp=True):
     """old lime mortar, recessed and crumbling, sandy; a stretch of grey cement repointing; damp and salt as the bricks;
        B: limewashed"""
     m = kitlib.Mat(name); T = Tor(m, W, H, wv); V = variant(m); y = T.y; cav = look(m, 'CAV', W, H)
@@ -1514,14 +1540,15 @@ def mortar_mat(name, W, H, col='#7d7466', cement='#6f6d68', wv=False):
     rep = m.remap(T.noise(0.9, 3, off=44.0), 0.62, 0.66); c = m.mix(rep, c, lin(cement))
     c = m.mix(m.remap(cav, 0.9, 0.4), c, m.hsv(c, 0.5, 1.0, 0.45))
     dl = m.math('ADD', 0.78, m.math('ADD', m.math('MULTIPLY', m.math('SUBTRACT', T.noise(0.9, 3, 0.5, off=3.0), 0.5), 0.9), m.math('MULTIPLY', m.math('SUBTRACT', T.noise(4.0, 3, off=4.0), 0.5), 0.2)))
-    wet = m.remap(m.math('SUBTRACT', y, dl), 0.05, -0.15, smooth=True)
+    wet = m.math('MULTIPLY', m.remap(m.math('SUBTRACT', y, dl), 0.05, -0.15, smooth=True), 1.0 if damp else 0.0)
     c = m.mix(m.math('MULTIPLY', wet, 0.7), c, m.mix(1.0, c, (0.55, 0.55, 0.57), 'MULTIPLY'))
-    salt = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(m.math('SUBTRACT', y, dl), 0.0, 0.04), m.remap(m.math('SUBTRACT', y, dl), 0.18, 0.04)), m.remap(T.noise(30, 4, off=6.0), 0.3, 0.6))
+    salt = m.math('MULTIPLY', m.math('MULTIPLY', m.math('MULTIPLY', m.remap(m.math('SUBTRACT', y, dl), 0.0, 0.04), m.remap(m.math('SUBTRACT', y, dl), 0.18, 0.04)), m.remap(T.noise(30, 4, off=6.0), 0.3, 0.6)), 1.0 if damp else 0.0)
     c = m.mix(salt, c, lin('#e0dcd2'))
     c = m.mix(m.remap(T.noise(1.3, 4, 0.6, off=9.0), 0.35, 0.85, 0.15, 0.6), c, m.hsv(c, 0.5, 0.8, 0.6))
     fk = m.math('ADD', m.math('ADD', T.noise(9, 5, 0.65, off=33.0), m.math('MULTIPLY', m.remap(y, 1.2, 0.0), 0.25)), m.math('MULTIPLY', m.math('SUBTRACT', 1.0, edge_fade(m, W, H, 0.04, 0.7, T, wv=False)), 0.6))
     fk = m.math('ADD', fk, m.math('MULTIPLY', m.math('SUBTRACT', T.noise(0.9, 3, 0.5, off=35.0), 0.5), 0.5))
-    c = m.mix(m.math('MULTIPLY', m.math('MULTIPLY', V, m.remap(fk, 0.66, 0.6)), edge_fade(m, W, H, 0.0, 0.03, T, wv=False)), c, m.mix(0.8, c, lin('#c4bead')))
+    if wash: fk = m.math('ADD', T.noise(9, 5, 0.65, off=33.0), 0.0)
+    c = m.mix(m.math('MULTIPLY', m.remap(fk, 0.66, 0.6), m.val(wash) if wash else m.math('MULTIPLY', V, edge_fade(m, W, H, 0.0, 0.03, T, wv=False))), c, m.mix(0.8, c, lin('#c4bead')))
     h = m.math('ADD', m.math('MULTIPLY', sand, 0.0003), m.math('MULTIPLY', lump, 0.0012))
     return finish(m, c, m.mixf(rep, 0.95, 0.85), h)
 
@@ -1849,6 +1876,265 @@ def workshop_ceil():
     return {'geo': G.build('workshop_ceil'), 'W': W, 'H': H, 'variants': 1, 'ao': 0.1, 'cav': 0.012, 'pom': 0.012,
             'notes': 'V-jointed ceiling boards along u under flaking limewash, sooted'}
 
+# ================================================================ upper bands (above 3.0 m) and servants' walls: both tile both ways
+def anaglypta(px=512):
+    """an embossed relief paper's repeat (one cell, square): a lozenge trellis of beaded ribs, a four-petal flower in each
+       lozenge, dots where the ribs cross; returns height 0..1 (soft, as embossed paper is)"""
+    from PIL import Image, ImageDraw, ImageFilter
+    S = 4; N = px * S; im = Image.new('L', (N, N), 0); d = ImageDraw.Draw(im)
+    def P(x, y): return (x * N, y * N)
+    w = int(N * 0.03)
+    for (a, b) in (((0.5, 0.0), (1.0, 0.5)), ((1.0, 0.5), (0.5, 1.0)), ((0.5, 1.0), (0.0, 0.5)), ((0.0, 0.5), (0.5, 0.0))):
+        d.line([P(*a), P(*b)], fill=200, width=w)
+        for t in np.linspace(0.08, 0.92, 7):
+            x, y = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t; r = 0.018
+            d.ellipse([P(x - r, y - r), P(x + r, y + r)], fill=255)
+    for (x, y) in ((0.5, 0.0), (1.0, 0.5), (0.5, 1.0), (0.0, 0.5), (0.5, 0.5)):
+        r = 0.05 if (x, y) != (0.5, 0.5) else 0.06; d.ellipse([P(x - r, y - r), P(x + r, y + r)], fill=255)
+    for k in range(4):                                                    # the flower in the lozenge
+        a = k * math.pi / 2; ox, oy = 0.5 + math.cos(a) * 0.12, 0.5 + math.sin(a) * 0.12
+        d.ellipse([P(ox - 0.075, oy - 0.075), P(ox + 0.075, oy + 0.075)], fill=230)
+        d.ellipse([P(ox - 0.035, oy - 0.035), P(ox + 0.035, oy + 0.035)], fill=150)
+    for (x, y) in ((0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)):     # (the corners: quarter flowers of the neighbours)
+        for k in range(4):
+            a = k * math.pi / 2 + math.pi / 4; ox, oy = x + math.cos(a) * 0.1, y + math.sin(a) * 0.1
+            d.ellipse([P(ox - 0.06, oy - 0.06), P(ox + 0.06, oy + 0.06)], fill=210)
+    a = np.asarray(im.filter(ImageFilter.GaussianBlur(S * 2.5)).resize((px, px), Image.LANCZOS), np.float32) / 255
+    return a
+
+def relief_paint_mat(name, W, H, relief, cell=(0.28125, 0.3), col='#cdc2a8', depth=0.0022, wv=True):
+    """painted embossed relief paper: the relief (an image, one cell repeating) for the height, paint pooled and grimed in
+       its hollows and rubbed on its crowns, yellowed, sooted heavily (it's up by the ceiling), streaked from the cornice"""
+    m = kitlib.Mat(name); T = Tor(m, W, H, wv); V = variant(m); x, y = T.x, T.y; cav = look(m, 'CAV', W, H)
+    t = m.n('ShaderNodeTexImage', interpolation='Cubic', extension='REPEAT'); t.image = relief
+    m.l(comb(m, m.math('DIVIDE', x, cell[0]), m.math('DIVIDE', y, cell[1]), 0.0), t.inputs['Vector']); rl = sep(m, t.outputs['Color'])[0]
+    c = lin(col)
+    col_ = m.mix(m.remap(T.noise(1.3, 4, 0.55), 0.3, 0.75), c, m.mix(1.0, c, (0.86, 0.82, 0.72), 'MULTIPLY'))
+    col_ = m.mix(m.math('MULTIPLY', m.remap(rl, 0.3, 0.0), 0.45), col_, m.hsv(col_, 0.5, 1.03, 0.82))   # (grime in the hollows: one paint, the relief does the rest)
+    col_ = m.mix(m.math('MULTIPLY', m.remap(rl, 0.8, 1.0), 0.12), col_, m.hsv(col_, 0.5, 0.95, 1.06))   # (crowns rubbed a little)
+    fib = T.noise(500, 3, 0.6); h = m.math('ADD', m.math('MULTIPLY', rl, depth), m.math('MULTIPLY', fib, 0.00004))
+    rough = m.mixf(rl, 0.78, 0.62)
+    soot = m.remap(T.noise(1.0, 4, 0.55, off=6.0), 0.3, 0.8, 0.25, 0.6); col_ = m.mix(soot, col_, m.hsv(col_, 0.5, 0.85, 0.66))
+    st = m.math('MULTIPLY', m.remap(T.noise(1.6, 3, 0.5, off=33.0), 0.55, 0.7, smooth=True), m.math('MULTIPLY', V, edge_fade(m, W, H, 0.08, 0.35, T, wv=wv)))
+    col_ = m.mix(m.math('MULTIPLY', st, 0.55), col_, m.mix(1.0, col_, (0.75, 0.62, 0.42), 'MULTIPLY'))
+    gr = m.math('MULTIPLY', m.remap(cav, 0.93, 0.5, smooth=True), m.remap(T.noise(25, 4), 0.3, 0.7, 0.5, 1.0)); col_ = m.mix(m.math('MULTIPLY', gr, 0.6), col_, (0.06, 0.05, 0.04))
+    return finish(m, col_, rough, h)
+
+def wood_upper():
+    """the nursery's upper band: embossed relief paper in yellowed paint, sooted; B: stained from the cornice"""
+    W, H = TW, FH; G = Geo(W, H)
+    REL = _pattern_image('anaglypta', anaglypta(512))
+    M = relief_paint_mat('wood_upper', W, H, REL)
+    G.add(plaster_grid(0.0, W, 0.0, H, W, step=0.02, amp=0.0015, seed=31.0, H=H), M, {}, smooth=True)
+    return {'geo': G.build('wood_upper'), 'W': W, 'H': H, 'variants': 2, 'ao': 0.08, 'cav': 0.01, 'pom': 0.004,
+            'notes': 'painted embossed (Anaglypta-like) relief paper, 8 x 10 cells per tile; B: water-stained'}
+
+def tile_upper():
+    """the hall's upper band: a plaster frieze of moulded panels (four across a tile, 0.75 m tall) in old stone-coloured
+       distemper"""
+    W, H = TW, FH; G = Geo(W, H)
+    M = distemper_mat('tile_upper', W, H, col='#c8bea6', plaster='#a89a84', repair='#d2c9b4', wv=True, ceiling=True)
+    G.add(plaster_grid(0.0, W, 0.0, H, W, step=0.02, amp=0.0008, seed=33.0, H=H), M, {}, smooth=True)
+    pw, ph = W / 4, H / 4
+    for i in range(4):
+        for j in range(4):
+            x0, y0 = i * pw + 0.07, j * ph + 0.08; x1, y1 = (i + 1) * pw - 0.07, (j + 1) * ph - 0.08
+            pts = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+            path = []
+            for k in range(4):
+                a, b = pts[k], pts[(k + 1) % 4]
+                for t in np.linspace(0, 1, 12, endpoint=False): path.append((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
+            G.add(rib(path, 0.035, 0.014, closed=True), M, {})
+            G.add(rib([(x0 + 0.04, y0 + 0.04), (x1 - 0.04, y0 + 0.04), (x1 - 0.04, y1 - 0.04), (x0 + 0.04, y1 - 0.04)] , 0.012, 0.006, closed=True), M, {})
+    return {'geo': G.build('tile_upper'), 'W': W, 'H': H, 'variants': 1, 'ao': 0.1, 'cav': 0.012, 'pom': 0.012,
+            'notes': 'plaster frieze of moulded panels (4 x 4 per tile) in old distemper'}
+
+def render_mat(name, W, H, col='#8e897f', dark='#6b675f'):
+    """rough cement render: coarse sand, float marks, a few cracks, damp patches, grime"""
+    m = kitlib.Mat(name); T = Tor(m, W, H); V = variant(m); cav = look(m, 'CAV', W, H)
+    sand = T.noise(300, 3, 0.65); grit = T.voronoi(180, 'Distance', off=3.0); mott = T.noise(1.5, 5, 0.6)
+    col_ = m.mix(m.remap(mott, 0.3, 0.72), lin(col), lin(dark))
+    col_ = m.mix(m.remap(sand, 0.25, 0.75), m.hsv(col_, 0.5, 1.0, 0.85), m.hsv(col_, 0.5, 1.0, 1.15))
+    col_ = m.mix(m.remap(grit, 0.3, 0.1, 0.0, 0.4), col_, m.hsv(col_, 0.5, 0.8, 1.3))
+    fl = noise3(m, comb(m, m.math('MULTIPLY', T.x, 8.0), m.math('MULTIPLY', T.y, 3.0), 0.0), 1.0, 3, 0.5)      # (float sweeps)
+    h = m.math('ADD', m.math('MULTIPLY', sand, 0.0005), m.math('ADD', m.math('MULTIPLY', m.remap(grit, 0.3, 0.1), 0.0006), m.math('MULTIPLY', fl, 0.0008)))
+    ce = m.math('DIVIDE', T.vwarp(1.3, 0.08, 3.0, 'Distance', 'DISTANCE_TO_EDGE', off=11.0), 1.3); keep = m.remap(T.noise(1.0, 2, off=21.0), 0.54, 0.58)
+    crack = m.math('MULTIPLY', m.math('SUBTRACT', 1.0, m.math('MINIMUM', 1.0, m.math('DIVIDE', ce, 0.0012))), keep)
+    col_ = m.mix(m.math('MULTIPLY', crack, 0.9), col_, (0.04, 0.038, 0.035)); h = m.math('SUBTRACT', h, m.math('MULTIPLY', crack, 0.0015))
+    damp = m.math('ADD', m.remap(T.noise(0.9, 4, 0.55, off=31.0), 0.55, 0.7, smooth=True), m.math('MULTIPLY', V, 0.0))
+    col_ = m.mix(m.math('MULTIPLY', damp, 0.45), col_, m.mix(1.0, col_, (0.66, 0.66, 0.66), 'MULTIPLY'))
+    gr = m.math('MULTIPLY', m.remap(cav, 0.93, 0.5, smooth=True), m.remap(T.noise(25, 4), 0.3, 0.7, 0.5, 1.0)); col_ = m.mix(m.math('MULTIPLY', gr, 0.7), col_, (0.05, 0.045, 0.04))
+    col_ = m.mix(m.remap(T.noise(1.2, 4, 0.55, off=19.0), 0.35, 0.85, 0.15, 0.55), col_, m.hsv(col_, 0.5, 0.8, 0.68))
+    return finish(m, col_, m.remap(sand, 0.3, 0.7, 0.85, 0.97), h)
+
+def concrete_upper():
+    W, H = TW, FH; G = Geo(W, H); M = render_mat('concrete_upper', W, H)
+    G.add(plaster_grid(0.0, W, 0.0, H, W, step=0.015, amp=0.003, seed=35.0, H=H), M, {}, smooth=True)
+    return {'geo': G.build('concrete_upper'), 'W': W, 'H': H, 'variants': 1, 'ao': 0.08, 'cav': 0.01, 'pom': 0.006, 'notes': 'rough cement render, cracks, damp, grime'}
+
+def attic_upper():
+    """the attic's upper band: the boarding running on up (full-length boards, nail rows every 3 m at the wall's heights)"""
+    W, H = TW, FH; G = Geo(W, H); t = 0.022; rows = (0.7, 1.7, 2.7)
+    P = pine_mat('attic_upper', W, H, early='#78664f', late='#4f3e2c', dusty=0.12, nails=False, wall_rows=rows, wv=True, sawn=1.0, fig=0.6)
+    IR = iron_mat('attic_unail', W, H); VOID = flatmat('attic_uvoid', (0.012, 0.01, 0.009), 0.95)
+    widths = split_widths(W, 12, 0.14, 0.24); x = 0.0
+    for wbd in widths:
+        gap = random.uniform(0.002, 0.008); wb = wbd - gap; xc = x + wbd / 2
+        bm = vboard(xc, wb, 0.0015, H - 0.0015, t, random.uniform(0.0004, 0.0015), random.uniform(0.001, 0.0025), 0, random.uniform(0, 50))   # (3 m boards, butted at the tile's seam)
+        d0 = random.uniform(0.1, 0.3); o3 = (random.uniform(-0.02, 0.02), random.uniform(-90, 90)); tl = math.tan(math.radians(random.uniform(0.15, 0.8))) * random.choice((-1, 1))
+        gp = lambda c, xc=xc, d0=d0, o=o3, tl=tl: (c.x - xc + o[0], d0 + c.z + (c.y - H / 2) * tl, c.y + o[1])
+        G.add(bm, P, {'gpos': gp, 'prand': random.random(), 'qs': 0.0, 'bL': H, 'bw': wb, 'spl': 9.0,
+                      'bx': (lambda c, xc=xc, wb=wb: (c.x - xc) / (wb / 2)), 'bl': (lambda c: c.y - H / 2)})
+        for ry in rows:
+            for sgn in (-1, 1):
+                nb = box(0.0038, 0.005, 0.004, 0.0004, 1); xform(nb, (xc + sgn * 0.6 * wb / 2, ry, -0.0025))
+                G.add(nb, IR, {'gpos': (0, 0, 0), 'prand': 0.5, 'qs': 0.0, 'bL': 1.0, 'bw': 0.2, 'spl': 9.0, 'bx': 0.0, 'bl': 0.0})
+        x += wbd
+    G.add(grid(-0.4, W + 0.4, -0.4, H + 0.4, 4, 4, -0.03), VOID, {'gpos': (0, 0, 0), 'prand': 0.5, 'qs': 0.0, 'bL': 1.0, 'bw': 0.2, 'spl': 9.0, 'bx': 0.0, 'bl': 0.0}, wrap=False)
+    return {'geo': G.build('attic_upper'), 'W': W, 'H': H, 'variants': 1, 'ao': 0.12, 'cav': 0.012, 'pom': 0.012, 'notes': 'rough-sawn vertical boarding, tiling every 3 m'}
+
+def workshop_upper():
+    """the workshop's upper band: stretcher-bond brick under thick old limewash, flaking"""
+    W, H = TW, FH; G = Geo(W, H); ch = H / 40; jt = 0.010
+    BR = brick_mat('workshop_ubrick', W, H, wv=True, wash=1.0, damp=False); MO = mortar_mat('workshop_umortar', W, H, wv=True, wash=1.0, damp=False)
+    for r in range(40):
+        y0 = r * ch; pitch = W / 10; off = pitch / 2 if r % 2 else 0.0
+        for i in range(10):
+            L = pitch - jt - random.uniform(-0.002, 0.006); Hh = ch - jt - random.uniform(-0.001, 0.004)
+            bm = brick_bm(L, Hh, 0.06, i * 31 + r, random.choice((0.0, 0.0, 0.0, 0.006)))
+            cx, cy = i * pitch + off + pitch / 2 + random.gauss(0, 0.0015), y0 + ch / 2 + random.gauss(0, 0.001)
+            xform(bm, (cx, cy, -0.03 + random.gauss(0, 0.0015)), (random.gauss(0, 0.008), random.gauss(0, 0.008), random.gauss(0, 0.006)))
+            o3 = Vector((random.uniform(-40, 40), random.uniform(-40, 40), random.uniform(-40, 40)))
+            G.add(bm, BR, {'gpos': (lambda c, cx=cx, cy=cy, o=o3: (c.x - cx + o.x, c.y - cy + o.y, c.z + o.z)), 'prand': random.random()})
+    G.add(xform(plaster_grid(-0.4, W + 0.4, -0.4, H + 0.4, W, step=0.012, amp=0.0015, seed=37.0, H=H), (0, 0, -0.009)), MO, {'gpos': (0, 0, 0), 'prand': 0.5}, wrap=False)
+    return {'geo': G.build('workshop_upper'), 'W': W, 'H': H, 'variants': 1, 'ao': 0.12, 'cav': 0.015, 'pom': 0.02, 'notes': 'limewashed stretcher-bond brick, flaking'}
+
+# ---------------------------------------------------------------- servants' walls
+SERVICE = {'wood': ('#5a4636', '#c9c0a8'), 'tile': ('#3f4a3a', '#cfc6ae'), 'concrete': ('#2e2b28', '#bdb7a8'),
+           'attic': ('#6b5a48', '#cbc4b2'), 'workshop': ('#3d4b3c', '#bfb8a3')}
+def service(style):
+    """a servants' passage: dark oil paint to 1.2 m with a black line, tired distemper above (repeating every 3 m)"""
+    def fn():
+        W, H = TW, FH; G = Geo(W, H); lo, up = SERVICE[style]; line = 1.2
+        PL = paint_mat(f'{style}_svc_paint', W, H, lo, '#7a6a52', '#6a4a34', '#8e7356', wv=True, chips=1.0, gloss=0.4, scuff=0.5, age=1.3, up=None, band=(line, line + 0.015))
+        DS = distemper_mat(f'{style}_svc_dist', W, H, col=up, wv=True, grime_band=(1.2, 1.7))
+        G.add(plaster_grid(0.0, W, line + 0.015, H, W, step=0.015, amp=0.0018, seed=41.0, H=H), DS, {'gpos': (0, 0, 0), 'prand': 0.5}, smooth=True)
+        G.add(plaster_grid(0.0, W, 0.0, line + 0.015, W, step=0.015, amp=0.0018, seed=41.0, H=H), PL, {'gpos': (lambda c: (c.y * 0.001, c.z, c.x)), 'prand': 0.5}, smooth=True)
+        return {'geo': G.build(f'{style}_service'), 'W': W, 'H': H, 'variants': 2, 'ao': 0.08, 'cav': 0.01, 'pom': 0.004,
+                'heights': {'line': line}, 'notes': f'servants\' passage: {lo} oil paint to {line} m with a black line, {up} distemper above, repeating every 3 m'}
+    return fn
+
+# ================================================================ beams (u along 2.25 m, v once round the section: tiles both ways)
+BEAM_H = TW * 512 / 2048                                           # (the flat frame's height: square texels)
+
+def aniso(T, scale, kx, ky=1.0, detail=4, rough=0.55, off=0.0):
+    """4D noise on the torus, stretched: features 1/kx times longer along x (still periodic)"""
+    m = T.m; v = m.n('ShaderNodeVectorMath', operation='MULTIPLY'); m.l(T.v, v.inputs[0]); v.inputs[1].default_value = (kx, kx, ky)
+    nz = m.n('ShaderNodeTexNoise', noise_dimensions='4D', i_Scale=scale, i_Detail=detail, i_Roughness=rough)
+    m.l(v.outputs[0], nz.inputs['Vector']); m.l(m.math('ADD', m.math('MULTIPLY', T.w, ky), off), nz.inputs['W']); return nz.outputs['Fac']
+
+def timber_mat(name, W, H, tone='#6e5640', dark='#3f3022', rings=90, dust=0.15, wash=0.0, soot=0.0, sawmarks=0.6):
+    """a sawn timber's face, grain along u: flame figure from ring lines bent by stretched noise (ring count a whole number
+       round v, so it repeats), fibre, band-saw marks across it, seasoning checks running with the grain, knots, dust, cobweb
+       grime, old limewash in patches (wash), soot (soot)"""
+    m = kitlib.Mat(name); T = Tor(m, W, H); cav = look(m, 'CAV', W, H); x, y = T.x, T.y
+    warp = m.math('ADD', m.math('MULTIPLY', m.math('SUBTRACT', aniso(T, 2.2, 1.0, 1.0, 3, off=1.0), 0.5), 16.0), m.math('MULTIPLY', m.math('SUBTRACT', aniso(T, 7.0, 1.0, 1.0, 2, off=2.0), 0.5), 3.0))   # (the figure flows, bent at a few decimetres)
+    ph = m.math('ADD', m.math('MULTIPLY', y, rings / H), warp)
+    ph = m.math('ADD', ph, m.math('MULTIPLY', m.math('SUBTRACT', aniso(T, 3.0, 0.15, 1.0, 2, off=15.0), 0.5), 6.0))   # (good years and lean ones)
+    ring = m.math('FRACT', ph)
+    lw = m.math('POWER', m.remap(ring, 0.45, 0.97), 1.3)
+    col_ = m.mix(m.math('MULTIPLY', lw, 0.7), lin(tone), lin(dark))
+    fib = aniso(T, 120, 0.04, 1.0, 3, 0.6, off=3.0); col_ = m.mix(m.remap(fib, 0.25, 0.75), m.hsv(col_, 0.5, 1.0, 0.88), m.hsv(col_, 0.5, 1.0, 1.1))
+    streak = aniso(T, 8, 0.05, 1.0, 4, off=4.0); col_ = m.mix(m.remap(streak, 0.2, 0.8), m.hsv(col_, 0.5, 0.92, 0.78), m.hsv(col_, 0.5, 1.06, 1.18))
+    col_ = m.mix(m.remap(aniso(T, 2.0, 0.1, 1.0, 3, off=14.0), 0.55, 0.8, 0.0, 0.5), col_, m.hsv(col_, 0.5, 1.1, 0.62))   # (dark heart streaks)
+    saw = m.math('MULTIPLY', m.math('ADD', 0.5, m.math('MULTIPLY', m.math('SINE', m.math('MULTIPLY', m.math('ADD', x, m.math('MULTIPLY', y, 0.04)), 2 * math.pi / (W / 320))), 0.5)), m.remap(T.noise(3, 2, off=5.0), 0.35, 0.7, 0.2, 1.0))
+    col_ = m.mix(m.math('MULTIPLY', saw, 0.15 * sawmarks), col_, m.hsv(col_, 0.5, 1.0, 0.8))
+    h = m.math('ADD', m.math('MULTIPLY', lw, 0.0002), m.math('ADD', m.math('MULTIPLY', fib, 0.00012), m.math('MULTIPLY', saw, 0.0002 * sawmarks)))
+    # seasoning checks with the grain, and a few knots
+    ck = aniso(T, 2.5, 0.06, 1.0, 3, 0.5, off=7.0); ckw = m.math('MULTIPLY', m.remap(aniso(T, 3.0, 0.2, 1.0, 2, off=8.0), 0.3, 0.7, 0.3, 1.6), 0.01)
+    check = m.math('MULTIPLY', m.math('SUBTRACT', 1.0, m.math('MINIMUM', 1.0, m.math('DIVIDE', m.math('ABSOLUTE', m.math('SUBTRACT', ck, 0.5)), ckw))), m.remap(aniso(T, 1.2, 0.3, 1.0, 2, off=9.0), 0.5, 0.6))
+    col_ = m.mix(check, col_, (0.02, 0.015, 0.01)); h = m.math('SUBTRACT', h, m.math('MULTIPLY', check, 0.004))
+    kv = T.voronoi(3.0, 'Distance', off=11.0); ks = m.remap(sep(m, T.voronoi(3.0, 'Color', off=11.0))[0], 0.75, 0.78)
+    knot = m.math('MULTIPLY', m.remap(kv, 0.05, 0.03, smooth=True), ks); col_ = m.mix(knot, col_, m.mix(m.remap(m.math('FRACT', m.math('MULTIPLY', kv, 150.0)), 0.3, 0.7), lin('#2e1e10'), lin('#4a3018')))
+    rough = m.math('ADD', m.mixf(lw, 0.82, 0.72), m.math('MULTIPLY', saw, 0.05))
+    # dirt: grime in checks and hollows, dust, cobweb haze, limewash, soot
+    gr = m.math('MULTIPLY', m.remap(cav, 0.95, 0.5, smooth=True), m.remap(T.noise(25, 4), 0.3, 0.7, 0.5, 1.0)); col_ = m.mix(m.math('MULTIPLY', gr, 0.7), col_, (0.04, 0.03, 0.022))
+    col_ = m.mix(m.remap(T.noise(1.2, 4, 0.55, off=19.0), 0.35, 0.85, 0.15, 0.55), col_, m.hsv(col_, 0.5, 0.8, 0.68))
+    dl = m.math('MULTIPLY', m.remap(m.math('ADD', T.noise(2.0, 4, 0.6, off=6.0), m.math('MULTIPLY', T.noise(12, 3, off=7.0), 0.3)), 0.4, 1.0, 0.0, dust), 1.0)
+    col_ = m.mix(dl, col_, lin('#86807a')); rough = m.mixf(dl, rough, 0.92)
+    web = m.math('MULTIPLY', m.remap(aniso(T, 5, 0.5, 1.0, 4, 0.7, off=12.0), 0.62, 0.78), 0.4 * dust); col_ = m.mix(web, col_, lin('#9a958e'))
+    if wash:
+        wf = m.math('ADD', T.noise(9, 5, 0.65, off=33.0), m.math('MULTIPLY', m.math('SUBTRACT', T.noise(0.9, 3, off=35.0), 0.5), 0.5))
+        wc = m.math('MULTIPLY', m.remap(wf, 0.62, 0.5, smooth=True), wash); col_ = m.mix(wc, col_, m.mix(0.35, m.mix(m.remap(T.noise(8, 3, off=31.0), 0.3, 0.7), lin('#c9c4b6'), lin('#aaa392')), col_))   # (thin: the grain shows through)
+        rough = m.mixf(wc, rough, 0.93)
+    if soot: col_ = m.mix(m.remap(T.noise(1.0, 4, 0.55, off=41.0), 0.3, 0.8, 0.3 * soot, 0.8 * soot), col_, m.hsv(col_, 0.5, 0.5, 0.45))
+    return finish(m, col_, rough, h)
+
+def steel_mat(name, W, H, paint='#6e3423', under='#5d5650'):
+    """a riveted steel I-beam in red-oxide paint, faded, flaking to grey mill scale and orange rust, rust blooming through,
+       rivet rows along it, sooted"""
+    m = kitlib.Mat(name); T = Tor(m, W, H); cav = look(m, 'CAV', W, H); edge = look(m, 'EDGE', W, H)
+    c = m.mix(m.remap(T.noise(2.0, 4, 0.55), 0.3, 0.75), lin(paint), m.mix(1.0, lin(paint), (1.2, 1.1, 1.0), 'MULTIPLY'))
+    brush = aniso(T, 200, 0.05, 1.0, 3, off=1.0); c = m.mix(m.remap(brush, 0.3, 0.7, 0.0, 0.12), c, m.hsv(c, 0.5, 1.0, 0.85))
+    h = m.math('MULTIPLY', brush, 0.00004)
+    fl = m.math('ADD', T.noise(6, 5, 0.65, off=2.0), m.math('MULTIPLY', edge, 0.4))
+    scale_ = m.remap(fl, 0.58, 0.6, smooth=True); rustm = m.remap(fl, 0.63, 0.66, smooth=True)
+    rc = m.mix(m.remap(T.noise(60, 4, off=3.0), 0.3, 0.7), lin('#6a3014'), lin('#9a5426'))
+    c = m.mix(scale_, c, m.mix(m.remap(T.noise(40, 3), 0.3, 0.7), lin(under), m.hsv(m.mix(0.0, lin(under), lin(under)), 0.5, 1.0, 1.3))); c = m.mix(rustm, c, rc)
+    bloom = m.math('MULTIPLY', m.remap(T.noise(5, 4, off=4.0), 0.6, 0.75), m.remap(T.noise(80, 3, off=5.0), 0.4, 0.6)); c = m.mix(bloom, c, rc)
+    h = m.math('SUBTRACT', h, m.math('ADD', m.math('MULTIPLY', scale_, 0.00004), m.math('MULTIPLY', rustm, 0.00006)))
+    rough = m.mixf(scale_, m.remap(T.noise(10, 3), 0.3, 0.7, 0.55, 0.7), 0.6); rough = m.mixf(m.math('MAXIMUM', rustm, bloom), rough, 0.92)
+    # rivet rows along u, where the flanges usually fall
+    rv = None
+    for vv in (0.08, 0.42, 0.58, 0.92):
+        dy = m.math('SUBTRACT', T.y, vv * H); dx = m.math('SUBTRACT', m.math('FRACT', m.math('DIVIDE', T.x, W / 15)), 0.5)
+        d = m.math('SQRT', m.math('ADD', m.math('POWER', m.math('MULTIPLY', dx, W / 15), 2.0), m.math('POWER', dy, 2.0)))
+        r_ = m.remap(d, 0.011, 0.0); rv = r_ if rv is None else m.math('MAXIMUM', rv, r_)
+    h = m.math('ADD', h, m.math('MULTIPLY', m.math('SQRT', m.math('MAXIMUM', rv, 0.0)), 0.006))
+    c = m.mix(m.math('MULTIPLY', m.remap(rv, 0.0, 0.3), 0.3), c, rc)
+    gr = m.math('MULTIPLY', m.remap(cav, 0.9, 0.4, smooth=True), m.remap(T.noise(25, 4), 0.3, 0.7, 0.5, 1.0)); c = m.mix(m.math('MULTIPLY', gr, 0.3), c, (0.05, 0.04, 0.03))
+    c = m.mix(m.remap(T.noise(1.0, 4, 0.55, off=41.0), 0.3, 0.8, 0.2, 0.6), c, m.hsv(c, 0.5, 0.6, 0.55))
+    return finish(m, c, rough, h, metal=m.mixf(scale_, 0.0, m.math('SUBTRACT', 1.0, rustm)))
+
+def beam_set(name, mat_fn, amp=0.002):
+    def fn():
+        W, H = TW, BEAM_H; G = Geo(W, H); M = mat_fn(name, W, H)
+        G.add(plaster_grid(0.0, W, 0.0, H, W, step=0.01, amp=amp, seed=51.0, H=H), M, {}, smooth=True)
+        return {'geo': G.build(name), 'W': W, 'H': H, 'variants': 1, 'ao': 0.05, 'cav': 0.008, 'pom': 0.006, 'perimeter': 'v once round the section (arch.js)',
+                'notes': name.replace('_', ' ')}
+    return fn
+
+# ================================================================ the detail tiles (common, data in R): spectral noise, periodic by construction
+def spectral(n, beta, seed):
+    rng = np.random.default_rng(seed); fx = np.fft.fftfreq(n)[None, :]; fy = np.fft.fftfreq(n)[:, None]; f = np.sqrt(fx * fx + fy * fy); f[0, 0] = 1
+    spec = (rng.normal(size=(n, n)) + 1j * rng.normal(size=(n, n))) / f ** beta; spec[0, 0] = 0
+    a = np.real(np.fft.ifft2(spec)); return (a - a.mean()) / (a.std() + 1e-9)
+
+def detail_tiles():
+    """dust_detail (fine dust: a fractal field, fibres and grit; averages about 0.5), wet_edge (where a drying edge breaks up:
+       contoured mottling), grime_detail (grunge); 512 x 512, tileable, written as grey WebP (the game reads R)"""
+    from PIL import Image
+    n = 512; out = os.path.join(OUT, 'common'); os.makedirs(out, exist_ok=True); rng = np.random.default_rng(5)
+    dust = 0.5 + 0.16 * spectral(n, 1.0, 1) + 0.08 * spectral(n, 0.6, 2)
+    fib = np.zeros((n, n), np.float32)
+    for _ in range(260):                                                  # (lint and hair: short bright curls, wrapped)
+        x, y = rng.uniform(0, n, 2); a = rng.uniform(0, math.pi); L = rng.uniform(6, 40); br = rng.uniform(0.15, 0.4)
+        for t in np.linspace(0, 1, int(L * 2)):
+            a += rng.normal(0, 0.08); xi, yi = int(x + math.cos(a) * t * L) % n, int(y + math.sin(a) * t * L) % n; fib[yi, xi] = max(fib[yi, xi], br)
+    grit = (rng.random((n, n)) > 0.996) * rng.uniform(0.2, 0.5, (n, n))
+    dust = np.clip(dust + fib + grit, 0, 1); dust = dust - dust.mean() + 0.5
+    w = spectral(n, 1.2, 3); wet = np.clip(0.5 + 0.5 * np.sin(w * 3.0) * np.clip(0.6 + 0.4 * spectral(n, 0.8, 4), 0, 1), 0, 1)
+    grime = np.clip(0.5 + 0.22 * spectral(n, 1.1, 5) + 0.1 * spectral(n, 0.5, 6) - 0.12 * np.abs(spectral(n, 1.6, 7)), 0, 1)
+    files = {}
+    for key, a in (('dust_detail', dust), ('wet_edge', wet), ('grime_detail', grime)):
+        img = Image.fromarray((np.clip(a, 0, 1) * 255 + 0.5).astype(np.uint8)).convert('RGB')
+        for t, k in (('hi', 1), ('md', 1), ('lo', 2)):
+            p = os.path.join(out, f'{key}.{t}.webp'); (img if k == 1 else img.resize((n // k, n // k), Image.LANCZOS)).save(p, 'WEBP', quality=92, method=6)
+        files[key] = f'common/{key}'
+        print(f'  {key}: mean {a.mean():.3f}, seam {abs(a[:, 0] - a[:, -1]).mean():.4f} (inner {np.abs(np.diff(a, axis=1)).mean():.4f})')
+    manifest_put('common', 'detail', {'files': files, 'px': {'hi': [n, n], 'md': [n, n], 'lo': [n // 2, n // 2]}, 'channel': 'R', 'tiles': 'uv',
+                                      'notes': 'dust_detail averages 0.5 (matlib packs R dust, G wet edge); grime_detail for walls and props'})
+
 # ================================================================ running a set
 SIZES = {'floor': (2048, 2048), 'wall': (2048, 2731), 'upper': (1024, 1365), 'ceil': (1024, 1024), 'service': (1024, 1365),
          'trim': (2048, 256), 'beam': (2048, 512), 'ibeam': (2048, 512)}
@@ -1948,9 +2234,15 @@ def room_view(style, kind, entry):
     sc = kitlib.reset(); d = os.path.join(TMP, 'sheets', 'surf'); man = manifest_load()['styles'].get(style, {})
     W, H = TW, FH; walls = man.get('wall') if kind != 'wall' else entry; floor = man.get('floor') if kind != 'floor' else entry
     if not walls: return None
-    wA, wB = ship_mat('wallA', walls, 0), ship_mat('wallB', walls, 1)
+    if kind == 'service': wA = wB = ship_mat('svcA', entry, 0)
+    else: wA, wB = ship_mat('wallA', walls, 0), ship_mat('wallB', walls, 1)
     for i, mt in enumerate((wA, wB, wA)): quad(f'back{i}', (i * W, 2 * W, 0), (W, 0, 0), (0, 0, H), mat=mt)          # (faces -y)
     for j, mt in enumerate((wA, wA)): quad(f'left{j}', (0, (j + 1) * W, 0), (0, -W, 0), (0, 0, H), mat=mt)          # (faces +x)
+    if kind == 'upper':                                                # (the band above, 1.5 m of it)
+        uA = ship_mat('upA', entry, 0)
+        for i in range(3): quad(f'bu{i}', (i * W, 2 * W, H), (W, 0, 0), (0, 0, 1.5), uv1=(1, 0.5), mat=uA)
+        for j in range(2): quad(f'lu{j}', (0, (j + 1) * W, H), (0, -W, 0), (0, 0, 1.5), uv1=(1, 0.5), mat=uA)
+        H = H + 1.5
     if floor:
         fA, fB = ship_mat('floorA', floor, 0), ship_mat('floorB', floor, 1)
         for i in range(3):
@@ -1967,6 +2259,7 @@ def room_view(style, kind, entry):
     win.data.shape = 'RECTANGLE'; win.data.size = 1.3; win.data.size_y = 1.6
     lamp('lamp', 'POINT', 60, loc=(1.1, 2 * W - 0.6, 1.7), size=0.08, color=(1.0, 0.72, 0.45))
     if kind == 'ceil': cam_at((3.4, 0.6, 1.5), (1.2, 2 * W - 0.6, 3.0), 20)
+    elif kind == 'upper': cam_at((3.6, 0.5, 1.6), (1.0, 2 * W - 0.2, 3.2), 18)
     else: cam_at((3.2, 0.7, 1.6), (0.9, 2 * W - 0.3, 1.25), 22)
     out = render(os.path.join(d, f'{style}_{kind}_room.png'), 1350, 900, 256); print('room', out, flush=True); return out
 
@@ -2038,7 +2331,7 @@ def sheet(style, kind, entry):
     for t in tiles: out.paste(t, (x, 30)); x += t.width
     ImageDraw.Draw(out).text((8, 8), f'{style} {kind}   {W:.2f} x {H:.2f} m   {entry["px"]["hi"]} px   pom {entry["pom"]} m   seams {json.dumps(entry["seam"].get("color"))}', fill=(230, 230, 230))
     p = os.path.join(d, f'{style}_{kind}.png'); out.save(p); print('sheet', p, f'{time.time() - t0:.0f}s', flush=True)
-    if kind in ('wall', 'floor', 'ceil'): room_view(style, kind, entry)
+    if kind in ('wall', 'floor', 'ceil', 'upper', 'service'): room_view(style, kind, entry)
     return p
 
 # ================================================================ main
@@ -2047,13 +2340,16 @@ def main():
     t0 = time.time(); got = {}
     for style in STYLES + ['common']:
         for kind, fn in SETS.get(style, {}).items():
-            if wanted(style, kind): got[f'{style}:{kind}'] = run_set(style, kind, fn)
+            if not wanted(style, kind): continue
+            if style == 'common': detail_tiles(); got['common:detail'] = 1; continue
+            got[f'{style}:{kind}'] = run_set(style, kind, fn)
     print(f'surfaces2: {len(got)} sets in {time.time() - t0:.0f}s')
 
 if __name__ == '__main__':
-    SETS['wood'] = {'floor': wood_floor, 'wall': wood_wall, 'ceil': wood_ceil}
-    SETS['tile'] = {'floor': tile_floor, 'wall': tile_wall, 'ceil': tile_ceil}
-    SETS['concrete'] = {'floor': concrete_floor, 'wall': concrete_wall, 'ceil': concrete_ceil}
-    SETS['attic'] = {'floor': attic_floor, 'wall': attic_wall, 'ceil': attic_ceil}
-    SETS['workshop'] = {'floor': workshop_floor, 'wall': workshop_wall, 'ceil': workshop_ceil}
+    SETS['wood'] = {'floor': wood_floor, 'wall': wood_wall, 'ceil': wood_ceil, 'upper': wood_upper, 'service': service('wood')}
+    SETS['tile'] = {'floor': tile_floor, 'wall': tile_wall, 'ceil': tile_ceil, 'upper': tile_upper, 'service': service('tile')}
+    SETS['concrete'] = {'floor': concrete_floor, 'wall': concrete_wall, 'ceil': concrete_ceil, 'upper': concrete_upper, 'service': service('concrete'), 'beam': beam_set('concrete_beam', lambda n, W, H: timber_mat(n, W, H, tone='#6a5440', dust=0.25, wash=0.7))}
+    SETS['attic'] = {'floor': attic_floor, 'wall': attic_wall, 'ceil': attic_ceil, 'upper': attic_upper, 'service': service('attic'), 'beam': beam_set('attic_beam', lambda n, W, H: timber_mat(n, W, H, tone='#5e4a36', dark='#352619', rings=80, dust=0.18, sawmarks=1.2))}
+    SETS['workshop'] = {'floor': workshop_floor, 'wall': workshop_wall, 'ceil': workshop_ceil, 'upper': workshop_upper, 'service': service('workshop'), 'beam': beam_set('workshop_beam', lambda n, W, H: timber_mat(n, W, H, tone='#4e3c2c', dark='#2a1e14', rings=100, dust=0.12, soot=0.8)), 'ibeam': beam_set('workshop_ibeam', steel_mat, 0.0008)}
+    SETS['common'] = {'detail': None}
     main()

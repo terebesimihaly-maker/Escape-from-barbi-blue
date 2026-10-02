@@ -13,7 +13,9 @@ without bumping its `version` (it changes gameplay).
   `py -3.11 -c "import sys; sys.path.insert(0,'tools/blender'); import bpy, common; bpy.ops.wm.read_factory_settings(use_empty=True); print(common.use_best_device())"`
 
 Scripts use `common.use_best_device()` (via `kitlib.reset()`), so Cycles runs on the GPU wherever one exists.
-Scratch files go to `/tmp/efbb-kit` (on Windows: `C:\tmp\efbb-kit`).
+Scratch files (bake intermediates, the asset `.blend`s, contact sheets, renders) go to the work folder (`defs.WORK`): `EFBB_WORK`
+if set, else a `renders` folder beside the repository if one exists (this PC: `D:\Dokumentumok\EFBB\renders`), else `/tmp/efbb-kit`.
+A surface bake deletes its own intermediates (about 1 GB a set) when it finishes.
 
 ## Running
 

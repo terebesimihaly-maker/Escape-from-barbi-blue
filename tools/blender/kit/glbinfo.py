@@ -112,7 +112,7 @@ fs.writeFileSync(dst + '.bin', Buffer.concat(bufs)); fs.writeFileSync(dst + '.js
 def _decode(path):
     js = os.path.join(GLTFT, 'kit-glbdump.mjs')
     if not os.path.exists(js) or open(js).read() != DUMP: open(js, 'w').write(DUMP)
-    tmp = '/tmp/efbb-kit/check'; os.makedirs(tmp, exist_ok=True); dst = os.path.join(tmp, os.path.basename(path).replace('.glb', '') + '_' + str(abs(hash(path)) % 10 ** 8))
+    import defs; tmp = os.path.join(defs.WORK, 'check'); os.makedirs(tmp, exist_ok=True); dst = os.path.join(tmp, os.path.basename(path).replace('.glb', '') + '_' + str(abs(hash(path)) % 10 ** 8))
     r = subprocess.run(['node', js, path, dst], cwd=GLTFT, capture_output=True, text=True)
     if r.returncode: raise RuntimeError('glbdump failed: ' + r.stderr[-1500:])
     meta = json.load(open(dst + '.json')); raw = open(dst + '.bin', 'rb').read(); out = {}
