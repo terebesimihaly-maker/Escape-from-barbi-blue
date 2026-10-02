@@ -79,6 +79,101 @@
     ],
     "tiles": "uv",
     "variants": 2
+   },
+   "wall": {
+    "ao_m": 0.12,
+    "bake_s": {
+     "ao": 18.7,
+     "cav": 7.9,
+     "colA": 23.1,
+     "colB": 24.4,
+     "col_shift": 26.7,
+     "dn_ao": 3.7,
+     "dn_cav": 3.0,
+     "height": 9.0,
+     "normal": 22.8,
+     "normal_shift": 26.2,
+     "rough": 24.5,
+     "total": 205.3,
+     "zgeo": 4.9
+    },
+    "files": {
+     "color": "attic/wall_color",
+     "normal": "attic/wall_normal",
+     "orh": "attic/wall_orh"
+    },
+    "heights": {
+     "nail_rows": [
+      0.45,
+      1.5,
+      2.6
+     ],
+     "skirting": 0.09
+    },
+    "notes": "vertical rough-sawn pine boarding, nailed to rails at 0.45 / 1.5 / 2.6 m; B: roof-leak streaks and mould",
+    "pom": 0.012,
+    "preview": false,
+    "px": {
+     "hi": [
+      4096,
+      2731
+     ],
+     "lo": [
+      1024,
+      682
+     ],
+     "md": [
+      2048,
+      1365
+     ]
+    },
+    "px_normal_orh": {
+     "hi": [
+      2048,
+      2731
+     ],
+     "lo": [
+      512,
+      682
+     ],
+     "md": [
+      1024,
+      1365
+     ]
+    },
+    "px_per_m": 910,
+    "seam": {
+     "AB": 0.0009,
+     "BA": 0.0009,
+     "color": {
+      "inner_u": 0.0116,
+      "inner_v": 0.0008,
+      "u": 0.0009,
+      "v": 0.0364
+     },
+     "normal": {
+      "inner_u": 0.0175,
+      "inner_v": 0.0074,
+      "u": 0.0,
+      "v": 0.0141
+     },
+     "orh": {
+      "inner_u": 0.0139,
+      "inner_v": 0.0009,
+      "u": 0.0076,
+      "v": 0.0147
+     },
+     "shift": {
+      "color": 0.0002,
+      "normal": 0.0032
+     }
+    },
+    "size_m": [
+     2.25,
+     3.0
+    ],
+    "tiles": "u",
+    "variants": 2
    }
   },
   "concrete": {
@@ -507,19 +602,19 @@
    "wall": {
     "ao_m": 0.12,
     "bake_s": {
-     "ao": 9.9,
-     "cav": 7.4,
-     "colA": 5.7,
-     "colB": 6.5,
-     "col_shift": 8.2,
-     "dn_ao": 2.3,
-     "dn_cav": 2.2,
-     "height": 3.7,
-     "normal": 6.5,
-     "normal_shift": 7.7,
-     "rough": 5.6,
-     "total": 75.1,
-     "zgeo": 3.3
+     "ao": 19.7,
+     "cav": 19.9,
+     "colA": 16.7,
+     "colB": 15.3,
+     "col_shift": 12.9,
+     "dn_ao": 3.7,
+     "dn_cav": 3.9,
+     "height": 8.0,
+     "normal": 14.3,
+     "normal_shift": 14.9,
+     "rough": 15.2,
+     "total": 159.8,
+     "zgeo": 5.3
     },
     "files": {
      "color": "wood/wall_color",
@@ -568,13 +663,13 @@
     },
     "px_per_m": 910,
     "seam": {
-     "AB": 0.0166,
-     "BA": 0.0166,
+     "AB": 0.0164,
+     "BA": 0.0164,
      "color": {
-      "inner_u": 0.0046,
+      "inner_u": 0.0045,
       "inner_v": 0.0052,
-      "u": 0.0166,
-      "v": 0.1224
+      "u": 0.0164,
+      "v": 0.1222
      },
      "normal": {
       "inner_u": 0.004,
@@ -583,10 +678,10 @@
       "v": 0.2176
      },
      "orh": {
-      "inner_u": 0.0044,
-      "inner_v": 0.0039,
-      "u": 0.0219,
-      "v": 0.2006
+      "inner_u": 0.004,
+      "inner_v": 0.0036,
+      "u": 0.0164,
+      "v": 0.2065
      },
      "shift": {
       "color": 0.0001,
@@ -675,6 +770,102 @@
      2.25
     ],
     "tiles": "uv",
+    "variants": 2
+   },
+   "wall": {
+    "ao_m": 0.12,
+    "bake_s": {
+     "ao": 17.2,
+     "cav": 17.5,
+     "colA": 21.1,
+     "colB": 14.0,
+     "col_shift": 9.1,
+     "dn_ao": 3.7,
+     "dn_cav": 4.2,
+     "height": 9.0,
+     "normal": 19.5,
+     "normal_shift": 9.0,
+     "rough": 17.2,
+     "total": 153.9,
+     "zgeo": 4.4
+    },
+    "files": {
+     "color": "workshop/wall_color",
+     "normal": "workshop/wall_normal",
+     "orh": "workshop/wall_orh"
+    },
+    "heights": {
+     "boards": [
+      0.0,
+      0.93
+     ],
+     "dado": 0.93,
+     "plaster_from": 0.9600000000000001,
+     "skirting": 0.14
+    },
+    "notes": "green painted V-jointed boarding to a batten at the dado height, distempered lime plaster above; B: damp, heavy flaking, mould",
+    "pom": 0.02,
+    "preview": false,
+    "px": {
+     "hi": [
+      4096,
+      2731
+     ],
+     "lo": [
+      1024,
+      682
+     ],
+     "md": [
+      2048,
+      1365
+     ]
+    },
+    "px_normal_orh": {
+     "hi": [
+      2048,
+      2731
+     ],
+     "lo": [
+      512,
+      682
+     ],
+     "md": [
+      1024,
+      1365
+     ]
+    },
+    "px_per_m": 910,
+    "seam": {
+     "AB": 0.0372,
+     "BA": 0.0372,
+     "color": {
+      "inner_u": 0.0016,
+      "inner_v": 0.0009,
+      "u": 0.0372,
+      "v": 0.3431
+     },
+     "normal": {
+      "inner_u": 0.0063,
+      "inner_v": 0.0047,
+      "u": 0.0536,
+      "v": 0.0147
+     },
+     "orh": {
+      "inner_u": 0.007,
+      "inner_v": 0.0046,
+      "u": 0.0847,
+      "v": 0.1526
+     },
+     "shift": {
+      "color": 0.0003,
+      "normal": 0.0008
+     }
+    },
+    "size_m": [
+     2.25,
+     3.0
+    ],
+    "tiles": "u",
     "variants": 2
    }
   }
