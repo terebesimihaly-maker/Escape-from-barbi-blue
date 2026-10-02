@@ -477,7 +477,11 @@ def oak_mat(name, W, H, tone='#86643f', dark='#4b321c', worn='#7f6e5c'):
     rays = m.math('MULTIPLY', m.remap(ry.outputs['Distance'], 0.30, 0.10, smooth=True), m.math('MULTIPLY', qs, m.remap(noise3(m, vmul(m, g, (60, 60, 4)), 1.0, 2), 0.3, 0.6)))
     col = m.mix(m.math('MULTIPLY', rays, 0.8), col, m.hsv(col, 0.5, 0.78, 1.35))
     # every board its own tree: hue, saturation, value; a few darker, a few greyer; sapwood edges; mineral streaks
-    col = m.hsv(col, m.remap(pr, 0, 1, 0.49, 0.51), m.remap(pr3, 0, 1, 0.8, 1.0), m.remap(pr2, 0, 1, 0.85, 1.1))
+    #     (spread wide but evenly through the middle: no single board so dark or pale that the 2.25 m repeat gives it away)
+    pr5 = m.math('FRACT', m.math('MULTIPLY', pr, 23.9)); pr6 = m.math('FRACT', m.math('MULTIPLY', pr, 5.53))
+    col = m.hsv(col, m.remap(pr5, 0, 1, 0.486, 0.514), m.remap(pr3, 0, 1, 0.72, 0.98), m.remap(pr2, 0, 1, 0.78, 1.18))
+    col = m.mix(m.math('MULTIPLY', m.remap(pr6, 0.28, 0.06, smooth=True), 0.85), col, m.hsv(col, 0.49, 0.8, 0.84))   # (browner, cooler boards)
+    col = m.mix(m.math('MULTIPLY', m.remap(pr6, 0.74, 0.94, smooth=True), 0.8), col, m.hsv(col, 0.503, 0.92, 1.14))   # (paler, honey-coloured ones)
     col = m.mix(m.remap(pr, 0.08, 0.0, smooth=True), col, m.hsv(col, 0.495, 1.04, 0.8))   # (a few darker boards, not so dark the repeat shows)
     col = m.mix(m.remap(pr, 0.9, 1.0, smooth=True), col, m.hsv(col, 0.5, 0.68, 1.0))
     sapw = m.remap(m.math('MULTIPLY', bx, sap), 0.45, 0.85, smooth=True)
@@ -524,6 +528,25 @@ def oak_mat(name, W, H, tone='#86643f', dark='#4b321c', worn='#7f6e5c'):
     blot = m.math('MULTIPLY', m.remap(sd, 0.15, 0.10, smooth=True), sel)
     tide = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(sd, 0.10, 0.115), m.remap(sd, 0.14, 0.115)), sel)
     col = m.mix(m.math('ADD', m.math('MULTIPLY', blot, 0.3), m.math('MULTIPLY', tide, 0.5)), col, m.hsv(col, 0.5, 1.1, 0.5))
+    # scuffs: black heel and rubber marks, short swipes (straight or a gentle arc, tapering at both ends, each its own depth of
+    #         black) inside a soft grey smear, gathered where people turn (clusters in tile space, so they run on across the
+    #         joints); patches where the wax is scuffed dull and pale
+    clus = m.remap(m.math('ADD', T.noise(2.4, 3, 0.55, off=40.0), m.math('MULTIPLY', T.noise(0.8, 2, off=43.0), 0.25)), 0.62, 0.74, smooth=True)
+    heel = None; smear = None
+    for k, (rot, spc, ln) in enumerate(((0.35, 0.10, 0.05), (2.0, 0.12, 0.04), (-0.9, 0.11, 0.06), (1.2, 0.14, 0.035))):
+        o = vadd(m, sp, (k * 4.1, k * 2.3, k * 1.9))
+        bend = noise3(m, vmul(m, o, (3.5, 3.5, 3.5)), 1.0, 1, 0.5, color=True)
+        ob = m.n('ShaderNodeVectorMath', operation='MULTIPLY_ADD'); m.l(bend, ob.inputs[0]); ob.inputs[1].default_value = (0.02, 0.02, 0.0); m.l(o, ob.inputs[2]); ob = ob.outputs[0]
+        seg = noise3(m, m.map(m.map(vadd(m, o, (k * 1.7, k * 3.3, 0.0)), (1, 1, 1), rot=(0, 0, rot)), (0.6 / ln, 1.0 / spc, 1)), 1.0, 1)
+        seg = m.math('MULTIPLY', m.remap(seg, 0.55, 0.63, smooth=True), m.remap(noise3(m, vadd(m, o, (k * 5.1, 0.0, 2.0)), 9.0, 1), 0.3, 0.7, 0.35, 1.0))   # (cut short, each its own darkness)
+        c1 = m.math('MULTIPLY', strokes(m, ob, rot, spc, 0.4, 0.003), seg); s1 = m.math('MULTIPLY', strokes(m, ob, rot, spc, 0.4, 0.012), seg)
+        heel = c1 if heel is None else m.math('MAXIMUM', heel, c1); smear = s1 if smear is None else m.math('MAXIMUM', smear, s1)
+    heel = m.math('MULTIPLY', heel, clus); smear = m.math('MULTIPLY', smear, clus)
+    col = m.mix(m.math('MULTIPLY', smear, 0.3), col, m.hsv(col, 0.5, 0.7, 0.62))
+    col = m.mix(m.math('MULTIPLY', heel, 0.6), col, (0.04, 0.035, 0.03)); rough = m.mixf(m.math('MULTIPLY', heel, 0.5), rough, 0.45)
+    scuff = m.math('MULTIPLY', m.remap(T.noise(3.0, 4, 0.6, off=41.0), 0.55, 0.7, smooth=True), m.remap(T.noise(20, 3, off=42.0), 0.3, 0.7, 0.5, 1.0))
+    col = m.mix(m.math('MULTIPLY', scuff, 0.4), col, m.hsv(col, 0.5, 0.86, 1.08)); rough = m.mixf(m.math('MULTIPLY', scuff, 0.75), rough, 0.6)
+    rough = m.mixf(m.math('MULTIPLY', mic, scuff), rough, 0.72)                       # (and the fine scratches thick in them)
     # dirt in the joints and along the board edges, a trace of dust (the game lays its own over the floor)
     cav = look(m, 'CAV', W, H); edge = look(m, 'EDGE', W, H)
     gr = m.math('MULTIPLY', m.remap(cav, 0.96, 0.45, smooth=True), m.remap(T.noise(30, 4), 0.3, 0.7, 0.5, 1.0))
@@ -652,27 +675,37 @@ def marble_mat(name, W, H, white='#dfdbd3', vein='#7f807f', black='#1d1c1b', cal
     wcol = m.mix(m.math('MULTIPLY', v3, 0.3), wcol, lin(vein))
     sp = m.remap(noise3(m, vmul(m, g, (300, 300, 300)), 1.0, 2), 0.7, 0.78)          # (dark specks)
     wcol = m.mix(m.math('MULTIPLY', sp, 0.4), wcol, m.mix(1.0, lin(vein), (0.6, 0.6, 0.6), 'MULTIPLY'))
-    # --- Nero Marquina: deep black, a few crisp white calcite fractures (smooth paths: little detail), finer branches near them,
-    #     wide plain stretches
+    # --- Nero Marquina: deep black under a faint grey cloud; fine, soft white veins that wander (contours of a gently warped
+    #     noise, not fracture networks), different on every slab: a few nearly plain, most with a hairline or two and a
+    #     scatter of fainter ones, now and then one bolder vein with a soft calcite haze round it, feathered wisps near it
     mw = noise3(m, vmul(m, g, (0.9, 0.9, 0.9)), 1.0, 2, 0.5, color=True)
-    pb = m.n('ShaderNodeVectorMath', operation='MULTIPLY_ADD'); m.l(mw, pb.inputs[0]); pb.inputs[1].default_value = (0.5, 0.5, 0.5); m.l(g, pb.inputs[2]); pb = pb.outputs[0]
+    pb = m.n('ShaderNodeVectorMath', operation='MULTIPLY_ADD'); m.l(mw, pb.inputs[0]); pb.inputs[1].default_value = (0.14, 0.14, 0.14); m.l(g, pb.inputs[2]); pb = pb.outputs[0]   # (gentle: a strong warp folds the veins into loops)
     wvar = noise3(m, vmul(m, g, (6, 6, 6)), 1.0, 2, 0.5)
-    jw = noise3(m, vmul(m, pb, (9, 9, 9)), 1.0, 3, 0.6, color=True)                  # (a finer warp: the fractures go jagged)
-    pj = m.n('ShaderNodeVectorMath', operation='MULTIPLY_ADD'); m.l(jw, pj.inputs[0]); pj.inputs[1].default_value = (0.03, 0.03, 0.03); m.l(pb, pj.inputs[2]); pj = pj.outputs[0]
-    b1 = fracvein(m, pj, 3.2, 0.0024, wvar, 0.55, 0.0)
-    b1b = m.math('MULTIPLY', hardvein(m, m.map(vadd(m, pb, (5.0, 2.0, 1.0)), (1.0, 1.7, 1.0)), 1.1, 0.0016, 2, 0.45, wvar), 0.8)
-    nv = m.n('ShaderNodeTexVoronoi', feature='DISTANCE_TO_EDGE', i_Scale=3.2, i_Randomness=1.0); m.l(pj, nv.inputs['Vector'])
-    near = m.remap(m.math('DIVIDE', nv.outputs['Distance'], 3.2), 0.03, 0.0, smooth=True)
-    b2 = m.math('MULTIPLY', fracvein(m, pj, 11.0, 0.0009, wvar, 0.5, 7.0), near)
-    b3 = m.math('MULTIPLY', fracvein(m, pj, 26.0, 0.0005, None, 0.25, 13.0), m.math('MULTIPLY', near, near))
-    bmask = m.remap(noise3(m, vadd(m, g, (2.0, 0.0, 0.0)), 1.1, 2), 0.3, 0.6, 0.15, 1.0)
-    bcol = m.mix(m.remap(noise3(m, pw, 2.5, 4), 0.35, 0.7, 0.0, 0.18), lin(black), m.mix(1.0, lin(black), (1.6, 1.6, 1.65), 'MULTIPLY'))
-    bcol = m.mix(m.math('MULTIPLY', m.math('MAXIMUM', b1, m.math('MULTIPLY', b1b, 0.8)), bmask), bcol, lin(calcite))
-    bcol = m.mix(m.math('MULTIPLY', m.math('MULTIPLY', b2, 0.75), bmask), bcol, lin(calcite))
-    bcol = m.mix(m.math('MULTIPLY', m.math('MULTIPLY', b3, 0.5), bmask), bcol, m.mix(0.5, lin(calcite), lin(black)))
+    jw = noise3(m, vmul(m, pb, (16, 16, 16)), 1.0, 3, 0.55, color=True)              # (a slight wobble, not jagged)
+    pj = m.n('ShaderNodeVectorMath', operation='MULTIPLY_ADD'); m.l(jw, pj.inputs[0]); pj.inputs[1].default_value = (0.008, 0.008, 0.008); m.l(pb, pj.inputs[2]); pj = pj.outputs[0]
+    def fade(off, sc, lo=0.3, hi=0.65, floor=0.0):                                  # (a vein comes and goes along its way)
+        return m.remap(noise3(m, vadd(m, g, off), sc, 2), lo, hi, floor, 1.0)
+    pr4 = m.math('FRACT', m.math('MULTIPLY', pr, 3.17)); pr5 = m.math('FRACT', m.math('MULTIPLY', pr, 23.9))
+    plain = m.remap(pr4, 0.0, 0.18, 0.2, 1.0)                                       # (some slabs nearly plain)
+    bold = m.math('MULTIPLY', m.remap(pr5, 0.55, 0.85, 0.35, 1.0), plain)              # (how strong this slab's main vein is)
+    mv = m.map(pj, (1.0, 2.8, 1.0))                                                 # (long sweeps, one way across the slab)
+    main = m.math('MULTIPLY', hardvein(m, mv, 0.9, 0.0012, 2, 0.4, wvar), m.math('MULTIPLY', fade((2.0, 0.0, 0.0), 2.0, 0.3, 0.6, 0.2), bold))
+    haze = m.math('MULTIPLY', hardvein(m, mv, 0.9, 0.009, 2, 0.4, wvar), m.math('MULTIPLY', fade((2.0, 0.0, 0.0), 2.0, 0.3, 0.6, 0.2), bold))
+    near = hardvein(m, mv, 0.9, 0.05, 2, 0.4, None)                                 # (where the wisps gather)
+    fine = m.math('MULTIPLY', hardvein(m, m.map(vadd(m, pj, (5.0, 2.0, 1.0)), (1.0, 2.6, 1.0)), 2.4, 0.0006, 2, 0.45, wvar),   # (finer veins running with it)
+                  m.math('MULTIPLY', fade((7.0, 3.0, 0.0), 3.0), m.math('MULTIPLY', m.remap(pr3, 0, 1, 0.3, 0.75), plain)))
+    hair = m.math('MULTIPLY', fracvein(m, pj, 7.0, 0.0004, None, 0.4, 5.0),         # (a faint web of straight hairline fractures)
+                  m.math('MULTIPLY', fade((13.0, 5.0, 0.0), 2.5, 0.35, 0.65), m.math('ADD', 0.3, m.math('MULTIPLY', near, 0.7))))
+    wisp = m.math('MULTIPLY', ridge(m, vadd(m, pj, (3.0, 9.0, 0.0)), 7.0, 4, 0.6, 22.0), m.math('MULTIPLY', near, m.math('MULTIPLY', bold, 0.6)))
+    bcol = m.mix(m.remap(noise3(m, pw, 2.5, 4), 0.35, 0.7, 0.0, 0.2), lin(black), m.mix(1.0, lin(black), (1.6, 1.6, 1.65), 'MULTIPLY'))
+    bcol = m.mix(m.math('MULTIPLY', haze, 0.1), bcol, lin(calcite))
+    bcol = m.mix(m.math('MULTIPLY', wisp, 0.3), bcol, m.mix(0.5, lin(calcite), lin(black)))
+    bcol = m.mix(m.math('MULTIPLY', hair, 0.3), bcol, m.mix(0.45, lin(calcite), lin(black)))
+    bcol = m.mix(m.math('MULTIPLY', fine, 0.55), bcol, m.mix(0.75, lin(calcite), lin(black)))
+    bcol = m.mix(m.math('MULTIPLY', main, 0.82), bcol, lin(calcite))
     col = m.mix(dk, wcol, bcol)
     col = m.hsv(col, 0.5, 1.0, m.remap(pr3, 0, 1, 0.95, 1.04))
-    h = m.math('MULTIPLY', m.math('ADD', v2, b2), -0.00003)                    # (the softer veins polish a hair lower)
+    h = m.math('MULTIPLY', m.math('ADD', v2, m.math('MULTIPLY', m.math('MAXIMUM', main, fine), dk)), -0.00003)   # (the softer veins polish a hair lower)
     # --- age: yellowed (the white more), dirt in the pits, cracks, etch rings and spots in the polish, scratches
     col = m.mix(m.math('MULTIPLY', m.remap(T.noise(1.2, 3, 0.5), 0.3, 0.75, 0.25, 0.7), m.math('SUBTRACT', 1.0, m.math('MULTIPLY', dk, 0.6))), col, m.mix(1.0, col, (0.93, 0.87, 0.76), 'MULTIPLY'))
     pits = m.math('MULTIPLY', m.remap(noise3(m, vmul(m, g, (700, 700, 700)), 1.0, 2), 0.68, 0.76), m.remap(T.noise(4, 3), 0.3, 0.7, 0.4, 1.0))
@@ -1520,16 +1553,27 @@ def brick_mat(name, W, H, reds=('#743c2b', '#663427', '#80472f', '#5a3329', '#46
     lw_ = m.mix(m.remap(T.noise(1.5, 4, 0.6, off=32.0), 0.35, 0.8, 0.1, 0.55), lw_, m.hsv(lw_, 0.5, 1.2, 0.72))   # (grimed)
     lw_ = m.mix(m.math('MULTIPLY', wet, 0.5), lw_, m.mix(1.0, lw_, (0.72, 0.72, 0.68), 'MULTIPLY'))           # (the damp greys it)
     lw_ = m.mix(m.math('MULTIPLY', gr, 0.6), lw_, m.hsv(lw_, 0.5, 1.0, 0.55))
-    fk = m.math('ADD', T.noise(9, 5, 0.65, off=33.0), m.math('MULTIPLY', m.remap(y, 1.2, 0.0), 0.25 if damp else 0.0))   # (more flaking low down: not on a band that repeats)
-    if not wash:
-        fk = m.math('ADD', fk, m.math('MULTIPLY', m.math('SUBTRACT', 1.0, edge_fade(m, W, H, 0.04, 0.7, T, wv=False)), 0.6))   # (off the tile's edges in flakes, not a fade)
-        fk = m.math('ADD', fk, m.math('MULTIPLY', m.math('SUBTRACT', T.noise(0.9, 3, 0.5, off=35.0), 0.5), 0.5))                # (the remains of an old wash, in big patches)
-    keepw = m.remap(fk, 0.62, 0.58, smooth=True)                                                    # (1 where the wash still holds)
+    fk, ft = wash_flakes(m, W, H, T, y, wash, damp)
+    keepw = m.remap(fk, ft + 0.02, ft - 0.02, smooth=True)                                          # (1 where the wash still holds)
     thin = m.math('MULTIPLY', edge, 0.6)
+    body = 0.92 if wash else m.remap(T.noise(6, 3, 0.55, off=36.0), 0.3, 0.7, 0.62, 0.97)              # (brushed on thin in places: the brick shows through)
     cover = m.math('MULTIPLY', m.math('MULTIPLY', keepw, m.math('SUBTRACT', 1.0, thin)), m.val(wash) if wash else m.math('MULTIPLY', V, edge_fade(m, W, H, 0.0, 0.03, T, wv=False)))
-    col = m.mix(m.math('MULTIPLY', cover, 0.92), col, lw_); rough = m.mixf(cover, rough, 0.92)
-    col = m.mix(m.math('MULTIPLY', m.math('MULTIPLY', m.remap(fk, 0.6, 0.57), m.remap(fk, 0.54, 0.57)), m.val(wash) if wash else V), col, m.hsv(col, 0.5, 1.0, 0.6))   # (the flake's edge)
+    col = m.mix(m.math('MULTIPLY', cover, body), col, lw_); rough = m.mixf(cover, rough, 0.92)
+    col = m.mix(m.math('MULTIPLY', m.math('MULTIPLY', m.remap(fk, ft, ft - 0.03), m.remap(fk, ft - 0.06, ft - 0.03)), m.val(wash) if wash else V), col, m.hsv(col, 0.5, 1.0, 0.6))   # (the flake's edge)
+    if not wash: h = m.math('ADD', h, m.math('MULTIPLY', cover, 0.00015))                         # (the coat stands a hair proud)
     return finish(m, col, rough, h)
+
+def wash_flakes(m, W, H, T, y, wash, damp):
+    """where an old limewash still holds (fk below ft): over a whole wall (wash > 0), only fine flaking; on the B variant the
+       remains of it in many small irregular patches (0.1 to 0.4 m, ragged), scattered over the tile, fewer toward its edges
+       (B must meet A there) and lower down where the damp lifted it"""
+    fk = m.math('ADD', T.noise(9, 5, 0.65, off=33.0), m.math('MULTIPLY', m.remap(y, 1.2, 0.0), 0.25 if damp else 0.0))
+    if wash: return fk, 0.6
+    pt = m.math('ADD', T.noise(4.2, 4, 0.6, off=35.0), m.math('MULTIPLY', m.math('SUBTRACT', T.noise(1.2, 2, 0.5, off=37.0), 0.5), 0.15))   # (patches, a few more in some areas)
+    fk = m.math('ADD', m.math('MULTIPLY', pt, 0.8), m.math('MULTIPLY', m.math('SUBTRACT', T.noise(16, 4, 0.65, off=33.0), 0.5), 0.3))      # (their edges ragged, flaked)
+    fk = m.math('ADD', fk, m.math('MULTIPLY', m.remap(y, 1.0, 0.0), 0.1 if damp else 0.0))
+    fk = m.math('ADD', fk, m.math('MULTIPLY', m.math('SUBTRACT', 1.0, edge_fade(m, W, H, 0.03, 0.8, T, wv=False)), 0.12))   # (thinning out toward the edges, no outline)
+    return fk, 0.368                                                                        # (about a third still covered: islands, not a coat)
 
 def mortar_mat(name, W, H, col='#7d7466', cement='#6f6d68', wv=False, wash=0.0, damp=True):
     """old lime mortar, recessed and crumbling, sandy; a stretch of grey cement repointing; damp and salt as the bricks;
@@ -1545,10 +1589,9 @@ def mortar_mat(name, W, H, col='#7d7466', cement='#6f6d68', wv=False, wash=0.0, 
     salt = m.math('MULTIPLY', m.math('MULTIPLY', m.math('MULTIPLY', m.remap(m.math('SUBTRACT', y, dl), 0.0, 0.04), m.remap(m.math('SUBTRACT', y, dl), 0.18, 0.04)), m.remap(T.noise(30, 4, off=6.0), 0.3, 0.6)), 1.0 if damp else 0.0)
     c = m.mix(salt, c, lin('#e0dcd2'))
     c = m.mix(m.remap(T.noise(1.3, 4, 0.6, off=9.0), 0.35, 0.85, 0.15, 0.6), c, m.hsv(c, 0.5, 0.8, 0.6))
-    fk = m.math('ADD', m.math('ADD', T.noise(9, 5, 0.65, off=33.0), m.math('MULTIPLY', m.remap(y, 1.2, 0.0), 0.25)), m.math('MULTIPLY', m.math('SUBTRACT', 1.0, edge_fade(m, W, H, 0.04, 0.7, T, wv=False)), 0.6))
-    fk = m.math('ADD', fk, m.math('MULTIPLY', m.math('SUBTRACT', T.noise(0.9, 3, 0.5, off=35.0), 0.5), 0.5))
-    if wash: fk = m.math('ADD', T.noise(9, 5, 0.65, off=33.0), 0.0)
-    c = m.mix(m.math('MULTIPLY', m.remap(fk, 0.66, 0.6), m.val(wash) if wash else m.math('MULTIPLY', V, edge_fade(m, W, H, 0.0, 0.03, T, wv=False))), c, m.mix(0.8, c, lin('#c4bead')))
+    if wash: fk, ft = m.math('ADD', T.noise(9, 5, 0.65, off=33.0), 0.0), 0.63
+    else: fk, ft = wash_flakes(m, W, H, T, y, wash, damp); ft += 0.03
+    c = m.mix(m.math('MULTIPLY', m.remap(fk, ft + 0.03, ft - 0.03), m.val(wash) if wash else m.math('MULTIPLY', V, edge_fade(m, W, H, 0.0, 0.03, T, wv=False))), c, m.mix(0.8, c, lin('#c4bead')))
     h = m.math('ADD', m.math('MULTIPLY', sand, 0.0003), m.math('MULTIPLY', lump, 0.0012))
     return finish(m, c, m.mixf(rep, 0.95, 0.85), h)
 

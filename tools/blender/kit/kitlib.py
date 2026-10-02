@@ -702,7 +702,19 @@ def bake_set(objs, name, px=2048, samples=64, high=None, cage=0.02, cavity=0.05,
                 n = slot.material.node_tree.nodes.get(node)
                 if n: n.image = img
     col = _bake_image(f'{name}_col', px, color=True); sc.render.bake.use_pass_direct = sc.render.bake.use_pass_indirect = False
+    # (a metal has no diffuse colour: Cycles' colour pass would bake brass and iron black; their albedo is the base colour)
+    undo = []
+    for o in objs:
+        for slot in o.material_slots:
+            b_ = slot.material.node_tree.nodes.get('Principled BSDF') if slot.material and slot.material.node_tree else None
+            if not b_: continue
+            inp = b_.inputs['Metallic']; src = inp.links[0].from_socket if inp.is_linked else None
+            if src: slot.material.node_tree.links.remove(inp.links[0])
+            undo.append((slot.material, inp, src, inp.default_value)); inp.default_value = 0.0
     sc.render.bake.use_pass_color = True; bake('DIFFUSE', col, max(4, samples // 8)); save_exr(col, exr('col'))
+    for m_, inp, src, v in undo:
+        inp.default_value = v
+        if src: m_.node_tree.links.new(src, inp)
     rough = _bake_image(f'{name}_rough', px); bake('ROUGHNESS', rough, 4); save_exr(rough, exr('rough'))
     met = _bake_image(f'{name}_metal', px); back = _metal_to_emit(objs); bake('EMIT', met, 4); back(); save_exr(met, exr('metal'))
     nrm = _bake_image(f'{name}_normal', px); bake('NORMAL', nrm, 4, normal_space='TANGENT')
