@@ -409,30 +409,57 @@ function ceilings(plan, opts) {
   if (opts.skipModules !== false) for (const m of plan.modules) if ((m.kind === 'skylight' || m.kind === 'ceilhole') && (opts.kit ? kitNode(opts.kit, m.node) : opts.skipModules === true)) cut.add(m.y * GW + m.x);
   const edge = (t0i, k) => { const x = t0i * L; return k === 0 ? x : k === 4 ? x + L : x + FR[k] * L; };   // (tile edge + FR[k] L: walls compute theirs the same way)
   const planUV = (x, z) => [x / PW, 1 - z / PH];
+  // the points along the edge between open tiles ta < tb (ax: the edge runs along x, tb below ta; else along z, tb right of ta):
+  // its ends, the FR points where a gable tile's roof slopes along it, where a sloping side crosses 3.0 m (the walls split there)
+  // and where the two ceilings cross. The tiles on both sides and the step between them all use these, so no T-junctions
+  const fineAx = (t, ax) => gid[t] >= 0 && gab[gid[t]].y === ax, ES = new Map();
+  const edgeS = (ta, tb, ax) => {
+    const key = ta * 2 + (ax ? 1 : 0); if (ES.has(key)) return ES.get(key);
+    const xa = ta % GW, ya = (ta / GW) | 0, ks = fineAx(ta, ax) || fineAx(tb, ax) ? [0, 1, 2, 3, 4] : [0, 4];
+    const at = (sv, extra) => { const p = ax ? [sv, (ya + 1) * L] : [(xa + 1) * L, sv]; return Object.assign({ s: sv, p, ha: Fl.ceilT(ta, p[0], p[1]), hb: Fl.ceilT(tb, p[0], p[1]) }, extra); };
+    const pts = ks.map(k => at(edge(ax ? xa : ya, k))), all = [pts[0]];
+    for (let j = 1; j < pts.length; j++) { const a = pts[j - 1], c = pts[j], mid = [];
+      const da = a.ha - a.hb, dc = c.ha - c.hb;
+      if (da * dc < 0 && Math.abs(da) > EPS && Math.abs(dc) > EPS) mid.push(at(a.s + (c.s - a.s) * (da / (da - dc)), { cross: true }));
+      for (const h of ['ha', 'hb']) if ((a[h] - FACE_H) * (c[h] - FACE_H) < 0) mid.push(at(a.s + (c.s - a.s) * (FACE_H - a[h]) / (c[h] - a[h])));
+      mid.sort((u, v) => u.s - v.s); for (const q of mid) if (q.s - all[all.length - 1].s > 1e-7 && c.s - q.s > 1e-7) all.push(q);
+      all.push(c); }
+    ES.set(key, all); return all;
+  };
+  // the points strictly inside the edge from (x, z) p to q shared with open tile nb (ax as above), in order from p to q
+  const inner = (t, nb, ax, p, q) => {
+    if (nb < 0 || W[nb]) return null;
+    const E = edgeS(Math.min(t, nb), Math.max(t, nb), ax), s0 = ax ? p[0] : p[1], s1 = ax ? q[0] : q[1], lo = Math.min(s0, s1), hi = Math.max(s0, s1);
+    const r = E.filter(e => e.s > lo + 1e-7 && e.s < hi - 1e-7).map(e => e.p); return s1 < s0 ? r.reverse() : r;
+  };
+  const nbOf = (tx, ty) => tx < 0 || ty < 0 || tx >= GW || ty >= GH ? -1 : ty * GW + tx;
   for (let ty = 0; ty < GH; ty++) for (let tx = 0; tx < GW; tx++) {
     const t = ty * GW + tx; if (W[t] || cut.has(t)) continue;
     const b = bufs.get(Fl.chunkOf(tx, ty), 'c'), k = gid[t];
     const vtx = (x, z) => { const y = Fl.ceilT(t, x, z); return [x, y, z]; };
     if (k < 0) {
-      // (an edge next to a gable tile that slopes along it takes that tile's points at FR, as its strips and the step there have them)
-      const P = [], x0 = tx * L, z0 = ty * L, x1 = x0 + L, z1 = z0 + L, ins = [0.14, 0.5, 0.86].map(f => FR.indexOf(f));
-      const fineN = (x, y, alongX) => x >= 0 && y >= 0 && x < GW && y < GH && !W[y * GW + x] && gid[y * GW + x] >= 0 && gab[gid[y * GW + x]].y === alongX;
-      P.push(vtx(x0, z0)); if (fineN(tx, ty - 1, true)) for (const k2 of ins) P.push(vtx(edge(tx, k2), z0));
-      P.push(vtx(x1, z0)); if (fineN(tx + 1, ty, false)) for (const k2 of ins) P.push(vtx(x1, edge(ty, k2)));
-      P.push(vtx(x1, z1)); if (fineN(tx, ty + 1, true)) for (const k2 of ins.slice().reverse()) P.push(vtx(edge(tx, k2), z1));
-      P.push(vtx(x0, z1)); if (fineN(tx - 1, ty, false)) for (const k2 of ins.slice().reverse()) P.push(vtx(x0, edge(ty, k2)));
+      // (an edge next to a gable tile that slopes along it takes the points edgeS gives it)
+      const x0 = tx * L, z0 = ty * L, x1 = x0 + L, z1 = z0 + L, C4 = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+      const NB = [[nbOf(tx, ty - 1), true], [nbOf(tx + 1, ty), false], [nbOf(tx, ty + 1), true], [nbOf(tx - 1, ty), false]], P = [];
+      for (let e = 0; e < 4; e++) { const a = C4[e], c = C4[(e + 1) % 4], [nb, ax] = NB[e]; P.push(vtx(a[0], a[1]));
+        if (nb >= 0 && !W[nb] && fineAx(nb, ax)) for (const q of inner(t, nb, ax, a, c)) P.push(vtx(q[0], q[1])); }
       poly(b, P, [0, -1, 0], P.map(p => [p[0] / L, p[2] / L]), P.map(p => planUV(p[0], p[2])));
       continue;
     }
     // a gable tile: strips across the ridge at FR (planar between them: the ridge sits at a tile's middle or edge)
     const q = gab[k];
     for (let j = 0; j < 4; j++) {
-      let P;
-      if (q.y) { const a = edge(tx, j), c = edge(tx, j + 1); P = [vtx(a, ty * L), vtx(c, ty * L), vtx(c, ty * L + L), vtx(a, ty * L + L)]; }
-      else { const a = edge(ty, j), c = edge(ty, j + 1); P = [vtx(tx * L, a), vtx(tx * L + L, a), vtx(tx * L + L, c), vtx(tx * L, c)]; }
-      // (plus the points where an edge crosses 3.0 m: the walls split there into main wall and upper band, so they share that vertex)
-      P = P.reduce((o, a, i) => { const c = P[(i + 1) % 4]; o.push(a);
-        if ((a[1] - FACE_H) * (c[1] - FACE_H) < 0) { const t = (FACE_H - a[1]) / (c[1] - a[1]); o.push([a[0] + (c[0] - a[0]) * t, FACE_H, a[2] + (c[2] - a[2]) * t]); } return o; }, []);
+      let C4, NB;      // (the strip's corners; on its two tile borders along the slope, the neighbour there)
+      if (q.y) { const a = edge(tx, j), c = edge(tx, j + 1); C4 = [[a, ty * L], [c, ty * L], [c, ty * L + L], [a, ty * L + L]]; NB = [[nbOf(tx, ty - 1), true], null, [nbOf(tx, ty + 1), true], null]; }
+      else { const a = edge(ty, j), c = edge(ty, j + 1); C4 = [[tx * L, a], [tx * L + L, a], [tx * L + L, c], [tx * L, c]]; NB = [null, [nbOf(tx + 1, ty), false], null, [nbOf(tx - 1, ty), false]]; }
+      // (plus, along those borders, edgeS's points next to an open tile, else where the edge crosses 3.0 m: the walls split there
+      // into main wall and upper band, so they share that vertex)
+      let P = [];
+      for (let e = 0; e < 4; e++) { const a = C4[e], c = C4[(e + 1) % 4], A = vtx(a[0], a[1]); P.push(A);
+        if (!NB[e]) continue;
+        const r = inner(t, NB[e][0], NB[e][1], a, c);
+        if (r) for (const p of r) P.push(vtx(p[0], p[1]));
+        else { const C = vtx(c[0], c[1]); if ((A[1] - FACE_H) * (C[1] - FACE_H) < 0) { const f = (FACE_H - A[1]) / (C[1] - A[1]); P.push([A[0] + (C[0] - A[0]) * f, FACE_H, A[2] + (C[2] - A[2]) * f]); } } }
       // the strip's normal, pointing down into the room
       const ux = P[1][0] - P[0][0], uy = P[1][1] - P[0][1], uz = P[1][2] - P[0][2], vx = P[P.length - 1][0] - P[0][0], vy = P[P.length - 1][1] - P[0][1], vz = P[P.length - 1][2] - P[0][2];
       let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const ln = Math.hypot(nx, ny, nz) || 1; if (ny > 0) { nx = -nx; ny = -ny; nz = -nz; }
@@ -443,18 +470,7 @@ function ceilings(plan, opts) {
   const steps = [];
   const atWall = p => { const cx = Math.round(p[0] / L), cz = Math.round(p[1] / L); return Fl.isW(cx - 1, cz - 1) || Fl.isW(cx, cz - 1) || Fl.isW(cx - 1, cz) || Fl.isW(cx, cz); };
   const step = (ta, tb, ax) => {          // ax: the edge runs along x (tb is below ta in z); else along z (tb right of ta)
-    // (5 points where a gable tile's roof slopes along this edge, else its two ends)
-    const fineT = t => gid[t] >= 0 && gab[gid[t]].y === ax;
-    const [xa, ya] = [ta % GW, (ta / GW) | 0], fine = fineT(ta) || fineT(tb), ks = fine ? [0, 1, 2, 3, 4] : [0, 4], pts = [];
-    for (const k of ks) { const p = ax ? [edge(xa, k), (ya + 1) * L] : [(xa + 1) * L, edge(ya, k)];
-      if (k === 4 && ax) p[1] = ya * L + L; if (!ax && k !== 4) p[0] = xa * L + L; if (!ax && k === 4) p[0] = xa * L + L;
-      pts.push({ s: ax ? p[0] : p[1], p, ha: Fl.ceilT(ta, p[0], p[1]), hb: Fl.ceilT(tb, p[0], p[1]) }); }
-    // (also where the two ceilings cross: the step changes sides there)
-    const all = [pts[0]];
-    for (let j = 1; j < pts.length; j++) { const a = pts[j - 1], c = pts[j], da = a.ha - a.hb, dc = c.ha - c.hb;
-      if (da * dc < 0 && Math.abs(da) > EPS && Math.abs(dc) > EPS) { const s = da / (da - dc), p = [a.p[0] + (c.p[0] - a.p[0]) * s, a.p[1] + (c.p[1] - a.p[1]) * s];
-        all.push({ s: ax ? p[0] : p[1], p, ha: a.ha + (c.ha - a.ha) * s, hb: a.hb + (c.hb - a.hb) * s, cross: true }); }
-      all.push(c); }
+    const all = edgeS(ta, tb, ax);
     for (let j = 0; j < all.length - 1; j++) {
       const a = all[j], c = all[j + 1], dm = (a.ha - a.hb) + (c.ha - c.hb);
       if (Math.abs(a.ha - a.hb) < 1e-5 && Math.abs(c.ha - c.hb) < 1e-5) continue;
@@ -624,47 +640,80 @@ function trims(plan, opts) {
     return true;
   };
   const rings = new Map(), joints = [];
-  const sweep = (s, k, a, b) => {
-    const P = prep[k], pr = PR[k], f = s.f, ch = Fl.chunkOf(s.tile[0], s.tile[1]), buf = bufs.get(ch, 't');
+  // per profile segment, once: its two vertex normals (in the profile's d, y) and v range
+  for (const k in prep) { const P = prep[k]; P.seg = [];
+    for (let q = 0; q < P.m - 1; q++) if (P.draw[q]) P.seg.push({ q, n0: P.vn(q, q), n1: P.vn(q + 1, q), sn: P.segN[q],
+      v0: P.v[0] + (P.v[1] - P.v[0]) * P.arcs[q] / P.total, v1: P.v[0] + (P.v[1] - P.v[0]) * P.arcs[q + 1] / P.total }); }
+  // straight runs: a moulding that goes on flat into the next face of the same wall line (same chunk, same height) is one sweep,
+  // so no butt rings are made inside it. joinNext(s, k): the face it continues into, or null
+  const joinNext = (s, k) => {
+    if (s.kind !== 'face') return null;
+    const lk = s.ends[1]; if (!lk || lk.cls !== 'flat' || lk.seg < 0) return null;
+    const g = S[lk.seg]; if (g.kind !== 'face' || !g.ends[0] || g.ends[0].seg !== s.i || g.t[0] !== s.t[0] || g.t[1] !== s.t[1] || g.n[0] !== s.n[0] || g.n[1] !== s.n[1]) return null;
+    const iv = IV[s.i][k], ig = IV[g.i][k]; if (!iv || !ig || iv[iv.length - 1][1] < s.len - 1e-6 || ig[0][0] > 1e-6 || !meets(s, 1, k)) return null;
+    if (Fl.chunkOf(s.tile[0], s.tile[1]) !== Fl.chunkOf(g.tile[0], g.tile[1])) return null;
+    if (k === 'cornice' && (s.f.hs || g.f.hs || Math.abs(s.top(s.len) - g.top(0)) > 1e-9)) return null;
+    return g;
+  };
+  // (s's first interval of k is the tail of a run that starts on an earlier face)
+  const isTail = (s, k) => { const lk = s.ends[0]; return !!(s.kind === 'face' && lk && lk.cls === 'flat' && lk.seg >= 0 && joinNext(S[lk.seg], k) === s); };
+  // sweep the run from lambda a on segment s0 to lambda b on segment s1 (s1 after s0 on one straight line, off1 metres on, or s0 itself)
+  const sweep = (s0, s1, off1, k, a, b) => {
+    const P = prep[k], pr = PR[k], s = s0, ch = Fl.chunkOf(s.tile[0], s.tile[1]), buf = bufs.get(ch, 't'), B = off1 + b, sx = s.t[0], sz = s.t[1], nx = s.n[0], nz = s.n[1];
     // each end: mitre (inside: -d at the end, +d at the start; outside: the other way), butt (flat, nothing to cap) or a capped stop
-    const endOf = (lam, e) => { const atEnd = e ? lam >= s.len - 1e-6 : lam <= 1e-6; if (!atEnd) return { m: 0, cap: true, cls: 'stop' };
-      const lk = s.ends[e], has = meets(s, e, k);
+    const endOf = (g, lam, e) => { const atEnd = e ? lam >= g.len - 1e-6 : lam <= 1e-6; if (!atEnd) return { m: 0, cap: true, cls: 'stop' };
+      const lk = g.ends[e], has = meets(g, e, k);
       if (lk.cls === 'inside') return { m: has ? (e ? -1 : 1) : 0, cap: false, cls: has ? 'inside' : 'butt-wall' };
       if (lk.cls === 'outside') return has ? { m: e ? 1 : -1, cap: false, cls: 'outside' } : { m: 0, cap: true, cls: 'stop' };
       return has ? { m: 0, cap: false, cls: 'flat' } : { m: 0, cap: true, cls: 'stop' }; };
-    const A = endOf(a, 0), Bn = endOf(b, 1);
-    // stations along the run: the ends, plus the gable's kinks for a cornice under a sloped top
+    const A = endOf(s0, a, 0), Bn = endOf(s1, b, 1);
+    // stations along the run: the ends, plus the gable's kinks for a cornice under a sloped top (never part of a longer run)
     const st = [a];
-    if (k === 'cornice' && s.kind === 'face' && s.f.hs) for (const u of FR) { const l = lamOf(s, u); if (l > a + 1e-6 && l < b - 1e-6) st.push(l); }
-    st.push(b); st.sort((x, y) => x - y);
-    const base = lam => k === 'skirting' ? 0 : k === 'cornice' ? s.top(clamp(lam, 0, s.len)) : (pr.y || 0);
-    const wpt = (lam, d, y) => [s.p0[0] + s.t[0] * lam + s.n[0] * d, y, s.p0[1] + s.t[1] * lam + s.n[1] * d];
-    const R = st.map((lam, j) => P.pts.map(([d, y]) => { const l = lam + (j === 0 ? A.m * d : j === st.length - 1 ? Bn.m * d : 0); return { p: wpt(l, d, base(lam) + y), l }; }));
-    for (let j = 0; j < R.length - 1; j++) for (let q = 0; q < P.m - 1; q++) {
-      if (!P.draw[q]) continue;
-      const n0 = P.vn(q, q), n1 = P.vn(q + 1, q), wn = nn => [s.n[0] * nn[0], nn[1], s.n[1] * nn[0]];
-      const v0 = P.v[0] + (P.v[1] - P.v[0]) * P.arcs[q] / P.total, v1 = P.v[0] + (P.v[1] - P.v[0]) * P.arcs[q + 1] / P.total;
-      const c = [R[j][q], R[j][q + 1], R[j + 1][q + 1], R[j + 1][q]], N = [wn(n0), wn(n1), wn(n1), wn(n0)], vv = [v0, v1, v1, v0];
-      // (wound by the segment's own normal, then each vertex gets its smoothed normal)
-      const sn = P.segN[q], segW = [s.n[0] * sn[0], sn[1], s.n[1] * sn[0]];
-      let nx = 0, ny = 0, nz = 0; for (let i = 0; i < 4; i++) { const p = c[i].p, r = c[(i + 1) % 4].p; nx += (p[1] - r[1]) * (p[2] + r[2]); ny += (p[2] - r[2]) * (p[0] + r[0]); nz += (p[0] - r[0]) * (p[1] + r[1]); }
-      if (Math.hypot(nx, ny, nz) < 1e-12) continue;
-      const flip = nx * segW[0] + ny * segW[1] + nz * segW[2] < 0, ids = c.map((cv, i) => buf.v(cv.p[0], cv.p[1], cv.p[2], N[i][0], N[i][1], N[i][2], (s.sw0 + cv.l) / L, vv[i]));
-      flip ? buf.ix.push(ids[0], ids[2], ids[1], ids[0], ids[3], ids[2]) : buf.ix.push(ids[0], ids[1], ids[2], ids[0], ids[2], ids[3]);
+    if (k === 'cornice' && s.kind === 'face' && s.f.hs) for (const u of FR) { const l = lamOf(s, u); if (l > a + 1e-6 && l < B - 1e-6) st.push(l); }
+    st.push(B); st.sort((x, y) => x - y);
+    const ns = st.length, m = P.m, py = pr.y || 0;
+    const base = lam => k === 'skirting' ? 0 : k === 'cornice' ? s.top(clamp(lam, 0, s.len)) : py;
+    // the stations' rings: flat arrays of x, y, z and lambda per profile point
+    const RX = new Float64Array(ns * m), RY = new Float64Array(ns * m), RZ = new Float64Array(ns * m), RL = new Float64Array(ns * m);
+    for (let j = 0; j < ns; j++) { const lam = st[j], by = base(lam), mm = j === 0 ? A.m : j === ns - 1 ? Bn.m : 0;
+      for (let q = 0; q < m; q++) { const d = P.pts[q][0], l = lam + mm * d, o = j * m + q;
+        RX[o] = s.p0[0] + sx * l + nx * d; RY[o] = by + P.pts[q][1]; RZ[o] = s.p0[1] + sz * l + nz * d; RL[o] = l; } }
+    const I4 = [0, 0, 0, 0];
+    for (let j = 0; j < ns - 1; j++) for (const g of P.seg) {
+      const q = g.q, o00 = j * m + q, o01 = o00 + 1, o11 = o01 + m, o10 = o00 + m;
+      // (wound by the segment's own normal: Newell's normal of the quad decides; each vertex gets its smoothed normal)
+      const wx = nx * g.sn[0], wy = g.sn[1], wz = nz * g.sn[0];
+      I4[0] = o00; I4[1] = o01; I4[2] = o11; I4[3] = o10; let cx = 0, cy = 0, cz = 0;
+      for (let i2 = 0; i2 < 4; i2++) { const p0 = I4[i2], p1 = I4[(i2 + 1) & 3]; cx += (RY[p0] - RY[p1]) * (RZ[p0] + RZ[p1]); cy += (RZ[p0] - RZ[p1]) * (RX[p0] + RX[p1]); cz += (RX[p0] - RX[p1]) * (RY[p0] + RY[p1]); }
+      if (cx * cx + cy * cy + cz * cz < 1e-24) continue;
+      const flip = cx * wx + cy * wy + cz * wz < 0, n0 = g.n0, n1 = g.n1, b0 = buf.count;
+      buf.v(RX[o00], RY[o00], RZ[o00], nx * n0[0], n0[1], nz * n0[0], (s.sw0 + RL[o00]) / L, g.v0);
+      buf.v(RX[o01], RY[o01], RZ[o01], nx * n1[0], n1[1], nz * n1[0], (s.sw0 + RL[o01]) / L, g.v1);
+      buf.v(RX[o11], RY[o11], RZ[o11], nx * n1[0], n1[1], nz * n1[0], (s.sw0 + RL[o11]) / L, g.v1);
+      buf.v(RX[o10], RY[o10], RZ[o10], nx * n0[0], n0[1], nz * n0[0], (s.sw0 + RL[o10]) / L, g.v0);
+      flip ? buf.ix.push(b0, b0 + 2, b0 + 1, b0, b0 + 3, b0 + 2) : buf.ix.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
     }
+    const ringAt = j => { const out = []; for (let q = 0; q < m; q++) { const o = j * m + q; out.push([RX[o], RY[o], RZ[o]]); } return out; };
     // end caps on stops
-    for (const [j, E, sgn] of [[0, A, -1], [R.length - 1, Bn, 1]]) {
+    for (const [j, E, sgn] of [[0, A, -1], [ns - 1, Bn, 1]]) {
       if (!E.cap) continue;
-      const lam = st[j], ring = P.ring.map(([d, y]) => wpt(lam, d, base(lam) + y)), nrm = [s.t[0] * sgn, 0, s.t[1] * sgn];
-      for (const [i0, i1, i2] of P.tris) {
-        const T3 = [ring[i0], ring[i1], ring[i2]];
-        poly(buf, T3, nrm, T3.map(p => [(s.sw0 + lam) / L + p[1] * 0, P.v[0] + (P.v[1] - P.v[0]) * 0.5]));
-      }
+      const lam = st[j], by = base(lam), ring = P.ring.map(([d, y]) => [s.p0[0] + sx * lam + nx * d, by + y, s.p0[1] + sz * lam + nz * d]), nrm = [sx * sgn, 0, sz * sgn];
+      const uu = (s.sw0 + lam) / L, vv = P.v[0] + (P.v[1] - P.v[0]) * 0.5;
+      for (const [i0, i1, i2] of P.tris) poly(buf, [ring[i0], ring[i1], ring[i2]], nrm, [[uu, vv], [uu, vv], [uu, vv]]);
     }
-    if (a <= 1e-6) rings.set(s.i + ':' + k + ':0', { cls: A.cls, ring: R[0].map(o => o.p), lam: a });                // (the segment's own ends only)
-    if (b >= s.len - 1e-6) rings.set(s.i + ':' + k + ':1', { cls: Bn.cls, ring: R[R.length - 1].map(o => o.p), lam: b });
+    if (a <= 1e-6) rings.set(s0.i + ':' + k + ':0', { cls: A.cls, ring: ringAt(0), lam: a });                // (the run's own ends only)
+    if (b >= s1.len - 1e-6) rings.set(s1.i + ':' + k + ':1', { cls: Bn.cls, ring: ringAt(ns - 1), lam: b });
   };
-  S.forEach((s, i) => { const o = IV[i]; for (const k of KINDS) if (o[k]) for (const [a, b] of o[k]) sweep(s, k, a, b); });
+  S.forEach((s, i) => { const o = IV[i]; for (const k of KINDS) if (o[k]) o[k].forEach(([a, b], n) => {
+    if (n === 0 && isTail(s, k)) return;
+    // follow the straight run on as far as it goes (it ends inside a face at a stop: that face's other intervals sweep on their own)
+    let last = s, lb = b, off = 0;
+    if (n === o[k].length - 1) for (let g = joinNext(last, k), guard = 0; g && g !== s && guard++ < 999; g = joinNext(last, k)) {
+      off += last.len; const ig = IV[g.i][k]; last = g; lb = ig[0][1];
+      if (ig.length > 1) break;
+    }
+    sweep(s, last, off, k, a, lb);
+  }); });
   // the joints, each once: the two rings that meet (for the tests: they must coincide, at 45 degrees on corners)
   for (const s of S) for (const e of [0, 1]) for (const k of KINDS) {
     const r = rings.get(s.i + ':' + k + ':' + e); if (!r || (r.cls !== 'inside' && r.cls !== 'outside' && r.cls !== 'flat')) continue;
@@ -864,7 +913,7 @@ function doorways(plan, kit, opts) {
   }
   for (const b of frameBuf.all()) { const m = meshOf(b, matOf(opts, 'frame', 'trim') || grey(), 'arch_frame_' + b.c, 'door_frame', b.c, { cast: opts.castShadow !== false }); if (m) group.add(m); }
   for (const b of headBuf.all()) { const m = meshOf(b, matOf(opts, 'header', 'wall') || grey(), 'arch_header_' + b.c, 'door_header', b.c, { cast: opts.castShadow !== false }); if (m) group.add(m); }
-  const res = finish({ doors, procedural, leafSize: { w: lb.max.x - lb.min.x, h: lb.max.y - lb.min.y, d: thick } }, group, t0);
+  const res = finish({ doors, procedural, leafSize: { w: lb.max.x - lb.min.x, h: lb.max.y - lb.min.y, d: thick }, headTop, hingeD }, group, t0);
   DOORS.list = doors; DOORS.res = res; DOORS.herQuiet = opts.herQuiet || null;
   return res;
 }

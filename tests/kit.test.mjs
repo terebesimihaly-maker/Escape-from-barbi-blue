@@ -183,11 +183,19 @@ for (let i = 0; i < 5; i++) for (const tier of TIERS) {
   const q = await b.newContext({ viewport: { width: 480, height: 300 } }).then(async c2 => {
     await c2.addInitScript(() => localStorage.setItem('bb_settings', JSON.stringify({ sens: 1, vol: 0.5, quality: 'low' })));
     const pg = await c2.newPage(); pg.on('pageerror', e => { console.log('  pageerror:', e.message); pageErrors.push(e.message); }); return pg; });
-  let blocked = true;
+  let blocked = true, blockCommon = true;
   await q.route('**/models/kit/lo/concrete.glb', r => blocked ? r.fulfill({ status: 404, body: 'not found' }) : r.continue());
+  await q.route('**/models/kit/lo/common.glb', r => blockCommon ? r.fulfill({ status: 404, body: 'not found' }) : r.continue());
   await q.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 120000 });
   await q.waitForFunction(() => !document.getElementById('play').disabled, null, { timeout: 120000, polling: 500 });
   await inject(q);
+  if (!await q.evaluate(() => typeof Arch !== 'undefined')) await q.addScriptTag({ url: '/js/arch.js' });
+  // common.glb failing: the kit works without its 5 nodes, and the next want() tries common again and adds them
+  const C1 = await q.evaluate(async () => { const k = await Kit.want('wood', 'lo'); return { k: !!k, partial: k && k.partial, conduit: k && k.has('Band_conduit') }; });
+  blockCommon = false;
+  const C2 = await q.evaluate(async () => { const k = await Kit.want('wood', 'lo'); return { same: k === Kit.get('wood', 'lo'), partial: k.partial, conduit: k.has('Band_conduit'), embers: k.has('Fix_fire_embers') }; });
+  check(C1.k && C1.partial && !C1.conduit, 'common.glb 404: the style kit still loads, marked partial (no common nodes)', C1);
+  check(C2.same && !C2.partial && C2.conduit && C2.embers, 'the next want() loads common again and adds its nodes to the cached kit', C2);
   const A = await q.evaluate(async () => {
     const got = await Kit.want('concrete', 'lo');
     bb.startFloor(2);
@@ -213,6 +221,9 @@ for (let i = 0; i < 5; i++) for (const tier of TIERS) {
   blocked = false;
   const B = await q.evaluate(async () => {
     const kit = await Kit.want('concrete', 'lo'), u = window.__up, old = u.R;
+    // the floor's walls as js/arch.js builds them without the kit (E7): every module face keeps its quad
+    const walls = Arch.walls(u.plan, { skipModules: false, tier: 'low' }); level.group.add(walls.group);
+    // 1. by default (walls with their module quads, nothing said): windows and the exit are not swapped in
     const R = Kit.upgradeInPlace(level, u.plan, { tier: 'lo', placeholders: true });
     const ab = __kt.aabbs(R), U = 0.045;
     const sameSolids = R.solids.length === old.solids.length && R.solids.every((s, i) => s.id === old.solids[i].id && ['x0', 'z0', 'x1', 'z1'].every(k => s.box[k] === old.solids[i].box[k])
@@ -220,19 +231,38 @@ for (let i = 0; i < 5; i++) for (const tier of TIERS) {
     const boardsNow = level.group.children.filter(o => o.children.some(c => /^Board(Short|Long)/.test(c.name)));
     const wards = closets.map(c => c.doors && c.doors[0].pivot.parent);
     await new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res)));      // (a couple of frames with the new pieces in the game)
-    return { kit: !!kit, ph: R.placeholder, levelKit: level.kit === R, oldGone: old.group.parent === null && old.disposed, newIn: R.group.parent === level.group, sameSolids,
+    const r1 = { kit: !!kit, ph: R.placeholder, levelKit: level.kit === R, oldGone: old.group.parent === null && old.disposed, newIn: R.group.parent === level.group, sameSolids,
       boards: boardsNow.length === u.boards.length && u.boards.every(o => boardsNow.includes(o)), paintings: level.paintings === u.paintings, doll: scares.doll === u.doll,
       wards: closets.length > 0 && wards.every((g, k) => g && g !== u.wards[k] && g.userData.kit && g.userData.kit.kind === 'wardrobe' && g.parent === level.group),
       hinges: closets.every(c => c.doors.length === 2 && c.doors.every(d => Math.abs(Math.abs(d.pivot.position.x) - 0.575) < 1e-9 && Math.abs(d.pivot.position.z - 0.305) < 1e-9)),
-      door: level.door !== u.door && level.door.kit === true && typeof level.door.setOpen === 'function' && level.door.group.parent === level.group && u.door.door.parent === null,
+      keptDoor: level.door === u.door && !level.door.kit, noWindows: !R.items.some(x => x.kind === 'window'), planWindows: (u.plan.windows || []).length,
       lights: __kt.lights(scene) === u.lights0, kitCount: R.kitCount, oldCount: old.kitCount };
+    // 2. with the walls given: windows and the exit go in, and the quads of the faces they cover are collapsed
+    const degenerate = fi => walls.faceVerts[fi].parts.filter(pt => pt.group !== 'upper' && pt.count).every(pt => {
+      const pa = walls.meshes[pt.mesh].geometry.attributes.position;
+      for (let k = pt.first; k < pt.first + pt.count; k++) if (pa.getX(k) !== pa.getX(pt.first) || pa.getY(k) !== pa.getY(pt.first) || pa.getZ(k) !== pa.getZ(pt.first)) return false;
+      return true; });
+    const R2 = await Kit.upgradeAsync(level, u.plan, { tier: 'lo', placeholders: true, walls });
+    const winFaces = R2.items.filter(x => x.kind === 'window').map(x => x.face), md = (u.plan.modules || []).find(m => m.kind === 'exit'), exitFace = md ? md.face : -1;
+    const covered = new Set(winFaces.concat(exitFace >= 0 ? [exitFace] : []));
+    const other = u.plan.faces.findIndex((f, i) => !f.skip && !covered.has(i) && walls.faceVerts[i].parts.some(pt => pt.group !== 'upper' && pt.count));
+    await new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res)));
+    const r2 = { async: R2 && level.kit === R2 && R.disposed, windows: winFaces.length, collapsed: R2.collapsed, winGone: winFaces.every(degenerate), exitFace,
+      exitGone: exitFace < 0 || degenerate(exitFace), otherKept: other >= 0 && !degenerate(other),
+      door: level.door !== u.door && level.door.kit === true && typeof level.door.setOpen === 'function' && level.door.group.parent === level.group && u.door.door.parent === null };
+    return Object.assign(r1, { r2 });
   });
   check(B.kit && !B.ph && B.levelKit && B.newIn && B.oldGone, 'upgradeInPlace: the kit arrives, the placeholders are swapped for kit pieces (the old group removed and disposed)', B);
   check(B.sameSolids, 'upgradeInPlace: the same solids, each still on its box');
   check(B.boards && B.paintings && B.doll, 'upgradeInPlace: boards, level.paintings and scares.doll are untouched (never a rebuild)', [B.boards, B.paintings, B.doll]);
   check(B.wards && B.hinges, 'upgradeInPlace: the wardrobes become kit wardrobes with the same hinges', [B.wards, B.hinges]);
-  check(B.door, 'upgradeInPlace: the exit door becomes the kit door (level.door with setOpen)');
+  check(B.keptDoor && B.noWindows, `upgradeInPlace on walls that still have their module quads: no windows (plan has ${B.planWindows}) and the old exit door stays (no z-fighting)`, B);
   check(B.lights, 'upgradeInPlace: the number of lights in the scene is unchanged (H12)');
+  const B2 = B.r2;
+  check(B2.async, 'upgradeAsync: compiles first, then swaps (level.kit is the new R, the old one disposed)', B2);
+  check(B2.door && B2.exitFace >= 0 && B2.exitGone, 'upgrade with opts.walls: the exit door becomes the kit door and its face quad is collapsed', B2);
+  check(B2.winGone && (B.planWindows === 0 || B2.windows > 0), `upgrade with opts.walls: ${B2.windows} windows placed, their face quads collapsed (${B2.collapsed} parts)`, B2);
+  check(B2.otherKept, 'upgrade with opts.walls: other faces keep their quads', B2);
   console.log(`  (upgrade: ${B.oldCount} -> ${B.kitCount} kit pieces)`);
   await q.context().close();
 }
@@ -286,6 +316,62 @@ for (const style of STYLES) {
   check(E.exitNull, `${style}: exit() is null without a kit`);
 }
 
+/* ---------- the exit leaf keeps each of its materials (wood, brass...) as its own copy ---------- */
+{
+  const X = await p.evaluate(() => {
+    const mk = (w, h, d, col, name) => { const g = new THREE.BoxGeometry(w, h, d); g.translate(w / 2, h / 2, 0); g.computeBoundingBox(); const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: col, name })); m.name = name; return m; };
+    const root = new THREE.Group(); root.name = 'Exit_wood';
+    const leaf = new THREE.Group(); leaf.name = 'Exit_leaf_wood'; leaf.position.set(-0.575, 0, 0);
+    const wood = mk(1.15, 2.3, 0.05, 0x553311, 'LeafWood'), brass = mk(0.05, 0.05, 0.08, 0xccaa33, 'LeafBrass'); brass.position.set(1.0, 1.0, 0.03);
+    leaf.add(wood); leaf.add(brass); root.add(leaf);
+    const kit = { style: 'wood', tier: 'lo', scene: root, common: null, nodes: { Exit_wood: root }, node: () => null, has: () => true, isPlaceholder: () => false, prims: new Map(), emitMats: new Map() };
+    const e = Kit.exit('wood', { kit, plan: { modules: [{ kind: 'exit', pos: [10, 0, 10], ry: 0, face: -1 }] } });
+    const mats = []; e.door.leaf.traverse(o => { if (o.isMesh) mats.push(o.material); });
+    let disposed = 0; for (const m of mats) m.addEventListener('dispose', () => disposed++);
+    const r = { names: mats.map(m => m.name + ':' + m.color.getHexString()), copies: mats.every(m => m !== wood.material && m !== brass.material), doorMesh: !!e.door.door.isMesh,
+      locked: e.door.lockedMat === e.door.door.material && e.door.lockedMat.name === 'LeafWood' && e.door.openMat === e.door.lockedMat };
+    e.door.dispose(); r.disposed = disposed; r.n = mats.length; return r;
+  });
+  check(X.names.sort().join() === 'LeafBrass:ccaa33,LeafWood:553311' && X.copies, 'exit leaf: each source material gets its own copy (the brass handle stays brass)', X.names);
+  check(X.doorMesh && X.locked, 'exit: level.door.door is the leaf\'s biggest mesh, lockedMat = openMat = its material copy');
+  check(X.disposed === X.n, 'exit: door.dispose() frees every material copy', X);
+}
+
+/* ---------- a floor's kit pieces are freed with the floor (disposeLevel's traversal skips userData.kit) ---------- */
+{
+  const F = await p.evaluate(async () => {
+    const kit = await Kit.want('workshop', 'lo');
+    bb.startFloor(4);
+    await new Promise(res => { const w = () => (bb.level && bb.level.grid === bb.grid ? res() : requestAnimationFrame(w)); w(); });
+    const plan = Dress.plan(Dress.envFromGame());
+    const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(70, 16 / 9, 0.05, 400); sc.add(new THREE.HemisphereLight(0xffffff, 0x222222, 1));
+    cam.position.set(GW * 1.125, 60, GH * 1.125); cam.lookAt(GW * 1.125, 0, GH * 1.125); cam.updateMatrixWorld(true);
+    // disposeLevel as level.js does it: take the group out of the scene, then free what isn't shared or the kit's
+    const disposeLevelLike = lv => { sc.remove(lv.group); const seen = new Set();
+      lv.group.traverse(o => { const u = o.userData; if (u.shared || u.sharedGeo || u.kit) return; if (o.geometry && !seen.has(o.geometry)) { seen.add(o.geometry); o.geometry.dispose(); }
+        for (const m of [].concat(o.material || [])) if (!seen.has(m)) { seen.add(m); m.dispose(); } });
+      if (lv.door) { lv.door.openMat.dispose(); lv.door.lockedMat.dispose(); } };
+    const cycle = () => {
+      const lv = { group: new THREE.Group(), door: null }; sc.add(lv.group);
+      const R = Kit.furnish(lv, plan, { tier: 'lo', evict: false });
+      const e = Kit.exit('workshop', { tier: 'lo', plan, level: lv }); if (e) { lv.group.add(e.group); lv.door = e.door; }
+      renderer.info.reset(); renderer.render(sc, cam);
+      const during = renderer.info.memory.geometries;
+      disposeLevelLike(lv); renderer.render(sc, cam);
+      return { during, after: renderer.info.memory.geometries, disposed: R.disposed, batches: R.owned.length,
+        // H22: every batch (instances, emissive parts, cords) within one 6x6-tile chunk
+        chunkBad: R.owned.filter(x => x.isInstancedMesh).filter(im => { const m = new THREE.Matrix4(), ks = new Set();
+          for (let j = 0; j < im.count; j++) { im.getMatrixAt(j, m); ks.add(Math.floor(m.elements[12] / 13.5) + ',' + Math.floor(m.elements[14] / 13.5)); } return ks.size > 1; }).map(im => im.name) };
+    };
+    renderer.render(sc, cam); const base0 = renderer.info.memory.geometries;
+    const c1 = cycle(), c2 = cycle(), c3 = cycle();       // (the first uploads the kit's own geometry, which stays: H21)
+    return { kit: !!kit, base0, c1, c2, c3 };
+  });
+  check(F.kit && F.c2.disposed && F.c2.during > F.c2.after, `floor left: furnish's pieces are freed by themselves when disposeLevel removes level.group (${F.c2.during} -> ${F.c2.after} GPU geometries)`, F);
+  check(F.c3.after === F.c2.after && F.c2.after === F.c1.after, 'floor after floor: GPU geometries come back to the same count (nothing leaks)', [F.c1, F.c2, F.c3].map(c => [c.during, c.after]));
+  check(F.c1.chunkBad.length === 0, 'every instanced batch, emissive parts and cords too, stays within one 6x6-tile chunk (H22)', F.c1.chunkBad);
+}
+
 /* ---------- memory: release() and evict() throw kits away ---------- */
 {
   const M = await p.evaluate(async () => {
@@ -302,12 +388,16 @@ for (const style of STYLES) {
     r.left = Kit.files().filter(f => f.state === 'done').map(f => f.tier + '/' + f.name).sort();
     r.woodReady = Kit.ready('wood', 'lo'); r.atticReady = Kit.ready('attic', 'lo'); r.mdReady = Kit.ready('wood', 'md');
     const again = await Kit.want('tile', 'lo'); r.again = !!again && Kit.ready('tile', 'lo');
+    // keep(): pinned styles (the lobby gate's floors) survive eviction until keep() changes
+    await Kit.want('attic', 'lo'); Kit.keep(['attic']); Kit.evict(['wood'], 'lo'); r.pinned = Kit.ready('attic', 'lo') && Kit.ready('wood', 'lo') && !Kit.ready('tile', 'lo');
+    Kit.keep([]); Kit.evict(['wood'], 'lo'); r.unpinned = !Kit.ready('attic', 'lo');
     return r;
   });
   check(M.n >= 1 && M.gd === M.geos && M.md === M.mats && M.td === M.texs && M.cd === 0, `release('tile') disposes its ${M.geos} geometries, ${M.mats} materials, ${M.texs} textures (not the common pieces)`, M);
   check(!M.ready && M.get === null, 'after release the kit is gone (ready false, get null)');
   check(M.left.join() === 'lo/common,lo/wood' && M.woodReady && !M.atticReady && !M.mdReady, 'evict([wood], lo) keeps only wood and the common pieces at lo', M.left);
   check(M.again, 'a released kit loads again on the next want()');
+  check(M.pinned && M.unpinned, 'Kit.keep([attic]): eviction keeps attic until keep() changes (E4 lobby gate vs E5)', M);
 }
 
 /* ---------- the URL flag ?kit=off ---------- */

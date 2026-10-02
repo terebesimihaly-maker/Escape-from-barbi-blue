@@ -7,7 +7,7 @@
    floor's seed (spec A14). No Math.random; the quality tier only sets the resolution (H7, H24). Every player sees the same dust.
 
    Surface.build(lv) -> {
-     ovAlbedo   ImageData (RGB multiply, alpha 255), plan space (row 0 = grid row 0, uv = (x / W, 1 - z / H): H14), 2048 / 1024 / 512 px
+     ovAlbedo   ImageData (RGB multiply, sRGB-encoded: the linear AO curves are applied to the decoded colour), plan space (row 0 = grid row 0, uv = (x / W, 1 - z / H): H14), 2048 / 1024 / 512 px
                 on the long side for high / medium / low: corner shade and the floor line (ao_profiles curves, built in until
                 textures/light/ao_profiles.json is loaded), contact shadows under boxes, wardrobes and floor-standing band pieces (H15:
                 under the flashlight a contact shadow must be in the albedo), floor decals (plan.decalSources.floor, and d.decals through
@@ -28,12 +28,17 @@
      maps       { ovAlbedo, ovSurf, tileInfo, ovCeil, detail, dustCol }: hand to MatLib.setLevelMaps (or spread the whole result)
      cpuSurf    { w, h, ppmX, ppmY, data (ovSurf's bytes, shared), dust(x, z), wet(x, z), clean(x, z) } (m): the CPU side of ovSurf
      decals     { group (one Mesh per 6 x 6 chunk that has decals), meshes, material, quads [{face, kind, src, corners [[x, y, z] x 4],
-                centre, half}], atlas {W, H, source 'procedural' | 'file'} }: merged quads 3 mm proud of their face (or of a servant
+                centre, half}], atlas {W, H, source 'procedural' | 'file', data | img, normal, rect(kind, id), texture(), normalTexture()} }: merged quads 3 mm proud of their face (or of a servant
                 run's inset, or a chimney breast's front), uv0 = the decal atlas rect, uv1 = the face's cell of the wall lightmap atlas,
                 so a decal is lit exactly like the wall behind it (MatLib.decalMaterial). Fitted inside their faces, <= 2 a face.
-     dustPrints InstancedMesh of 200 (ring buffer) at y = 0.003
+     dustPrints InstancedMesh of 200 shoe prints (ring buffer) at y = 0.003. Its children: her bare prints (a ring of 100) and the
+                floor's static prints (staticPrints), so adding dustPrints to the level adds them all
+     staticPrints { child, her }: InstancedMeshes, the child shoe prints beside some paths and her bare trail to a wardrobe (vh-placed,
+                crisp at every tier; ovSurf B holds only their soft smear)
      update(dt, actors)  every frame: actors [{x, z (m), id, kind ('player' | 'mate' | 'her' | 'child'...)}]; every 0.65 m of an actor's
-                walk a print where cpuSurf dust > 0.4 (not on rugs). Visual only. Her wet blue prints stay render.js's.
+                walk a print where cpuSurf dust > 0.4 (not on rugs or loose boards); her prints bare. Visual only. Returns this frame's
+                prints [{id, kind, x, z}]: render.js keeps its wet blue prints for her, but leaves one out where she left a dust print
+                (or wherever cpuSurf.dust(x, z) > 0.4)
      stats      { ms, w, h, paths, prints, wet, decals, ... };   dispose()   frees what build made (not the ImageData maps: MatLib owns
                 the textures it makes of them) }
    lv: the floor (Surface.lvFromData(d, {tier}) builds it from d; Surface.lvFromGame({tier, spawns, plan}) from the live globals):
@@ -42,11 +47,16 @@
      lv when missing), and optionally: cells (LightBaker's result.wallCells, else LightBaker.packAtlas gives the same), aoProfiles,
      materials { decal } (a decal material to use instead of MatLib.decalMaterial).
    Surface.load(tier) -> Promise: fetches textures/light/ao_profiles.json and the Blender decal atlas (textures/decals/decals.json and
-   decals_{albedo,normal}.<tier>.webp) once; later builds use them. Without them: built-in AO curves and a procedural decal atlas. */
+   decals_{albedo,normal}.<tier>.webp) once per tier; later builds use the last tier asked for.
+   Cost: the smooth layers are worked out at <= 1024 px (WORK_MAX) and scaled up for High; stats.T has the time per phase. Without them: built-in AO curves and a procedural decal atlas. */
 (function () {
 'use strict';
 
-const UM = 0.045, TU = 50, L = TU * UM, PT = 40, CH = 6, R_NAV0 = 13, PRINTS = 200, STEP = 0.65;
+const UM = 0.045, TU = 50, L = TU * UM, PT = 40, CH = 6, R_NAV0 = 13, PRINTS = 200, BARE_PRINTS = 100, STEP = 0.65, BOARD_LEN = 24, BOARD_W = 13;
+// the smooth layers (distances, paths, wet, dust) are worked out at most this many px on the long side and scaled up for High:
+// they change over 0.1 m and more, and doing them at 2048 px made High cost seconds (the crisp things, the canvas decals and the
+// prints, stay at full size)
+const WORK_MAX = 1024;
 const RES = [512, 1024, 2048], TIER = { low: 0, medium: 1, high: 2, lo: 0, md: 1, hi: 2 };
 const FACE_U = [0, 0.14, 0.5, 0.86, 1], DIRS4 = [[1, 0], [-1, 0], [0, 1], [0, -1]], PI = Math.PI;
 const STYLE_OF = ['wood', 'tile', 'concrete', 'attic', 'workshop'];
@@ -66,6 +76,40 @@ const vhOf = seed => (x, y, k) => hash(x, y, (Math.imul(k, 2654435761) ^ seed) |
 // a small seeded generator for the shapes inside one stain or crack (seeded from vh, so still pure)
 const rngOf = s => { let a = s >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
 const tierOf = t => def(TIER[String(t || 'low').toLowerCase()], 0);
+// sRGB <-> linear: ovAlbedo is uploaded as an sRGB texture, so a linear multiplier (the AO curves) is applied to the decoded colour
+// and encoded again: the GPU then multiplies by exactly the curve, and the floor meets the wall's own AO at the floor line
+const DEC = new Float32Array(256), ENC = new Uint8Array(4096);
+for (let c = 0; c < 256; c++) { const v = c / 255; DEC[c] = v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+for (let i = 0; i < 4096; i++) { const v = i / 4095; ENC[i] = Math.round(255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055)); }
+// bilinear resampling tables, n destination px from m source px (pixel centres line up): [i0, i1, frac]
+function resTab(n, m) {
+  const a0 = new Int32Array(n), a1 = new Int32Array(n), f = new Float32Array(n);
+  for (let i = 0; i < n; i++) { const x = clamp((i + 0.5) * m / n - 0.5, 0, m - 1), x0 = Math.floor(x); a0[i] = x0; a1[i] = Math.min(m - 1, x0 + 1); f[i] = x - x0; }
+  return [a0, a1, f];
+}
+// an RGBA byte image scaled up bilinearly: whole pixels as 32-bit words, two channels at a time (R B, then G A, 16 bits a lane),
+// weights in 1/256 (the same bytes on every machine: integer arithmetic only)
+function upsample4(src, sw, sh, dw, dh) {
+  const out = new Uint8ClampedArray(dw * dh * 4), S = new Uint32Array(src.buffer, src.byteOffset, sw * sh), O = new Uint32Array(out.buffer);
+  const [X0, X1, FXf] = resTab(dw, sw), [Y0, Y1, FYf] = resTab(dh, sh), FX = Int32Array.from(FXf, f => Math.round(f * 256)), FY = Int32Array.from(FYf, f => Math.round(f * 256));
+  const M = 0x00FF00FF, RND = 0x00800080;
+  const lerp = (p, q, f) => { const g = 256 - f;   // (two words -> one, both lane pairs)
+    const rb = (((p & M) * g + (q & M) * f + RND) >>> 8) & M, ga = ((((p >>> 8) & M) * g + ((q >>> 8) & M) * f + RND) >>> 8) & M; return (rb | (ga << 8)) >>> 0; };
+  for (let j = 0; j < dh; j++) { const r0 = Y0[j] * sw, r1 = Y1[j] * sw, fy = FY[j], o = j * dw;
+    for (let i = 0; i < dw; i++) { const x0 = X0[i], x1 = X1[i], fx = FX[i];
+      O[o + i] = lerp(lerp(S[r0 + x0], S[r0 + x1], fx), lerp(S[r1 + x0], S[r1 + x1], fx), fy); } }
+  return out;
+}
+// zero one channel of an RGBA (or 1-channel: stride 1) image where the pixel centre is inside any of the rects [x0, z0, x1, z1] (m)
+function maskRects(a, stride, ch, w, h, ppX, ppY, rects) {
+  for (const [x0, z0, x1, z1] of rects) {
+    const i0 = Math.max(0, Math.ceil(x0 * ppX - 0.5)), i1 = Math.min(w - 1, Math.floor(x1 * ppX - 0.5)), j0 = Math.max(0, Math.ceil(z0 * ppY - 0.5)), j1 = Math.min(h - 1, Math.floor(z1 * ppY - 0.5));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) a[(j * w + i) * stride + ch] = 0;
+  }
+}
+const onRugOf = (rugs, x, z) => rugs.some(r => { const dx = x - r.x, dz = z - r.z, c = Math.cos(r.rot || 0), s = Math.sin(r.rot || 0), a = dx * c - dz * s, b = dx * s + dz * c;
+  return Math.abs(a) < r.w / 2 + 0.05 && Math.abs(b) < r.l / 2 + 0.05; });
+const inRects = (rects, x, z) => { for (const r of rects) if (x > r[0] && x < r[2] && z > r[1] && z < r[3]) return true; return false; };
 
 /* ---------- AO curves: textures/light/ao_profiles.json when loaded, else the same built-in ones as js/lightbake.js ---------- */
 const AO_DEF = { inside: [0.42, 0.11], outside: [0.06, 0.05], floor: [0.32, 0.12], ceil: [0.28, 0.14], skirting: [0.22, 0.05], boxFloor: [0.55, 0.1], boxWall: [0.45, 0.13] };
@@ -107,7 +151,12 @@ function norm(lv) {
   const spawns = (lv.spawns && lv.spawns.length ? lv.spawns : [[TU * 1.5, TU * 1.5]]).map(s => [Math.floor(s[0] / TU), Math.floor(s[1] / TU)]);
   const puzzles = (lv.puzzles || []).map(p => ({ cell: [p.cell[0], p.cell[1]], dir: [p.dir[0], p.dir[1]] }));
   const fi = def(lv.floorIdx, def(lv.i, P.floorIdx)) | 0, style = lv.style || P.style || STYLE_OF[fi] || 'wood';
-  return { P, GW, GH, n, W, isW, solids, closets, notes, exit, spawns, puzzles, decals: lv.decals || [], style, fi, tier: tierOf(lv.tier || (typeof settings !== 'undefined' && settings.quality)),
+  // the loose floorboards (d.creaks [x, y, along, len] in u, or the game's {x, y, along, len}): their rectangles in m, a little grown.
+  // The 3D boards lie on the floor, so no wet runs under them and no dust print lands on them (as with rugs)
+  const boards = (lv.creaks || []).map(b => { const a = Array.isArray(b) ? { x: b[0], y: b[1], along: b[2], len: b[3] } : b, len = a.len || BOARD_LEN;
+    const hx = (a.along ? BOARD_W / 2 : len / 2) * UM + 0.04, hz = (a.along ? len / 2 : BOARD_W / 2) * UM + 0.04, cx = a.x * UM, cz = a.y * UM;
+    return [cx - hx, cz - hz, cx + hx, cz + hz]; });
+  return { P, GW, GH, n, W, isW, solids, closets, notes, exit, spawns, puzzles, boards, decals: lv.decals || [], style, fi, tier: tierOf(lv.tier || (typeof settings !== 'undefined' && settings.quality)),
     vh: vhOf(P.seed >>> 0) };
 }
 
@@ -174,10 +223,12 @@ function blur(R, r) {
       for (let i = -r; i <= r; i++) s += a[o + clamp(i, 0, w - 1)];
       for (let i = 0; i < w; i++) { tmp[i] = (s + (n >> 1)) / n; s += a[o + Math.min(w - 1, i + r + 1)] - a[o + Math.max(0, i - r)]; }
       a.set(tmp.subarray(0, w), o); }
-    for (let i = 0; i < w; i++) { let s = 0;
-      for (let j = -r; j <= r; j++) s += a[clamp(j, 0, h - 1) * w + i];
-      for (let j = 0; j < h; j++) { tmp[j] = (s + (n >> 1)) / n; s += a[Math.min(h - 1, j + r + 1) * w + i] - a[Math.max(0, j - r) * w + i]; }
-      for (let j = 0; j < h; j++) a[j * w + i] = tmp[j]; }
+    // (the vertical pass row by row, a running sum per column: the image is read in order, not a column at a time)
+    const sums = new Int32Array(w), out = new Uint8Array(w * h);
+    for (let j = -r; j <= r; j++) { const o = clamp(j, 0, h - 1) * w; for (let i = 0; i < w; i++) sums[i] += a[o + i]; }
+    for (let j = 0; j < h; j++) { const o = j * w, add = Math.min(h - 1, j + r + 1) * w, sub = Math.max(0, j - r) * w;
+      for (let i = 0; i < w; i++) { out[o + i] = (sums[i] + (n >> 1)) / n; sums[i] += a[add + i] - a[sub + i]; } }
+    a.set(out);
   }
 }
 function imageOf(data, w, h) {   // ImageData in a browser ({data, w, h} elsewhere: MatLib.dataTexture takes both)
@@ -232,31 +283,39 @@ function build(lv) {
   const t0 = now(), TM = {}, lap = k => { TM[k] = +(now() - t0).toFixed(1); }, E = norm(lv), { P, GW, GH, n, W, isW, vh, style } = E, idx = (x, y) => y * GW + x, stats = {};
   const N = RES[E.tier], ppt = N / Math.max(GW, GH), w = Math.max(1, Math.round(GW * ppt)), h = Math.max(1, Math.round(GH * ppt));
   const ppmX = w / (GW * L), ppmY = h / (GH * L), np = w * h, ao = aoCurves(lv.aoProfiles || assets.ao);
-  const noteT = new Uint8Array(n); for (const q of E.notes) if (q[0] >= 0 && q[1] >= 0 && q[0] < GW && q[1] < GH) noteT[idx(q[0], q[1])] = 1;
+  // the work grid: the smooth layers at <= WORK_MAX px (the full size below that), scaled up at the end when High asks for more
+  const NW = Math.min(N, WORK_MAX), pW = NW / Math.max(GW, GH), ww = Math.max(1, Math.round(GW * pW)), wh = Math.max(1, Math.round(GH * pW));
+  const wpX = ww / (GW * L), wpY = wh / (GH * L), nw = ww * wh, up = ww !== w || wh !== h;
+  const noteRects = E.notes.filter(q => q[0] >= 0 && q[1] >= 0 && q[0] < GW && q[1] < GH).map(q => [q[0] * L, q[1] * L, (q[0] + 1) * L, (q[1] + 1) * L]);
+  const dryRects = noteRects.concat(E.boards);             // (no wet on a note's tile, nor under a loose board)
   const tileSpace = P.identities && P.identities.tileSpace, spaces = (P.identities && P.identities.spaces) || [];
   const fpt = (f, u, d) => [f.x0 + (f.x1 - f.x0) * u + f.nx * d, f.z0 + (f.z1 - f.z0) * u + f.nz * d];
 
-  /* distances: to the walls (per pixel, from its tile's neighbours) and to the boxes (their footprints grown by 0.6 m), in cm */
+  /* distances (work grid): to the walls (per pixel, from its tile's neighbours) and to the boxes (their footprints grown by 0.6 m), in cm */
   // the neighbours of each tile as bits (1 W, 2 E, 4 N, 8 S, 16 NW, 32 NE, 64 SW, 128 SE), and a wall distance (m) from them
   const nb = new Uint8Array(n);
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) nb[idx(x, y)] = (isW(x - 1, y) ? 1 : 0) | (isW(x + 1, y) ? 2 : 0) | (isW(x, y - 1) ? 4 : 0) | (isW(x, y + 1) ? 8 : 0)
     | (isW(x - 1, y - 1) ? 16 : 0) | (isW(x + 1, y - 1) ? 32 : 0) | (isW(x - 1, y + 1) ? 64 : 0) | (isW(x + 1, y + 1) ? 128 : 0);
   const EX = [0, 0], wallD = (t, lx, lz) => {             // (EX: the distances to the nearest wall across x and across z)
     const b = nb[t], ex = Math.min(b & 1 ? lx : 9, b & 2 ? L - lx : 9), ez = Math.min(b & 4 ? lz : 9, b & 8 ? L - lz : 9); let d = ex < ez ? ex : ez;
-    // (the corner of a wall tile across the diagonal: an outside corner, or a pillar)
-    if (b & 16) d = Math.min(d, Math.hypot(lx, lz)); if (b & 32) d = Math.min(d, Math.hypot(L - lx, lz));
-    if (b & 64) d = Math.min(d, Math.hypot(lx, L - lz)); if (b & 128) d = Math.min(d, Math.hypot(L - lx, L - lz));
+    // (the corner of a wall tile across the diagonal: an outside corner, or a pillar; only within 0.6 m does it matter)
+    if (b & 240) { if (b & 16 && lx < d && lz < d) d = Math.min(d, Math.hypot(lx, lz)); if (b & 32 && L - lx < d && lz < d) d = Math.min(d, Math.hypot(L - lx, lz));
+      if (b & 64 && lx < d && L - lz < d) d = Math.min(d, Math.hypot(lx, L - lz)); if (b & 128 && L - lx < d && L - lz < d) d = Math.min(d, Math.hypot(L - lx, L - lz)); }
     EX[0] = ex; EX[1] = ez; return d; };
   const wallAt = (x, z) => { const tx = clamp(Math.floor(x / L), 0, GW - 1), ty = clamp(Math.floor(z / L), 0, GH - 1), t = idx(tx, ty); return W[t] ? 0 : wallD(t, x - tx * L, z - ty * L); };
-  const colT = new Int32Array(w), colL = new Float32Array(w);
-  for (let i = 0; i < w; i++) { const x = (i + 0.5) / ppmX; colT[i] = Math.min(GW - 1, Math.floor(x / L)); colL[i] = x - colT[i] * L; }
-  const dWall = new Uint8Array(np), dBox = new Uint8Array(np).fill(255), inside = new Float32Array(np).fill(1);
-  for (let j = 0; j < h; j++) { const z = (j + 0.5) / ppmY, ty = Math.min(GH - 1, Math.floor(z / L)), lz = z - ty * L, row = ty * GW;
-    for (let i = 0; i < w; i++) { const t = row + colT[i], k = j * w + i;
-      if (W[t]) { inside[k] = ao.inside[0]; continue; }
-      const d = wallD(t, colL[i], lz);
-      dWall[k] = d >= 2.55 ? 255 : Math.round(d * 100);
-      if (EX[0] < 0.6 && EX[1] < 0.6) inside[k] = cv(ao.inside, Math.hypot(EX[0], EX[1]));   // (an inside corner: the two walls' AO meet)
+  const colT = new Int32Array(ww), colL = new Float32Array(ww);
+  for (let i = 0; i < ww; i++) { const x = (i + 0.5) / wpX; colT[i] = Math.min(GW - 1, Math.floor(x / L)); colL[i] = x - colT[i] * L; }
+  // the shade (a linear multiplier): the floor line and inside corners here, box contact below. Under a wall tile it holds the floor
+  // line's own value at the wall, so scaling up never darkens the seam by blending in a wall pixel
+  const fLut = new Float32Array(256), bLut = new Float32Array(256), shade = new Float32Array(nw);
+  for (let c = 0; c < 256; c++) { fLut[c] = cv(ao.floor, c / 100); bLut[c] = cv(ao.boxFloor, c / 100); }
+  const dWall = new Uint8Array(nw), dBox = new Uint8Array(nw).fill(255);
+  for (let j = 0; j < wh; j++) { const z = (j + 0.5) / wpY, ty = Math.min(GH - 1, Math.floor(z / L)), lz = z - ty * L, row = ty * GW;
+    for (let i = 0; i < ww; i++) { const t = row + colT[i], k = j * ww + i;
+      if (W[t]) { shade[k] = fLut[0]; continue; }
+      const d = wallD(t, colL[i], lz), c = d >= 2.55 ? 255 : Math.round(d * 100);
+      dWall[k] = c; shade[k] = fLut[c];
+      if (EX[0] < 0.6 && EX[1] < 0.6) shade[k] *= cv(ao.inside, Math.hypot(EX[0], EX[1]));   // (an inside corner: the two walls' AO meet)
     } }
   const boxes = [];                                        // [x0, z0, x1, z1] m: what stands on the floor
   const boxAt = (x, z) => { let d = 9; for (const [x0, z0, x1, z1] of boxes) d = Math.min(d, Math.hypot(x < x0 ? x0 - x : x > x1 ? x - x1 : 0, z < z0 ? z0 - z : z > z1 ? z - z1 : 0)); return d; };
@@ -266,14 +325,15 @@ function build(lv) {
   for (const b of P.band || []) { if ((b.z0 || 0) > 0.15) continue; const f = P.faces[b.face]; if (!f) continue;
     const a = fpt(f, b.u0, 0), c = fpt(f, b.u1, b.depth); boxes.push([Math.min(a[0], c[0]), Math.min(a[1], c[1]), Math.max(a[0], c[0]), Math.max(a[1], c[1])]); }
   for (const [x0, z0, x1, z1] of boxes) {
-    const i0 = Math.max(0, Math.floor((x0 - 0.6) * ppmX)), i1 = Math.min(w - 1, Math.ceil((x1 + 0.6) * ppmX)), j0 = Math.max(0, Math.floor((z0 - 0.6) * ppmY)), j1 = Math.min(h - 1, Math.ceil((z1 + 0.6) * ppmY));
-    for (let j = j0; j <= j1; j++) { const z = (j + 0.5) / ppmY, dz = z < z0 ? z0 - z : z > z1 ? z - z1 : 0;
-      for (let i = i0; i <= i1; i++) { const x = (i + 0.5) / ppmX, dx = x < x0 ? x0 - x : x > x1 ? x - x1 : 0, d = Math.round(Math.hypot(dx, dz) * 100), k = j * w + i;
+    const i0 = Math.max(0, Math.floor((x0 - 0.6) * wpX)), i1 = Math.min(ww - 1, Math.ceil((x1 + 0.6) * wpX)), j0 = Math.max(0, Math.floor((z0 - 0.6) * wpY)), j1 = Math.min(wh - 1, Math.ceil((z1 + 0.6) * wpY));
+    for (let j = j0; j <= j1; j++) { const z = (j + 0.5) / wpY, dz = z < z0 ? z0 - z : z > z1 ? z - z1 : 0, dz2 = dz * dz;
+      for (let i = i0; i <= i1; i++) { const x = (i + 0.5) / wpX, dx = x < x0 ? x0 - x : x > x1 ? x - x1 : 0, d = Math.round(Math.sqrt(dx * dx + dz2) * 100), k = j * ww + i;
         if (d < dBox[k]) dBox[k] = d; } } }
+  for (let k = 0; k < nw; k++) if (dBox[k] < 60) shade[k] *= bLut[dBox[k]];
 
   lap('dist');
   /* B: the paths walked clean, A: their polish; child shoe prints beside some of them, her bare prints to a wardrobe */
-  const cut = cutsOf(E), routes = [], pathR = Raster(w, h, ppmX, ppmY), printR = Raster(w, h, ppmX, ppmY), herPrints = [];
+  const cut = cutsOf(E), routes = [], pathR = Raster(ww, wh, wpX, wpY), printR = Raster(ww, wh, wpX, wpY), herPrints = [], childPrints = [];
   const sp = E.spawns[0], route = (a, b, val) => { if (!a || !b) return; const p = bfsPathOn(E, cut, a[0], a[1], b[0], b[1]); if (p && p.length) routes.push({ tiles: [a].concat(p), val }); };
   route(sp, E.exit, 1);
   for (const q of E.puzzles) route(sp, q.cell, 1);
@@ -281,43 +341,55 @@ function build(lv) {
   for (const pr of (P.paths && P.paths.pairs) || []) route([pr[0], pr[1]], [pr[2], pr[3]], 0.75);
   routes.forEach((r, k) => { r.poly = polyOf(E, r.tiles, k % 7); const v = Math.round(255 * r.val);
     for (let s = 0; s + 1 < r.poly.length; s++) capsule(pathR, r.poly[s][0], r.poly[s][1], r.poly[s + 1][0], r.poly[s + 1][1], 0.35, v); });
-  blur(pathR, Math.max(1, Math.round(0.15 * 0.5 * (ppmX + ppmY))));
+  blur(pathR, Math.max(1, Math.round(0.15 * 0.5 * (wpX + wpY))));
+  // the static prints are crisp instances (staticPrints); here only their soft smear in the dust (B), which is all a few px can hold.
+  // Placed by exact distances, so the same prints at every resolution; never on a rug or a loose board (they'd be under it)
+  const free = (x, z) => !inRects(E.boards, x, z) && !onRugOf(P.rugs || [], x, z);
   // child shoe prints: beside three of the paths (0.5 m off the worn line, so they show in the dust), every 0.7 m
-  let nPrints = 0;
   routes.map((r, k) => [vh(k, 3, 1220), k]).filter(([, k]) => routes[k].val < 1).sort((a, b) => a[0] - b[0] || a[1] - b[1]).slice(0, 3).forEach(([, k]) => {
     const side = vh(k, 4, 1221) < 0.5 ? -1 : 1;
     // (left, right, left...: 0.35 m apart, so each foot every 0.7 m; never within 0.22 m of a wall or a box)
     along(routes[k].poly, 0.35, 0.2).forEach(([x, z, ux, uz], q) => { const foot = q & 1 ? 1 : -1, off = side * 0.5 + foot * 0.09, px = x - uz * off, pz = z + ux * off;
-      if (wallAt(px, pz) < 0.22 || boxAt(px, pz) < 0.22) return;     // (exact distances: the same prints at every resolution)
-      if (q >= 48) return;
-      footprint(printR, px, pz, ux, uz, false, 235, 0.85); nPrints++; }); });
+      if (q >= 48 || wallAt(px, pz) < 0.22 || boxAt(px, pz) < 0.22 || !free(px, pz)) return;
+      footprint(printR, px, pz, ux, uz, false, 235, 0.85); childPrints.push([px, pz, ux, uz]); }); });
   // her bare prints: the last six tiles of the way from the exit to one wardrobe, ending at its doors (about 13 m)
   const ht = P.paths ? P.paths.herTrail : -1, hc = E.closets[ht];
   if (hc && E.exit) { const p = bfsPathOn(E, cut, E.exit[0], E.exit[1], hc[0], hc[1]);
     if (p && p.length) { const tiles = [E.exit].concat(p).slice(-7), poly = polyOf(E, tiles, 5), end = poly[poly.length - 1];
       end[0] = (hc[0] + 0.5) * L - hc[2] * 0.35; end[1] = (hc[1] + 0.5) * L - hc[3] * 0.35;
       along(poly, 0.33, 0.1).forEach(([x, z, ux, uz], q) => { const foot = q & 1 ? 1 : -1, px = x - uz * foot * 0.1, pz = z + ux * foot * 0.1;
-        footprint(printR, px, pz, ux, uz, true, 245, 1.05); herPrints.push([px, pz, ux, uz]); nPrints++; }); } }
+        if (!free(px, pz)) return;
+        footprint(printR, px, pz, ux, uz, true, 245, 1.05); herPrints.push([px, pz, ux, uz]); }); } }
+  blur(printR, 1);
 
   lap('paths');
-  /* R: wet patches (the plan's, and by sinks), never on a note's tile */
-  const wetR = Raster(w, h, ppmX, ppmY), wets = (P.wet || []).slice();
-  for (const b of P.band || []) if (/sink|washstand|washtub/.test(b.id || b.node || '')) { const f = P.faces[b.face], q = fpt(f, b.u, b.depth + 0.35);
-    wets.push({ kind: 'sink', x: q[0], z: q[1], rx: 0.45, rz: 0.32, rot: Math.atan2(f.nz, f.nx), amount: 0.5, tile: [f.x, f.y] }); }
-  for (const s of E.solids) if (/wash|sink/.test(s.id || '')) { const cx = (s.x0 + s.x1) / 2 * UM, cz = (s.y0 + s.y1) / 2 * UM;
-    wets.push({ kind: 'sink', x: cx + 0.2, z: cz + ((s.y1 - s.y0) / 2 * UM + 0.3), rx: 0.4, rz: 0.3, rot: 0, amount: 0.45, tile: [Math.floor(cx / L), Math.floor(cz / L)] }); }
+  /* R: wet patches (the plan's, by sinks and washstands, and the workshop's sinks), never on a note's tile or under a loose board */
+  const wetR = Raster(ww, wh, wpX, wpY), wets = (P.wet || []).slice();
+  const bandWet = (b, amount) => { const f = P.faces[b.face]; if (!f) return; const q = fpt(f, b.u, b.depth + 0.35);
+    wets.push({ kind: 'sink', x: q[0], z: q[1], rx: 0.45, rz: 0.32, rot: Math.atan2(f.nz, f.nx), amount, tile: [f.x, f.y] }); };
+  // (a piece's open front: rot r turns it r x 90 degrees, its front +z at rot 0 (layout.js kitSize); 0.3 m out, a little to one side)
+  const frontWet = (s, amount, k) => { const th = (s.rot | 0) * PI / 2, fx = Math.round(Math.sin(th)), fz = Math.round(Math.cos(th)), cx = (s.x0 + s.x1) / 2 * UM, cz = (s.y0 + s.y1) / 2 * UM;
+    const reach = (fx ? (s.x1 - s.x0) : (s.y1 - s.y0)) / 2 * UM + 0.3, side = (vh(k, 7, 1237) - 0.5) * 0.5, x = cx + fx * reach + fz * side, z = cz + fz * reach - fx * side;
+    wets.push({ kind: 'sink', x, z, rx: 0.4, rz: 0.3, rot: Math.atan2(fz, fx) + PI / 2, amount, tile: [Math.floor(x / L), Math.floor(z / L)] }); };
+  for (const b of P.band || []) if (/sink|washstand|washtub/.test(b.id || b.node || '')) bandWet(b, 0.5);
+  E.solids.forEach((s, k) => { if (/wash|sink/.test(s.id || '')) frontWet(s, 0.45, k); });
+  if (style === 'workshop') {                              // (D3's workshop sinks: no sink in the kit, so by the benches and the paint shelves)
+    const cand = [];
+    E.solids.forEach((s, k) => { if (/workbench|sorting_table/.test(s.id || '')) cand.push([vh(k, 0, 1235), k, s, null]); });
+    (P.band || []).forEach((b, k) => { if (/paint_shelf|tool_wall/.test(b.id || b.node || '')) cand.push([vh(k, 1, 1235), k + 100000, null, b]); });
+    cand.sort((a, b) => a[0] - b[0] || a[1] - b[1]).slice(0, 1 + (vh(GW, GH, 1236) < 0.5 ? 1 : 0)).forEach(([, k, s, b]) => s ? frontWet(s, 0.5, k) : bandWet(b, 0.5));
+  }
   wets.forEach((q, k) => { const tx = q.tile ? q.tile[0] : Math.floor(q.x / L), ty = q.tile ? q.tile[1] : Math.floor(q.z / L);
     const wob = [0.16, vh(tx, ty, 1230) * 6.28, vh(tx, ty, 1231) * 6.28, vh(tx, ty, 1232) * 6.28];
     if (q.kind === 'drain') { ellipse(wetR, q.x, q.z, q.rx, q.rz, 0, Math.round(255 * q.amount), 0.12, false, wob); return; }
     ellipse(wetR, q.x, q.z, q.rx, q.rz, q.rot || 0, Math.round(255 * q.amount), 0.12, false, wob);
     if (q.kind === 'leak') ellipse(wetR, q.x, q.z, q.rx * 0.45, q.rz * 0.45, q.rot, Math.round(255 * Math.min(1, q.amount + 0.25)), 0.08);   // (wettest under the drip)
   });
-  for (let j = 0; j < h; j++) { const ty = Math.min(GH - 1, Math.floor((j + 0.5) / ppmY / L)); for (let i = 0; i < w; i++) {
-    const tx = Math.min(GW - 1, Math.floor((i + 0.5) / ppmX / L)); if (noteT[idx(tx, ty)]) wetR.a[j * w + i] = 0; } }
+  maskRects(wetR.a, 1, 0, ww, wh, wpX, wpY, dryRects);
 
   lap('wet');
   /* G: dust; clumps where the plan drops dust, plaster or rubble */
-  const D = P.dust || { base: 0.45, nearWall: 0.4, nearDist: 0.3, noiseKey: 1101 }, clumps = Raster(w, h, ppmX, ppmY);
+  const D = P.dust || { base: 0.45, nearWall: 0.4, nearDist: 0.3, noiseKey: 1101 }, clumps = Raster(ww, wh, wpX, wpY);
   for (const q of (P.decalSources && P.decalSources.floor) || []) if (q.kind === 'dust' || q.kind === 'plaster' || q.kind === 'rubble') {
     const tx = Math.floor(q.x / L), ty = Math.floor(q.z / L);
     ellipse(clumps, q.x, q.z, q.size / 2, q.size / 2 * 0.7, q.rot, q.kind === 'dust' ? 110 : 80, q.size * 0.25, true, [0.2, vh(tx, ty, 1240) * 6.28, vh(tx, ty, 1241) * 6.28, 1]); }
@@ -325,18 +397,21 @@ function build(lv) {
   for (let b = 0; b < nz; b++) for (let a = 0; a < nx; a++) lat[b * nx + a] = vh(a, b, D.noiseKey || 1101);
   const spMul = new Float32Array(n).fill(1);
   if (tileSpace) for (let t = 0; t < n; t++) { const s = spaces[tileSpace[t]]; if (s && s.dustMul) spMul[t] = s.dustMul; }
-  const surf = new Uint8ClampedArray(np * 4), wear = WEAR[style] ? 0.85 : 0, nd = D.nearDist || 0.3, nw = D.nearWall || 0.4;
-  const nearLut = new Float32Array(256), cAx = new Int32Array(w), cSx = new Float32Array(w);   // (per cm of distance; per column of the noise)
+  const surfW = new Uint8ClampedArray(nw * 4), wear = WEAR[style] ? 0.85 : 0, nd = D.nearDist || 0.3, nwl = D.nearWall || 0.4;
+  const nearLut = new Float32Array(256), cAx = new Int32Array(ww), cSx = new Float32Array(ww);   // (per cm of distance; per column of the noise)
   for (let c = 0; c < 256; c++) nearLut[c] = smooth(1 - c / 100 / nd);
-  for (let i = 0; i < w; i++) { const fx = (i + 0.5) / ppmX / NC; cAx[i] = Math.floor(fx); cSx[i] = smooth(fx - cAx[i]); }
-  for (let j = 0; j < h; j++) { const z = (j + 0.5) / ppmY, row = Math.min(GH - 1, Math.floor(z / L)) * GW, fz = z / NC, bz = Math.floor(fz), sz = smooth(fz - bz), r0 = bz * nx, r1 = r0 + nx;
-    for (let i = 0; i < w; i++) { const k = j * w + i, ax = cAx[i], sx = cSx[i];
+  for (let i = 0; i < ww; i++) { const fx = (i + 0.5) / wpX / NC; cAx[i] = Math.floor(fx); cSx[i] = smooth(fx - cAx[i]); }
+  for (let j = 0; j < wh; j++) { const z = (j + 0.5) / wpY, row = Math.min(GH - 1, Math.floor(z / L)) * GW, fz = z / NC, bz = Math.floor(fz), sz = smooth(fz - bz), r0 = bz * nx, r1 = r0 + nx;
+    for (let i = 0; i < ww; i++) { const k = j * ww + i, ax = cAx[i], sx = cSx[i];
       const n0 = lat[r0 + ax] + (lat[r0 + ax + 1] - lat[r0 + ax]) * sx, n1 = lat[r1 + ax] + (lat[r1 + ax + 1] - lat[r1 + ax]) * sx;
       const noise = n0 + (n1 - n0) * sz, dw = dWall[k], db = dBox[k], wet = wetR.a[k];
-      const dust = ((D.base + nw * nearLut[dw < db ? dw : db]) * spMul[row + colT[i]] * (0.7 + 0.6 * noise) + clumps.a[k] / 255) * (1 - 0.7 / 255 * wet);
+      const dust = ((D.base + nwl * nearLut[dw < db ? dw : db]) * spMul[row + colT[i]] * (0.7 + 0.6 * noise) + clumps.a[k] / 255) * (1 - 0.7 / 255 * wet);
       const o = k * 4, pth = pathR.a[k], pr = printR.a[k];
-      surf[o] = wet; surf[o + 1] = dust * 255 + 0.5; surf[o + 2] = pth > pr ? pth : pr; surf[o + 3] = pth * wear + 0.5;
+      surfW[o] = wet; surfW[o + 1] = dust * 255 + 0.5; surfW[o + 2] = pth > pr ? pth : pr; surfW[o + 3] = pth * wear + 0.5;
     } }
+  // High: scaled up (then the dry rects again, exactly, at the full size)
+  const surf = up ? upsample4(surfW, ww, wh, w, h) : surfW;
+  if (up) maskRects(surf, 4, 0, w, h, ppmX, ppmY, dryRects);
 
   lap('surf');
   /* tileInfo: albedo variant B where the paths wear the floor (and a few by vh), boards turned per region */
@@ -351,7 +426,7 @@ function build(lv) {
   }
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) { const t = idx(x, y), o = t * 4; tinfo[o + 3] = 255; if (W[t]) continue;
     let sum = 0, cnt = 0;                                  // (how worn: the path value over the tile's middle)
-    for (let j = Math.floor((y + 0.25) * L * ppmY); j < Math.ceil((y + 0.75) * L * ppmY) && j < h; j++) for (let i = Math.floor((x + 0.25) * L * ppmX); i < Math.ceil((x + 0.75) * L * ppmX) && i < w; i++) { sum += pathR.a[j * w + i]; cnt++; }
+    for (let j = Math.floor((y + 0.25) * L * wpY); j < Math.ceil((y + 0.75) * L * wpY) && j < wh; j++) for (let i = Math.floor((x + 0.25) * L * wpX); i < Math.ceil((x + 0.75) * L * wpX) && i < ww; i++) { sum += pathR.a[j * ww + i]; cnt++; }
     tinfo[o] = (cnt && sum / cnt > 110) || vh(x, y, 1301) < 0.1 ? 255 : 0;
     const ax = doorAx.get(t), sr = tileSpace ? spaceRot.get(tileSpace[t]) : null, st = straight(x, y);
     tinfo[o + 1] = ax ? (ax === 'x' ? 255 : 0) : sr && sr.passage && st ? (st === 'z' ? 255 : 0) : sr ? sr.rot : (st === 'z' ? 255 : 0);   // (a threshold lies across its doorway)
@@ -379,13 +454,16 @@ function build(lv) {
     g.setTransform(1, 0, 0, 1, 0, 0);
   }
   lap('canvas');
-  const pix = g ? g.getImageData(0, 0, w, h).data : null;
-  const fLut = new Float32Array(256), bLut = new Float32Array(256);
-  for (let c = 0; c < 256; c++) { fLut[c] = cv(ao.floor, c / 100); bLut[c] = cv(ao.boxFloor, c / 100); }
-  for (let k = 0; k < np; k++) {
-    const s = fLut[dWall[k]] * inside[k] * bLut[dBox[k]], o = k * 4;
-    alb[o] = pix ? s * pix[o] : s * 255; alb[o + 1] = pix ? s * pix[o + 1] : s * 255; alb[o + 2] = pix ? s * pix[o + 2] : s * 255; alb[o + 3] = 255;
-  }
+  // (the canvas colours are sRGB; the shade is linear: decode, multiply, encode)
+  const pix = g ? g.getImageData(0, 0, w, h).data : null, [X0, X1, FX] = resTab(w, ww), [Y0, Y1, FY] = resTab(h, wh);
+  for (let j = 0; j < h; j++) { const r0 = Y0[j] * ww, r1 = Y1[j] * ww, fy = FY[j];
+    for (let i = 0; i < w; i++) { let s;
+      if (up) { const fx = FX[i], a = shade[r0 + X0[i]], b = shade[r0 + X1[i]], c = shade[r1 + X0[i]], d = shade[r1 + X1[i]], t = a + (b - a) * fx; s = t + (c + (d - c) * fx - t) * fy; }
+      else s = shade[j * ww + i];
+      const o = (j * w + i) * 4, s4 = s * 4095 + 0.5;
+      if (pix && (pix[o] & pix[o + 1] & pix[o + 2]) !== 255) { alb[o] = ENC[(DEC[pix[o]] * s4) | 0]; alb[o + 1] = ENC[(DEC[pix[o + 1]] * s4) | 0]; alb[o + 2] = ENC[(DEC[pix[o + 2]] * s4) | 0]; }
+      else alb[o] = alb[o + 1] = alb[o + 2] = ENC[s4 | 0];
+      alb[o + 3] = 255; } }
 
   lap('albedo');
   /* ovCeil: half size, the plan's ceiling decals over white */
@@ -403,11 +481,11 @@ function build(lv) {
     dust(x, z) { const o = this.px(x, z); return surf[o + 1] / 255 * (1 - surf[o + 2] / 255); },
     wet(x, z) { return surf[this.px(x, z)] / 255; }, clean(x, z) { return surf[this.px(x, z) + 2] / 255; } };
   const maps = { ovAlbedo: imageOf(alb, w, h), ovSurf, tileInfo: imageOf(tinfo, GW, GH), ovCeil: imageOf(ceilPix, cw, chh), detail: detailTile(), dustCol: DUST_COL[style] || DUST_COL.wood };
-  const decals = wallDecals(E, lv), prints = dustPrints(E, cpuSurf);
+  const decals = wallDecals(E, lv), prints = dustPrints(E, cpuSurf, { child: childPrints, her: herPrints });
   lap('decals');
-  Object.assign(stats, { T: TM, w, h, ceil: [cw, chh], routes: routes.length, prints: nPrints, herPrints: herPrints.length, wet: wets.length, boxes: boxes.length,
-    decals: decals.quads.length, decalChunks: decals.meshes.length, ms: +(now() - t0).toFixed(1) });
-  return Object.assign({}, maps, { maps, cpuSurf, decals, dustPrints: prints.mesh, update: prints.update, routes: routes.map(r => r.tiles), stats,
+  Object.assign(stats, { T: TM, w, h, work: [ww, wh], ceil: [cw, chh], routes: routes.length, prints: childPrints.length + herPrints.length, childPrints: childPrints.length, herPrints: herPrints.length,
+    wet: wets.length, boxes: boxes.length, decals: decals.quads.length, decalChunks: decals.meshes.length, ms: +(now() - t0).toFixed(1) });
+  return Object.assign({}, maps, { maps, cpuSurf, decals, dustPrints: prints.mesh, staticPrints: prints.statics, update: prints.update, routes: routes.map(r => r.tiles), stats,
     dispose() { decals.dispose(); prints.dispose(); } });
 }
 
@@ -481,6 +559,8 @@ function paintDecalOwn(g, d) {
 }
 
 /* ---------- the detail tiles' stand-in (B9 dust_detail, wet_edge): 256 x 256, tileable value noise, made once ---------- */
+// (dust_detail averages about 0.5: MatLib's floor reads dust = G (1 - B) x detail x 1.6, so open floor stays half dusty and the thick
+// dust is along the walls and in the halls, as D2 means; a brighter tile buried the boards everywhere but on the paths)
 let detailCache = null;
 function detailTile() {
   if (detailCache) return detailCache;
@@ -490,7 +570,7 @@ function detailTile() {
     const a0 = v(ax, ay) + (v(ax + 1, ay) - v(ax, ay)) * sx, a1 = v(ax, ay + 1) + (v(ax + 1, ay + 1) - v(ax, ay + 1)) * sx; return a0 + (a1 - a0) * sy; };
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
     const dn = oct(x, y, 8, 1501) * 0.5 + oct(x, y, 32, 1502) * 0.3 + oct(x, y, 128, 1503) * 0.2, we = oct(x, y, 6, 1504) * 0.6 + oct(x, y, 24, 1505) * 0.4, o = (y * S + x) * 4;
-    d[o] = Math.round(clamp(0.25 + dn * 0.85, 0, 1) * 255); d[o + 1] = Math.round(clamp((we - 0.2) * 1.4, 0, 1) * 255); d[o + 3] = 255;
+    d[o] = Math.round(clamp(0.1 + dn * 0.8, 0, 1) * 255); d[o + 1] = Math.round(clamp((we - 0.2) * 1.4, 0, 1) * 255); d[o + 3] = 255;
   }
   return (detailCache = { data: d, w: S, h: S });
 }
@@ -591,21 +671,33 @@ function atlasFor(E, style) {
 }
 function wallDecals(E, lv) {
   const { P, GW, GH, tier } = E, F = P.faces, src = (P.decalSources && P.decalSources.wall) || [], quads = [], group = typeof THREE !== 'undefined' ? new THREE.Group() : null, meshes = [];
+  // (dispose frees only what this made: its geometry, and its own material with the atlas textures it made. MatLib also keeps the
+  // level's wall lightmap in that material's userData.disposables; that one stays MatLib's to free, in releaseLevel)
+  const own = [];
   const out = { group, meshes, quads, material: null, atlas: null, dispose() {
     for (const m of meshes) m.geometry.dispose();
-    if (out.material && out.ownMaterial) { const ds = out.material.userData.disposables || []; for (const t of ds) t.dispose(); if (out.material.map && !ds.includes(out.material.map)) out.material.map.dispose(); out.material.dispose(); } } };
+    for (const t of own.splice(0)) t.dispose();
+    if (out.material && out.ownMaterial) out.material.dispose(); } };
   if (group) group.name = 'SurfaceDecals';
   if (!src.length) return out;
   // the wall lightmap atlas cells (uv1): LightBaker's own wallCells when given, else packAtlas (the same cells as bake(), from the faces' h)
   let cells = lv.cells || lv.wallCells || null;
   if (!cells && typeof LightBaker !== 'undefined') { try { cells = LightBaker.packAtlas(F.map(f => ({ x0: f.x0, z0: f.z0, x1: f.x1, z1: f.z1, nx: f.nx, nz: f.nz, x: f.x, y: f.y, h: f.h })), ['lo', 'md', 'hi'][tier]).cells; } catch (e) { cells = null; } }
   const at = atlasFor(E, P.style || E.style); if (!at) return out;
-  out.atlas = { W: at.W, H: at.H, source: at.source };
+  // the atlas the quads' uv0 point into, with a texture factory, so a material handed in through lv.materials.decal can sample it
+  // (texture() makes a new texture each call: whoever calls it owns it)
+  out.atlas = { W: at.W, H: at.H, source: at.source, data: at.data || null, img: at.img || null, normal: at.normal || null, rect: at.rect,
+    texture() {
+      if (typeof THREE === 'undefined') return null;
+      if (at.data) return typeof MatLib !== 'undefined' ? MatLib.dataTexture(imageOf(at.data, at.W, at.H), { srgb: true }) : Object.assign(new THREE.CanvasTexture(imageOf(at.data, at.W, at.H)), { colorSpace: THREE.SRGBColorSpace });
+      const t = new THREE.CanvasTexture(at.img); t.colorSpace = THREE.SRGBColorSpace; return t; },
+    normalTexture() { return at.normal && typeof THREE !== 'undefined' ? new THREE.CanvasTexture(at.normal) : null; } };
   const NCX = Math.ceil(GW / CH), bufs = new Map();
   const topAt = (f, u) => { if (!f.hs) return f.h; let j = 0; while (j < 3 && u > FACE_U[j + 1]) j++; const s = (u - FACE_U[j]) / (FACE_U[j + 1] - FACE_U[j]); return f.hs[j] + (f.hs[j + 1] - f.hs[j]) * s; };
   for (const q of src) {
     const f = F[q.face], rect = at.rect(q.kind, q.id | 0); if (!f || !rect) continue;
-    const len = Math.hypot(f.x1 - f.x0, f.z1 - f.z0), asp = ASPECT[q.kind] || 1;
+    // (the decal's width / height: the atlas rect's own when it is Blender's, so nothing is stretched; the procedural one is made from ASPECT)
+    const len = Math.hypot(f.x1 - f.x0, f.z1 - f.z0), asp = at.source === 'file' && rect[3] > 0 ? rect[2] / rect[3] : ASPECT[q.kind] || 1;
     let hw = (asp >= 1 ? q.size : q.size * asp) / 2, hh = (asp >= 1 ? q.size / asp : q.size) / 2;
     const uc = q.u * len, vc = q.v, c = Math.cos(q.rot || 0), s = Math.sin(q.rot || 0);
     // fit it inside the face: shrink about its centre until every corner is within the face and under the ceiling line
@@ -632,13 +724,10 @@ function wallDecals(E, lv) {
   // the material: the integrator's, else MatLib's decal family (lit through uv1 like the wall), else a plain transparent one
   let mat = lv.materials && lv.materials.decal;
   if (!mat) {
-    let tex;
-    if (at.data) tex = typeof MatLib !== 'undefined' ? MatLib.dataTexture(imageOf(at.data, at.W, at.H), { srgb: true }) : Object.assign(new THREE.CanvasTexture(imageOf(at.data, at.W, at.H)), { colorSpace: THREE.SRGBColorSpace });
-    else { tex = new THREE.CanvasTexture(at.img); tex.colorSpace = THREE.SRGBColorSpace; }
-    let ntex = null; if (at.normal) ntex = new THREE.CanvasTexture(at.normal);
+    const tex = out.atlas.texture(), ntex = out.atlas.normalTexture();
     if (typeof MatLib !== 'undefined') mat = MatLib.decalMaterial({ map: tex, normalMap: ntex || undefined, tier: ['low', 'medium', 'high'][tier] });
     else mat = new THREE.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.02, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
-    const ds = mat.userData.disposables || (mat.userData.disposables = []); ds.push(tex); if (ntex) ds.push(ntex);
+    own.push(tex); if (ntex) own.push(ntex);
     out.ownMaterial = true;
   }
   out.material = mat;
@@ -654,34 +743,54 @@ function wallDecals(E, lv) {
   return out;
 }
 
-/* ---------- dust prints (D2): one InstancedMesh of 200, a ring buffer, stamped where the dust is thick ---------- */
-function dustPrints(E, cpu) {
-  const st = new Map(), rugs = E.P.rugs || [];
-  const none = { mesh: null, update() {}, dispose() {} };
-  if (typeof THREE === 'undefined') return none;
-  const c = canvas(64, 32), g = ctx2d(c);                  // (alpha map: white sole on black, an opaque canvas read as data in G)
-  if (!g) return none;
+/* ---------- prints (D2): the dust prints people leave (ring buffers), and the floor's static ones (crisp instances) ---------- */
+// the two soles as alpha maps (64 x 32, white on black: an opaque canvas, read by three's alphaMap from G). Toes to the right (+x)
+function soleTex(bare) {
+  const c = canvas(64, 32), g = ctx2d(c); if (!g) return null;
   g.fillStyle = '#000'; g.fillRect(0, 0, 64, 32); g.fillStyle = '#fff';
-  g.beginPath(); g.ellipse(39, 16, 20, 10, 0, 0, 7); g.fill(); g.beginPath(); g.ellipse(10, 16, 8.5, 7.5, 0, 0, 7); g.fill();
-  g.fillStyle = '#000'; for (let k = 0; k < 5; k++) g.fillRect(24 + k * 6, 8, 1.5, 16);   // (tread lines)
-  const tex = new THREE.CanvasTexture(c), geo = new THREE.PlaneGeometry(0.26, 0.11); geo.rotateX(-PI / 2);
-  const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, alphaMap: tex, transparent: true, opacity: 0.6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-  mat.userData.disposables = [tex];
-  if (typeof MatLib !== 'undefined') MatLib.withLightField(mat);
-  const mesh = new THREE.InstancedMesh(geo, mat, PRINTS); mesh.count = 0; mesh.frustumCulled = false; mesh.name = 'SurfDustPrints'; mesh.renderOrder = 1;
-  const col = new THREE.Color(0x4a4741); for (let i = 0; i < PRINTS; i++) mesh.setColorAt(i, col);
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-  let head = 0;
-  const onRug = (x, z) => rugs.some(r => { const dx = x - r.x, dz = z - r.z, c2 = Math.cos(r.rot || 0), s2 = Math.sin(r.rot || 0), a = dx * c2 - dz * s2, b = dx * s2 + dz * c2;
-    return Math.abs(a) < r.w / 2 + 0.05 && Math.abs(b) < r.l / 2 + 0.05; });
-  const stamp = (x, z, ang, kind) => {
-    const k = kind === 'her' ? 1.15 : kind === 'child' ? 0.8 : 1;
-    m4.compose(v.set(x, 0.003, z), q.setFromAxisAngle(up, -ang), sc.set(k, 1, k)); mesh.setMatrixAt(head, m4);
-    mesh.setColorAt(head, col.setHex(kind === 'her' ? 0x55524b : 0x4a4741)); head = (head + 1) % PRINTS;
-    mesh.count = Math.min(PRINTS, mesh.count + 1); mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  if (!bare) { g.beginPath(); g.ellipse(39, 16, 20, 10, 0, 0, 7); g.fill(); g.beginPath(); g.ellipse(10, 16, 8.5, 7.5, 0, 0, 7); g.fill();
+    g.fillStyle = '#000'; for (let k = 0; k < 5; k++) g.fillRect(24 + k * 6, 8, 1.5, 16); }     // (tread lines)
+  else { g.beginPath(); g.ellipse(38, 16.5, 11, 8.5, 0, 0, 7); g.fill(); g.beginPath(); g.ellipse(11, 16, 7.5, 6.5, 0, 0, 7); g.fill();   // (ball, heel)
+    g.beginPath(); g.ellipse(24, 19.5, 9, 3.6, 0, 0, 7); g.fill();                                // (the outer edge of the arch)
+    for (let t = 0; t < 5; t++) { g.beginPath(); g.arc(53 - Math.abs(t - 0.6) * 1.6, 8.5 + t * 3.9, t ? 2.1 : 3.1, 0, 7); g.fill(); } }   // (toes, the big one first)
+  return new THREE.CanvasTexture(c);
+}
+function dustPrints(E, cpu, statics) {
+  const st = new Map(), rugs = E.P.rugs || [], boards = E.boards || [];
+  const none = { mesh: null, statics: null, update() { return []; }, dispose() {} };
+  if (typeof THREE === 'undefined') return none;
+  const texS = soleTex(false), texB = soleTex(true); if (!texS || !texB) return none;
+  const geo = new THREE.PlaneGeometry(0.26, 0.11); geo.rotateX(-PI / 2);
+  const mats = [], meshes = [];
+  const meshOf = (tex, count, name, opacity) => {
+    const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, alphaMap: tex, transparent: true, opacity, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    if (typeof MatLib !== 'undefined') MatLib.withLightField(mat);
+    mats.push(mat);
+    const m = new THREE.InstancedMesh(geo, mat, Math.max(1, count)); m.count = 0; m.frustumCulled = false; m.name = name; m.renderOrder = 1; meshes.push(m); return m;
   };
-  const stamped = [];                                      // (the last ones, for the tests: [x, z, dust])
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+  const put = (m, i, x, z, ang, k, hex) => { m4.compose(v.set(x, 0.003, z), q.setFromAxisAngle(up, -ang), sc.set(k, 1, k)); m.setMatrixAt(i, m4); m.setColorAt(i, col.setHex(hex)); };
+  // the dynamic ones: shoes (player, teammates, a child) in dustPrints, a ring of 200; her bare feet in its child, a ring of 100
+  const mesh = meshOf(texS, PRINTS, 'SurfDustPrints', 0.6), bare = meshOf(texB, BARE_PRINTS, 'SurfDustPrintsBare', 0.55);
+  for (let i = 0; i < PRINTS; i++) mesh.setColorAt(i, col.setHex(0x4a4741));
+  for (let i = 0; i < BARE_PRINTS; i++) bare.setColorAt(i, col.setHex(0x55524b));
+  mesh.add(bare);
+  // the static ones (build's child shoe prints beside the paths, her bare trail to a wardrobe), placed once, also children of dustPrints
+  const sChild = meshOf(texS, statics.child.length, 'SurfChildPrints', 0.5), sHer = meshOf(texB, statics.her.length, 'SurfHerPrints', 0.5);
+  statics.child.forEach(([x, z, ux, uz], i) => put(sChild, i, x, z, Math.atan2(uz, ux), 0.85, 0x4a4741));
+  statics.her.forEach(([x, z, ux, uz], i) => put(sHer, i, x, z, Math.atan2(uz, ux), 1.05, 0x4d4f58));
+  sChild.count = statics.child.length; sHer.count = statics.her.length;
+  for (const m of [sChild, sHer]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; mesh.add(m); }
+  const heads = new Map([[mesh, 0], [bare, 0]]);
+  const stamp = (x, z, ang, kind) => {
+    const her = kind === 'her', m = her ? bare : mesh, N = her ? BARE_PRINTS : PRINTS, i = heads.get(m);
+    put(m, i, x, z, ang, her ? 1.1 : kind === 'child' ? 0.8 : 1, her ? 0x55524b : 0x4a4741); heads.set(m, (i + 1) % N);
+    m.count = Math.min(N, m.count + 1); m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true;
+  };
+  const stamped = [];                                      // (the last ones, for the tests: [x, z, dust, kind])
+  // -> this frame's prints [{id, kind, x, z}]: render.js leaves out its own (wet, blue) print for her where she left a dust print
   const update = (dt, actors) => {
+    const out = [];
     for (const a of actors || []) {
       if (!a || !Number.isFinite(a.x) || !Number.isFinite(a.z)) continue;
       const id = a.id !== undefined ? a.id : a.kind, s = st.get(id);
@@ -693,11 +802,14 @@ function dustPrints(E, cpu) {
       while (s.acc >= STEP) { s.acc -= STEP; s.foot = -s.foot;
         const back = s.acc, ux = Math.cos(s.ang), uz = Math.sin(s.ang), px = a.x - ux * back - uz * s.foot * 0.09, pz = a.z - uz * back + ux * s.foot * 0.09;
         const dust = cpu.dust(px, pz);
-        if (dust > 0.4 && !onRug(px, pz)) { stamp(px, pz, s.ang, a.kind); stamped.push([px, pz, dust]); if (stamped.length > PRINTS) stamped.shift(); } }
+        if (dust > 0.4 && !onRugOf(rugs, px, pz) && !inRects(boards, px, pz)) { stamp(px, pz, s.ang, a.kind); out.push({ id, kind: a.kind, x: px, z: pz });
+          stamped.push([px, pz, dust, a.kind]); if (stamped.length > PRINTS) stamped.shift(); } }
     }
+    return out;
   };
   mesh.userData.stamped = stamped;
-  return { mesh, update, dispose() { geo.dispose(); tex.dispose(); mat.dispose(); mesh.dispose && mesh.dispose(); } };
+  return { mesh, statics: { child: sChild, her: sHer }, update,
+    dispose() { geo.dispose(); texS.dispose(); texB.dispose(); for (const m of mats) m.dispose(); for (const m of meshes) if (m.dispose) m.dispose(); } };
 }
 
 /* ---------- lv from d, or from the live game ---------- */
@@ -713,24 +825,28 @@ function lvFromGame(o) {
   /* global grid, GW, GH, SOLIDS, closets, notes, decals, puzzles, exit, creaks, floorIdx, FLOORS */
   o = o || {};
   const env = Dress.envFromGame();
-  return Object.assign({}, env, { decals, spawns: o.spawns || null, tier: o.tier || (typeof settings !== 'undefined' ? settings.quality : 'low'), plan: o.plan || Dress.plan(env) });
+  // the spawns, when not handed in (applyFloor keeps no d.spawns): floors.js's rule, tile (2, 2) for a team, else (1, 1). Only the
+  // first spawn's tile matters here (where the clean paths start)
+  const team = typeof MP !== 'undefined' && MP.on && (MP.n || 1) > 1, sp = o.spawns || [[TU * (team ? 2.5 : 1.5), TU * (team ? 2.5 : 1.5)]];
+  return Object.assign({}, env, { decals, spawns: sp, tier: o.tier || (typeof settings !== 'undefined' ? settings.quality : 'low'), plan: o.plan || Dress.plan(env) });
 }
 
 /* ---------- Blender's data, when it's there ---------- */
-let loading = null;
+const loading = {};                                       // (one fetch per tier; the atlas in use is the last tier asked for)
+let wanted = null;
 function load(tier) {
-  if (loading) return loading;
-  const t = ['lo', 'md', 'hi'][tierOf(tier)];
+  const t = ['lo', 'md', 'hi'][tierOf(tier)]; wanted = t;
+  if (loading[t]) return loading[t].then(r => { if (wanted === t && r) assets.decals = r; return assets; });
   const json = url => fetch(url).then(r => r.ok ? r.json() : null).catch(() => null);
   const img = url => new Promise(res => { if (typeof Image === 'undefined') return res(null); const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = url; });
-  loading = Promise.all([json('textures/light/ao_profiles.json'), json('textures/decals/decals.json')]).then(([ao, dj]) => {
-    assets.ao = ao;
-    if (!dj) return assets;
-    return Promise.all([img('textures/decals/decals_albedo.' + t + '.webp'), img('textures/decals/decals_normal.' + t + '.webp')]).then(([albedo, normal]) => {
-      if (albedo) assets.decals = { entries: Array.isArray(dj) ? dj : dj.decals || [], albedo, normal }; return assets; });
+  loading[t] = Promise.all([json('textures/light/ao_profiles.json'), json('textures/decals/decals.json')]).then(([ao, dj]) => {
+    if (ao) assets.ao = ao;
+    if (!dj) return null;
+    return Promise.all([img('textures/decals/decals_albedo.' + t + '.webp'), img('textures/decals/decals_normal.' + t + '.webp')]).then(([albedo, normal]) =>
+      albedo ? { entries: Array.isArray(dj) ? dj : dj.decals || [], albedo, normal, tier: t } : null);
   });
-  return loading;
+  return loading[t].then(r => { if (wanted === t && r) assets.decals = r; return assets; });
 }
 
-window.Surface = { build, lvFromData, lvFromGame, load, bfsPath: bfsPathOn, vh: vhOf, aoCurves, assets: () => assets, KINDS };
+window.Surface = { build, lvFromData, lvFromGame, load, bfsPath: bfsPathOn, vh: vhOf, aoCurves, aoAt: cv, srgb: { DEC, ENC }, assets: () => assets, KINDS };
 })();

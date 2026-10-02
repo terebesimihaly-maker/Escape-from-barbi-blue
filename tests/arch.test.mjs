@@ -25,10 +25,63 @@ await p.evaluate(() => {
     const ok = (k, c, v) => { if (!c) put(k, v); };
     const isW = (x, y) => x < 0 || y < 0 || x >= GW || y >= GH || grid[y][x] === 1;
     const kit = kitOn && typeof Kit !== 'undefined' ? Kit.get(plan.style, 'lo') : null;
-    const W = Arch.walls(plan, o), C = Arch.ceilings(plan, o), T = Arch.trims(plan, o), Bm = Arch.beams(plan, o);
+    // (with the kit, faces whose module the kit has are left out; with no kit nothing is: E7)
+    const oK = kit ? Object.assign({ kit }, o) : o;
+    const W = Arch.walls(plan, oK), C = Arch.ceilings(plan, oK), T = Arch.trims(plan, oK), Bm = Arch.beams(plan, o);
     const r6 = v => Math.round(v * 1e4) / 1e4, key = (x, y, z) => r6(x) + ',' + r6(y) + ',' + r6(z);
     const roof = (x, z) => ceilAtXZ(x, z);
     info.ms = { walls: W.stats.ms, ceilings: C.stats.ms, trims: T.stats.ms, beams: Bm.stats.ms };
+
+    /* no kit (E7): every face keeps its quad, no ceiling tile is cut; walls + ceilings are watertight without T-junctions */
+    const W0 = Arch.walls(plan, o), C0 = Arch.ceilings(plan, o), T0 = Arch.trims(plan, o);
+    ok('no kit: every face keeps its wall quad (E7)', W0.faceVerts.every(r => r.parts.some(q => q.group !== 'upper')), W0.faceVerts.filter(r => !r.parts.some(q => q.group !== 'upper')).map(r => r.face).slice(0, 5));
+    ok('no kit: no ceiling tile cut', C0.cut.length === 0, C0.cut.length);
+    {
+      const T3 = [], q4 = v => Math.round(v * 1e4), key = p => q4(p[0]) + ',' + q4(p[1]) + ',' + q4(p[2]), E = new Map();
+      for (const res of [W0, C0]) for (const m of res.meshes) { const P = m.geometry.attributes.position, I = m.geometry.index;
+        for (let k = 0; k < I.count; k += 3) T3.push([0, 1, 2].map(j => { const v = I.getX(k + j); return [P.getX(v), P.getY(v), P.getZ(v)]; })); }
+      let degen = 0;
+      T3.forEach((t, ti) => { const u = [0, 1, 2].map(j => t[1][j] - t[0][j]), v = [0, 1, 2].map(j => t[2][j] - t[0][j]);
+        if (Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]) < 1e-8) degen++;
+        for (let j = 0; j < 3; j++) { const a = t[j], b = t[(j + 1) % 3], ka = key(a), kb = key(b), k = ka < kb ? ka + '|' + kb : kb + '|' + ka;
+          const e = E.get(k); if (e) e.n++; else E.set(k, { n: 1, a, b }); } });
+      ok('walls and ceilings: no degenerate triangles', degen === 0, degen);
+      // every edge used by one triangle only (off the floor) must be matched along its line by other such edges exactly, or it is a
+      // T-junction (covered by edges with other end points) or a hole (not covered)
+      const lines = new Map();
+      for (const e of E.values()) { if (e.n !== 1 || (Math.abs(e.a[1]) < 1e-6 && Math.abs(e.b[1]) < 1e-6)) continue;
+        let d = [0, 1, 2].map(j => e.b[j] - e.a[j]); const l = Math.hypot(...d); d = d.map(x => x / l);
+        const sg = Math.abs(d[0]) > 1e-9 ? Math.sign(d[0]) : Math.abs(d[1]) > 1e-9 ? Math.sign(d[1]) : Math.sign(d[2]); d = d.map(x => x * sg);
+        const ta = e.a[0] * d[0] + e.a[1] * d[1] + e.a[2] * d[2], tb = e.b[0] * d[0] + e.b[1] * d[1] + e.b[2] * d[2], c = [0, 1, 2].map(j => e.a[j] - d[j] * ta);
+        const lk = d.map(x => Math.round(x * 1e4)).join(',') + '@' + c.map(x => Math.round(x * 1e3)).join(',');
+        e.t0 = Math.min(ta, tb); e.t1 = Math.max(ta, tb); (lines.get(lk) || lines.set(lk, []).get(lk)).push(e); }
+      let tj = 0, open = 0;
+      for (const es of lines.values()) for (const e of es) {
+        let iv = [[e.t0, e.t1]];
+        for (const g of es) { if (g === e) continue; const nv = []; for (const [a, b] of iv) { if (g.t1 <= a + 1e-5 || g.t0 >= b - 1e-5) { nv.push([a, b]); continue; } if (g.t0 > a + 1e-5) nv.push([a, g.t0]); if (g.t1 < b - 1e-5) nv.push([g.t1, b]); } iv = nv; }
+        if (iv.reduce((s2, [a, b]) => s2 + b - a, 0) < 1e-5) { tj++; put('walls and ceilings: no T-junctions', [e.a, e.b].map(p => p.map(x => +x.toFixed(3)))); } else open++;
+      }
+      info.water = { tris: T3.length, tj, openEdges: open };
+    }
+
+    /* trims: the exit's door always stops skirting and dado; fireplace / exit faces keep their cornice above the module; peel stops the dado */
+    // trim triangles lying on face f's wall (0-0.2 m out), between heights y0 and y1, whose span along the wall overlaps (u0, u1)
+    // (a straight run is one sweep, so its triangles can span several faces: their extent counts, not their vertices)
+    const trimNear = (res, f, u0, u1, y0, y1) => { let c = 0; const tx = (f.x1 - f.x0) / L, tz = (f.z1 - f.z0) / L;
+      for (const m of res.meshes) { const P = m.geometry.attributes.position, I = m.geometry.index;
+        for (let k = 0; k < I.count; k += 3) { let lo = 1e9, hi = -1e9, in3 = true;
+          for (let j = 0; j < 3; j++) { const v = I.getX(k + j), x = P.getX(v), y = P.getY(v), z = P.getZ(v);
+            const dn = (x - f.x0) * f.nx + (z - f.z0) * f.nz - (f.inset || 0), u = ((x - f.x0) * tx + (z - f.z0) * tz) / L;
+            if (!(dn > -1e-4 && dn < 0.2 && y > y0 && y < y1)) { in3 = false; break; } lo = Math.min(lo, u); hi = Math.max(hi, u); }
+          if (in3 && hi > u0 && lo < u1) c++; } } return c; };
+    const PRs = Arch.profiles(plan.style), corH = PRs.cornice ? -Math.min(...PRs.cornice.pts.map(q => q[1])) : 0;
+    F.forEach((f, fi) => { const md = f.mod && f.mod.type !== 'window' ? plan.modules[f.mod.i] : null; if (!md) return;
+      if (md.kind === 'exit') { ok('trims: no skirting or dado across the exit door (kit or not)', trimNear(T0, f, 0.26, 0.74, -0.01, 1.3) === 0 && trimNear(T, f, 0.26, 0.74, -0.01, 1.3) === 0, fi); info.exitFaces = (info.exitFaces || 0) + 1; }
+      if ((md.kind === 'exit' || md.kind === 'fireplace') && PRs.cornice && kit && Math.min(...(f.hs || [f.h])) > 3.0 + corH + 0.05) {
+        ok('trims: the cornice runs on above an exit or fireplace module', trimNear(T, f, 0.1, 0.9, f.h - corH - 0.01, f.h + 0.01) > 0, [fi, md.kind, f.h]); info.fireCornice = (info.fireCornice || 0) + 1; } });
+    if (PRs.dado) for (const md of plan.modules) if (md.kind === 'peel') {
+      ok('trims: the dado rail stops at peeling paper', trimNear(T0, F[md.face], md.u0 + 0.01, md.u1 - 0.01, PRs.dado.y - 0.06, PRs.dado.y + 0.06) === 0, [md.face, md.u0, md.u1]); info.peels = (info.peels || 0) + 1; }
+    for (const r of [W0, C0, T0]) r.dispose();
 
     /* uv1: the atlas cells are LightBaker's, exactly */
     const pa = LightBaker.packAtlas(B.faces, 'lo', LightBaker.faceHeights(B)), bk = LightBaker.bake(B, 'lo');
@@ -114,7 +167,8 @@ await p.evaluate(() => {
           for (const vi of [a, bb, cc]) {
             const x = P.getX(vi), y = P.getY(vi), z = P.getZ(vi), ex = onX ? 0 : Math.sign(cx - x) * 1e-5, ez = onX ? Math.sign(cz - z) * 1e-5 : 0;   // (nudged along the edge too)
             const ha = roof(x + dn[0] * 1e-5 + ex, z + dn[1] * 1e-5 + ez), hb = roof(x - dn[0] * 1e-5 + ex, z - dn[1] * 1e-5 + ez);
-            ok('step vertices sit on one of the two ceiling edges (no gap)', Math.abs(y - ha) < 1e-4 || Math.abs(y - hb) < 1e-4, [x, y, z, ha, hb]);
+            // (or at 3.0 m between them where the step ends at a wall: the wall's main / upper band split, shared)
+            ok('step vertices sit on one of the two ceiling edges (no gap)', Math.abs(y - ha) < 1e-4 || Math.abs(y - hb) < 1e-4 || (Math.abs(y - 3) < 1e-9 && y > Math.min(ha, hb) && y < Math.max(ha, hb)), [x, y, z, ha, hb]);
           }
         }
       }
@@ -185,6 +239,11 @@ await p.evaluate(() => {
         ok('beam top under the ceiling', 'beams stop at the walls (never through a wall tile)', q.y1 <= roof(x, z) + 0.02, [q.kind, x, z, q.y1, roof(x, z)]); }
     }
     info.beams = bk2;
+    // low beams stop 0.10 m short of a doorway tile's edge along its passage (the leaves reach past the tile)
+    for (const q of Bm.pieces) { if (q.kind === 'post' || q.y0 >= 2.56) continue; const ax = Math.abs(q.x1 - q.x0) > 1e-6, a0 = ax ? Math.min(q.x0, q.x1) : Math.min(q.z0, q.z1), a1 = ax ? Math.max(q.x0, q.x1) : Math.max(q.z0, q.z1), c = ax ? q.z0 : q.x0;
+      for (const dw of plan.doorways) { if (!dw.leaves.length || (dw.axis === 'x') !== ax) continue; const e0 = (ax ? dw.x : dw.y) * L, c0 = (ax ? dw.y : dw.x) * L;
+        if (c < c0 || c > c0 + L) continue;
+        ok('low beams stop 0.10 m short of a doorway tile', !(a1 > e0 - 0.1 + 1e-6 && a1 <= e0 + 1e-6) && !(a0 < e0 + L + 0.1 - 1e-6 && a0 >= e0 + L - 1e-6), [q.kind, a0, a1, dw.x, dw.y]); } }
     let bMin = 1e9; Bm.group.traverse(m => { if (m.isMesh) bMin = Math.min(bMin, m.geometry.boundingBox.min.y); });
     const pMin = Math.min(1e9, ...Bm.pieces.filter(q => q.kind !== 'post').map(q => q.y0));
     if (Bm.pieces.some(q => q.kind !== 'post') && !Bm.pieces.some(q => q.kind === 'post')) ok('beam meshes no lower than the plan\'s beams', bMin >= pMin - 1e-6, [bMin, pMin]);
@@ -205,12 +264,19 @@ await p.evaluate(() => {
           const wall = cA + lf.side * L / 2, m4 = new THREE.Matrix4(), corner = new THREE.Vector3();
           let tip = 0, near = 1e9, al = 1e9, y0 = 1e9, y1 = -1e9;
           for (const im of lf.ims) { im.getMatrixAt(lf.k, m4); const bx = im.geometry.boundingBox || (im.geometry.computeBoundingBox(), im.geometry.boundingBox);
+            im.updateMatrix(); m4.premultiply(im.matrix);                     // (the side +1 leaf's mesh carries the mirror)
+            ok(label + ': side +1 leaves mirrored, side -1 not (B1)', (m4.determinant() < 0) === (lf.side > 0), [d.x, d.y, lf.side]);
+            // the leaf's top edge (both faces, 11 points) never inside a beam
+            for (const zz of [bx.min.z, bx.max.z]) for (let k = 0; k <= 10; k++) { corner.set(bx.min.x + (bx.max.x - bx.min.x) * k / 10, bx.max.y, zz).applyMatrix4(m4);
+              for (const q of Bm.pieces) { if (q.kind === 'post') continue; const hw = q.w / 2, ax = Math.abs(q.x1 - q.x0) > 1e-6;
+                if (corner.y > q.y0 && corner.y < q.y1 && (ax ? corner.x > Math.min(q.x0, q.x1) && corner.x < Math.max(q.x0, q.x1) && Math.abs(corner.z - q.z0) < hw : corner.z > Math.min(q.z0, q.z1) && corner.z < Math.max(q.z0, q.z1) && Math.abs(corner.x - q.x0) < hw)) {
+                  put(label + ': leaf never inside a beam', [d.x, d.y, lf.side, +lf.angle.toFixed(1), q.kind]); break; } } }
             for (let c = 0; c < 8; c++) { corner.set(c & 1 ? bx.max.x : bx.min.x, c & 2 ? bx.max.y : bx.min.y, c & 4 ? bx.max.z : bx.min.z).applyMatrix4(m4);
               const xyz = [corner.x, corner.y, corner.z], dw = Math.abs(xyz[across] - wall); tip = Math.max(tip, dw); near = Math.min(near, dw);
               al = Math.min(al, (xyz[along] - cB) * d.swing); y0 = Math.min(y0, corner.y); y1 = Math.max(y1, corner.y); } }
           ok(label + ': leaf tip <= 0.45 m from its side wall (H11)', tip <= 0.45 + 1e-6, [d.x, d.y, lf.side, lf.angle, tip]);
           ok(label + ': leaf stays out of the wall', near >= 0.02, [d.x, d.y, lf.side, near]);
-          ok(label + ': leaf on its swing side, beyond the lining', al >= 0.17 - 1e-4, [d.x, d.y, lf.side, al]);
+          ok(label + ': leaf on its swing side, beyond the lining and its architraves', al >= res.hingeD - 1e-4 && res.hingeD >= 0.19 - 1e-6, [d.x, d.y, lf.side, al, res.hingeD]);
           ok(label + ': leaf from the floor up to 2.55 m, under the header', y0 > -1e-4 && y1 <= 2.6, [y0, y1]);
           worst = Math.max(worst, tip); tips.push(tip);
         }
@@ -226,6 +292,8 @@ await p.evaluate(() => {
       ok(label + ': a side board pins that leaf at 90 degrees', D.doors.every(q => q.leaves.every(lf => lf.pin === !!q.d.leaves.find(x => x.side === lf.side).pin && (!lf.pin || lf.angle === 90))));
       ok(label + ': kit pieces are shared (H21)', !k || D.group.children.filter(m => /frame|leaf/.test(m.userData.arch || '')).every(m => m.userData.shared && m.userData.kit));
       const rest = leafCheck(D, label + ' at rest');
+      // the header starts on the frame head's top, never coplanar with its soffit at 2.60 m
+      D.group.traverse(m => { if (m.isMesh && m.userData.arch === 'door_header') ok(label + ': header from the frame head\'s top (no soffit at 2.60 m)', m.geometry.boundingBox.min.y >= D.headTop - 1e-6 && D.headTop > 2.6 + 0.03, [m.geometry.boundingBox.min.y, D.headTop]); });
       // the animation: someone walks up to the first door with leaves, waits, leaves; the sway runs on every other door
       const door = D.doors.find(q => q.leaves.some(lf => !lf.pin)), heard = [];
       const sfx = (kind, at, vol, soft) => heard.push({ kind, vol, soft, at });
@@ -244,6 +312,14 @@ await p.evaluate(() => {
       creaks.push(heard.length); doorRes.push({ label, rest: +rest.toFixed(4), worst: +worst.toFixed(4), phase, procedural: D.procedural, draws: D.stats.draws, tris: D.stats.tris });
       D.dispose();
     }
+    // with no sfx given, the game's own sfx (js/audio.js) creaks; null is silent
+    { const D = Arch.doorways(plan, null, Object.assign({ herQuiet: () => 0 }, o)), door = D.doors.find(q => q.leaves.length), orig = sfx.creak; let calls = 0, nulls = 0;
+      sfx.creak = () => { calls++; };
+      try { for (let s2 = 0; s2 < 1; s2 += 0.05) Arch.updateDoors(0.05, [{ x: door.cx, z: door.cz }]); } finally { sfx.creak = orig; }
+      const D2 = Arch.doorways(plan, null, Object.assign({ herQuiet: () => 0 }, o)), door2 = D2.doors.find(q => q.leaves.length);
+      sfx.creak = () => { nulls++; };
+      try { for (let s2 = 0; s2 < 1; s2 += 0.05) Arch.updateDoors(0.05, [{ x: door2.cx, z: door2.cz }], null); } finally { sfx.creak = orig; }
+      ok('updateDoors without sfx creaks through the game\'s sfx; null is silent', calls === 1 && nulls === 0, [calls, nulls]); D.dispose(); D2.dispose(); }
     // muted while she is quiet
     { const D = Arch.doorways(plan, null, Object.assign({ herQuiet: () => 1 }, o)), heard = [], door = D.doors.find(q => q.leaves.length);
       for (let s = 0; s < 1; s += 0.05) Arch.updateDoors(0.05, [{ x: door.cx, z: door.cz }], () => heard.push(1));
@@ -252,8 +328,13 @@ await p.evaluate(() => {
 
     /* modules: the kit's pieces where the plan put them */
     if (kit) {
-      const M = Arch.modules(plan, kit, o);
+      const Mn = Arch.modules(plan, kit, o);
+      ok('modules: windows only when asked (Kit.furnish owns them)', Mn.placed.every(q => q.kind !== 'window'), Mn.placed.filter(q => q.kind === 'window').length); Mn.dispose();
+      const M = Arch.modules(plan, kit, Object.assign({ windows: true }, o));
       const want = plan.windows.length + plan.modules.filter(m => m.kind !== 'exit').length;
+      // its wall parts' geometry is the floor's own: not tagged shared / kit, freed by dispose()
+      let wsN = 0, wsTag = 0, wsFreed = 0;
+      M.group.traverse(m => { if (m.isMesh && m.userData.arch === 'wallsurface') { wsN++; if (m.userData.shared || m.userData.kit || m.userData.sharedGeo) wsTag++; m.geometry.addEventListener('dispose', () => wsFreed++); } });
       ok('modules: every plan window and module placed (or reported missing)', M.placed.length + M.missing.length === want, [M.placed.length, M.missing.length, want]);
       for (const q of M.placed) {
         const src = q.kind === 'window' ? plan.windows.find(w => w.face === q.face) : plan.modules.find(m => m.kind === q.kind && m.x === q.x && m.y === q.y && m.face === q.face);
@@ -264,15 +345,20 @@ await p.evaluate(() => {
         q.obj.traverse(m => { if (m.isMesh && m.userData.arch === 'wallsurface') { const c = W.cells[q.face], U1 = m.geometry.attributes.uv1;
           for (let v = 0; v < U1.count; v++) ok('module wall part: uv1 in its face\'s cell', U1.getX(v) >= c.u0 - 1e-6 && U1.getX(v) <= c.u0 + c.su + 1e-6 && U1.getY(v) >= c.v0 - 1e-6 && U1.getY(v) <= c.v0 + c.H * c.sv + 1e-6, q.kind); } });
       }
-      info.modules = { placed: M.placed.length, missing: [...new Set(M.missing)], draws: M.stats.draws, tris: M.stats.tris };
+      info.modules = { placed: M.placed.length, missing: [...new Set(M.missing)], draws: M.stats.draws, tris: M.stats.tris, wallParts: wsN };
       M.dispose();
+      ok('modules: wall parts own their geometry (not shared) and dispose() frees it', wsTag === 0 && wsFreed === wsN, [wsN, wsTag, wsFreed]);
+      // everything at once, and again (the kit arriving later)
+      const A1 = Arch.build(plan, kit, o), A2 = Arch.rebuild(A1, plan, kit, o);
+      ok('Arch.build / rebuild: all six parts in one group, rebuild disposes the old one', ['walls', 'ceilings', 'trims', 'beams', 'doorways', 'modules'].every(k => A2[k] && A2[k].group.parent === A2.group) && !A1.group.parent && A2.stats.draws > 0);
+      A2.dispose();
     }
 
     /* the same plan builds the same geometry */
     const sig = res => { let h = 0x811c9dc5; res.group.traverse(m => { if (!m.isMesh) return; const a = m.geometry.attributes.position.array;
       for (let k = 0; k < a.length; k += 7) { h ^= Math.round(a[k] * 1e4); h = Math.imul(h, 16777619); } }); return h >>> 0; };
     const plan2 = Dress.plan(Dress.envFromData(JSON.parse(JSON.stringify(d)))), o2 = { bake: Dress.bakeInput(plan2, Dress.envFromData(d)), tier: 'lo' };
-    const W2 = Arch.walls(plan2, o2), C2 = Arch.ceilings(plan2, o2), T2 = Arch.trims(plan2, o2);
+    const o2k = kit ? Object.assign({ kit }, o2) : o2, W2 = Arch.walls(plan2, o2k), C2 = Arch.ceilings(plan2, o2k), T2 = Arch.trims(plan2, o2k);
     ok('same floor -> identical walls, ceilings and trims', sig(W) === sig(W2) && sig(C) === sig(C2) && sig(T) === sig(T2));
     for (const r of [W2, C2, T2]) r.dispose();
 
@@ -304,6 +390,7 @@ for (const [i, n, seed] of runs) {
   console.log(`     draws/tris: walls ${I.counts.walls.draws}/${I.counts.walls.tris} (${I.counts.walls.chunks} chunks), ceilings ${I.counts.ceilings.draws}/${I.counts.ceilings.tris}, trims ${I.counts.trims.draws}/${I.counts.trims.tris}, `
     + `beams ${I.counts.beams.draws}/${I.counts.beams.tris}; doors ${I.doors.map(q => q.label.split(' ')[0] + ' ' + q.draws + '/' + q.tris + ' tip rest ' + q.rest + ' anim ' + q.worst).join(', ')}; `
     + `modules ${I.modules ? I.modules.placed + ' placed, ' + I.modules.draws + '/' + I.modules.tris + (I.modules.missing.length ? ' missing ' + I.modules.missing.join(' ') : '') : '-'}; build ms ${JSON.stringify(I.ms)}`);
+  console.log(`     watertight (no kit): ${JSON.stringify(I.water)}; exit faces ${I.exitFaces || 0}, fireplace/exit cornices ${I.fireCornice || 0}, peels ${I.peels || 0}`);
   for (const k in R.cnt) { allCnt[k] = (allCnt[k] || 0) + R.cnt[k]; (allBad[k] || (allBad[k] = [])).push(R.tag + ' ' + JSON.stringify(R.bad[k])); }
   if (R.gables) check(I.gableFaces > 0 && I.gableCols > 0, `${R.tag}: gable faces checked against ceilAtXZ (${I.gableCols} roof points)`);
 }
@@ -317,7 +404,11 @@ const KEYS = ['uv1 cells = LightBaker.packAtlas = bake().wallCells', 'walls.face
   'dado rail at its B5 height', 'picture rail at 3.0 m', 'skirting stands on the floor', 'cornice top at the ceiling (follows the face height)', 'trims have inside and outside mitres',
   'king posts stand on their tie (>= 2.30 m) and stop at the roof', 'beam bottom >= 2.30 m (she is 2.19 m)', 'beam top under the ceiling', 'beams stop at the walls (never through a wall tile)', 'beam meshes no lower than the plan\'s beams', 'chunk bounds within its 6 x 6 tiles',
   'door creaks are muted while herQuiet() > 0.5', 'modules: every plan window and module placed (or reported missing)', 'module origin = plan position (wall pieces on the floor at the face centre, B1)',
-  'face module at its face centre on the wall plane', 'module wall part: uv1 in its face\'s cell', 'same floor -> identical walls, ceilings and trims'];
+  'face module at its face centre on the wall plane', 'module wall part: uv1 in its face\'s cell', 'same floor -> identical walls, ceilings and trims',
+  'no kit: every face keeps its wall quad (E7)', 'no kit: no ceiling tile cut', 'walls and ceilings: no degenerate triangles', 'walls and ceilings: no T-junctions',
+  'trims: no skirting or dado across the exit door (kit or not)', 'trims: the cornice runs on above an exit or fireplace module', 'trims: the dado rail stops at peeling paper',
+  'low beams stop 0.10 m short of a doorway tile', 'updateDoors without sfx creaks through the game\'s sfx; null is silent', 'modules: windows only when asked (Kit.furnish owns them)',
+  'modules: wall parts own their geometry (not shared) and dispose() frees it', 'Arch.build / rebuild: all six parts in one group, rebuild disposes the old one'];
 for (const k of KEYS) check(!allCnt[k], k + ' (all floors)', allBad[k] && allBad[k].slice(0, 3));
 const doorKeys = Object.keys(allCnt).filter(k => !KEYS.includes(k));
 for (const pre of ['procedural doorways', 'kit doorways']) {

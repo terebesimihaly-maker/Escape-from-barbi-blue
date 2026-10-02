@@ -11,10 +11,14 @@
      Kit.ready(style, tier?) / Kit.get(style, tier?) loaded? / the kit (null when not loaded, or with ?kit=off in the URL)
      Kit.progress() -> 0..1                          bytes so far over everything asked for (sizes from models/kit/manifest.json)
      Kit.release(style)                              throw a style's kits away (every tier; 'common': the common pieces)
-     Kit.evict(keep, tier)                           keep only those styles at that tier (Kit.furnish does it on floor entry: E5)
+     Kit.evict(keep, tier)                           keep only those styles at that tier (Kit.furnish does it on floor entry: E5,
+                                                     keeping this floor's style, the next one, opts.keep, and in multiplayer every
+                                                     floor still ahead: E4's lobby waited for them)
+     Kit.keep(styles)                                pin styles no eviction drops until the next keep() (the lobby gate's list)
      Kit.tierFor(quality, lowq) -> 'lo' | 'md' | 'hi' low -> lo; medium -> md (lo on phones); high -> hi if MAX_TEXTURE_SIZE >= 8192
                                                      and deviceMemory >= 8 (and not a phone), else md
-     A kit: { style, tier, nodes {name: template}, node(name), has(name), isPlaceholder(name) (manifest: a grey stand-in), scene, common }.
+     A kit: { style, tier, nodes {name: template}, node(name), has(name), isPlaceholder(name) (manifest: a grey stand-in), scene, common,
+     partial (common.glb failed: the next want() tries it again and adds its nodes) }.
      Everything loaded is marked userData.kit / userData.shared (textures too), so disposeLevel never frees it; lights are stripped (H12);
      on lo the Standard materials become Lambert; every kit material gets MatLib.withLightField (C5) the first time a kit is used.
 
@@ -28,22 +32,34 @@
        band       plan.band: furniture and props against the walls;  windows: plan.windows (glass, sky and the wall part get the
                   reserved materials: R.reserved.{wall, glass, sky} lists the meshes, js/atmos.js may swap their materials)
        fixtures   plan.fixtures: bodies instanced; Fix_*_emit parts as instanced emissive (MatLib.emissiveMesh, colour x state, flicker
-                  group); every lit lamp's glow in ONE Points mesh (MatLib.glowPoints); cords of hanging lamps in one instanced mesh
+                  group; per chunk); every lit lamp's glow in ONE Points mesh (MatLib.glowPoints); cords instanced per chunk
        animated   rocking chairs, mobiles, pendulums, swaying dolls (KIT.anims pivots) and swaying curtains (shape keys) as small separate
                   copies, moved by R.update(dt, t); still with calm effects on, and left in the instances on Low
        Every object carries userData.kit = { kind, node, mount, aabb (node frame), solid [per instance], item [per instance] }, so
-       disposeLevel skips it; R.dispose() frees what this furnish made (instance buffers, merged and copied geometry, the glow).
+       disposeLevel's traversal skips it. R.dispose() frees what this furnish made (instance buffers, merged and copied geometry, the
+       glow), and level.door.dispose() what Kit.exit made: both run by themselves when disposeLevel takes level.group out of the scene
+       (its 'removed' event; furnish listens on level.group), or call Kit.disposeLevel(level) first. The kit's own pieces stay.
        opts: kit (a kit, or null for placeholders), tier, solids (default SOLIDS), ceilAt(xm, zm) (default ceilAtXZ), wallMat (the level's
              wall material, for windows' wall parts), glassMat, skyMat (else Kit.reserved, else plain stand-ins), wallCells
              (LightBaker's, so windows' wall parts sample their face's lightmap cell; default: LightBaker.packAtlas of plan.faces),
              bakeTier, placeholders (use the manifest's grey stand-in nodes too; default Kit.placeholderArt = true), anim, shadows,
-             calm, evict (default true), windows (false: leave plan.windows to Arch.modules, which can place them too; one of the two)
+             calm, evict (default true), keep (more styles eviction keeps), windows (false: leave plan.windows to Arch.modules,
+             which can place them too; one of the two)
      Kit.upgradeInPlace(level, plan?, opts?)         when a kit arrives after its floor was built with placeholders: swaps only what the
                                                      kit owns (level.kit, the wardrobes, the exit door, level.house.upgrade if any).
                                                      Never rebuilds: scares.doll, level.paintings and the boards stay. Returns the new R.
+                                                     Windows and the exit replace their wall face, which a floor built without its kit
+                                                     still has (E7): they are swapped in only with opts.facesSkipped (the walls were
+                                                     built with the module skips) or opts.walls (Arch.walls' result: those faces' quads
+                                                     are collapsed; R.collapsed counts the parts). Arch.trims on them stay.
+     Kit.upgradeAsync(level, plan?, opts?)           the same, but compiles the new pieces (renderer.compileAsync) before swapping, so
+                                                     no program compiles mid-play (H13) -> Promise<R | null> (null: the floor was left)
+     Kit.disposeLevel(level)                         free level.kit and a kit level.door now (see furnish)
      Kit.wardrobe(c, style, opts?) -> Group | null   makeWardrobe's contract from Ward_body/leafL/leafR: c.doors [{pivot, leaf, side, open}],
                                                      hinges x = +-0.575, z = 0.305; null without the kit (level.js keeps its own)
-     Kit.exit(style, opts?) -> { group, door } | null door = level.door { door, lamp, lockedMat, openMat, open, setOpen(on, dt), shared, ... }:
+     Kit.exit(style, opts?) -> { group, door } | null door = level.door { door (the leaf's biggest mesh), lamp, lockedMat, openMat, open,
+                                                     setOpen(on, dt), dispose(), shared, kit, leaf (its hinge pivot), ... }:
+                                                     opts: plan, wallMat, wallCells (default: LightBaker.packAtlas of plan.faces), level
                                                      setOpen(true) drops the boards (0.4 s), then swings the leaf out 0 -> 1.75 rad (1.6 s)
      Kit.placeholderBox(box, opts?) -> Mesh          one grey box {x0, z0, x1, z1 (m), h} (or {x, z, w, d, h}), shared geometry
      Kit.setReserved({ glass, sky })                 js/atmos.js's glass and sky materials for every later furnish */
@@ -153,15 +169,20 @@ function makeKit(style, tier, scene, common) {
   const nodes = {};
   for (const sc of [common, scene]) if (sc) for (const o of sc.children) nodes[nameOf(o)] = o;
   const isPlaceholder = n => !!(manifest && manifest.nodes && manifest.nodes[n] && manifest.nodes[n].placeholder);
-  return { style, tier, scene, common, nodes, node: n => nodes[n] || null, has: n => !!nodes[n], isPlaceholder, prims: new Map(), emitMats: new Map() };
+  return { style, tier, scene, common, partial: !common, nodes, node: n => nodes[n] || null, has: n => !!nodes[n], isPlaceholder, prims: new Map(), emitMats: new Map() };
 }
 function want(style, tier) {
   tier = tierOf(tier) || curTier();
   if (!style || kitOff()) return Promise.resolve(null);
   if (style === 'common') return Promise.all([loadManifest(), loadFile('common', tier).promise]).then(r => r[1] ? true : null);
   const key = tier + '/' + style, k = kits.get(key);
-  if (k) return Promise.resolve(k);
   if (pending.has(key)) return pending.get(key);
+  if (k && !k.partial) return Promise.resolve(k);
+  if (k) {                   // (its common pieces failed last time: try them again, and add their nodes to the kit when they come)
+    const c = loadFile('common', tier);
+    const p = c.promise.then(cm => { pending.delete(key); if (cm && files.get(c.key) === c && kits.get(key) === k) addCommon(k, cm); return k; });
+    pending.set(key, p); return p;
+  }
   const a = loadFile(style, tier), c = loadFile('common', tier);
   const p = Promise.all([a.promise, c.promise, loadManifest()]).then(([s, cm]) => {
     pending.delete(key);
@@ -169,6 +190,11 @@ function want(style, tier) {
     const kit = makeKit(style, tier, s, cm && files.get(c.key) === c ? cm : null); kits.set(key, kit); return kit;
   });
   pending.set(key, p); return p;
+}
+function addCommon(kit, cm) {
+  kit.common = cm; kit.partial = false;
+  for (const o of cm.children) { const n = nameOf(o); if (!kit.nodes[n]) kit.nodes[n] = o; }
+  for (const [key, v] of [...kit.prims]) if (v === null) kit.prims.delete(key);      // (nodes looked up while common was missing)
 }
 const preload = (list, tier) => Promise.all((list || []).map(n => want(n, tier)));
 const ready = (style, tier) => !kitOff() && kits.has((tierOf(tier) || curTier()) + '/' + style);
@@ -202,9 +228,19 @@ function release(style) {
   dropKits(k => k.style === style || style === 'common');
   return n;
 }
-// keep only these styles at this tier, and that tier's common pieces (loads still running are left alone)
+// styles never evicted until keep() changes them: the lobby gate (E4) pins the kits of floors L.level..4 it waited for
+const pinned = new Set();
+function keep(list) { pinned.clear(); for (const s of list || []) if (s) pinned.add(s); return [...pinned]; }
+// what floor entry keeps (E5: this floor's style and the next); in multiplayer every floor still ahead too (E4: the lobby waited for them)
+function keepFor(fi, extra) {
+  const ks = [FLOORS_STYLE(fi), FLOORS_STYLE((fi | 0) + 1)].concat(extra || []);
+  if (typeof MP !== 'undefined' && MP && MP.on && typeof FLOORS !== 'undefined') for (let i = fi | 0; i < FLOORS.length; i++) ks.push(FLOORS[i].style);
+  return ks.filter(Boolean);
+}
+const FLOORS_STYLE = fi => typeof FLOORS !== 'undefined' && FLOORS[fi | 0] ? FLOORS[fi | 0].style : null;
+// keep only these styles (and the pinned ones) at this tier, and that tier's common pieces (loads still running are left alone)
 function evict(keep, tier) {
-  tier = tierOf(tier) || curTier(); const ks = new Set((keep || []).filter(Boolean));
+  tier = tierOf(tier) || curTier(); const ks = new Set((keep || []).filter(Boolean)); for (const s of pinned) ks.add(s);
   for (const f of [...files.values()]) {
     if (f.state === 'loading') continue;
     if (f.tier === tier && (f.name === 'common' || ks.has(f.name))) continue;
@@ -373,6 +409,7 @@ function nodeFor(it, v, ceilMax) {
   return it.node;
 }
 const nextStyle = fi => typeof FLOORS !== 'undefined' && FLOORS[(fi | 0) + 1] ? FLOORS[(fi | 0) + 1].style : null;
+const liveLevel = () => typeof level !== 'undefined' ? level : undefined;    // (level.js's current floor)
 const isCalm = o => typeof o.calm === 'function' ? !!o.calm() : o.calm !== undefined ? !!o.calm : typeof calm === 'function' ? calm() : false;
 
 /* ---------- furnishing a floor ---------- */
@@ -391,7 +428,7 @@ function furnish(level, plan, opts) {
   if (kit) lightField(kit);
   const S = shared(), glassMat = o.glassMat || reserved.glass || S.glass, skyMat = o.skyMat || reserved.sky || S.sky, wallMat = o.wallMat || null;
   const ok = n => !!(kit && n && kit.nodes[n] && (usePH || !kit.isPlaceholder(n)));
-  const inst = new Map(), merges = new Map(), emits = new Map(), glows = [], cords = [], ph = new Map();
+  const inst = new Map(), merges = new Map(), emits = new Map(), glows = [], cords = new Map(), ph = new Map();
   let cells;                 // (LightBaker's wall atlas cells, worked out the first time a wall part needs one)
   const cellOf = face => {
     if (cells === undefined) {
@@ -498,15 +535,16 @@ function furnish(level, plan, opts) {
       else m = place(fx.ox, fx.oy, fx.oz, fx.ry);
       put('fixture', fx.node, fx.mount, m, { fixture: k, face: fx.face });
       const lvl = fx.state === 'dead' ? 0.03 : 1, col = (fx.color || [1, 0.8, 0.6]).map(c => c * 4 * lvl), grp = fx.state === 'flicker' ? fx.group : -1;
-      P.emit.forEach((p, j) => {
-        const key = fx.node + '|' + j; let b = emits.get(key); if (!b) emits.set(key, b = { p, node: fx.emitNode || fx.node + '_emit', list: [] });
-        b.list.push({ m: new THREE.Matrix4().multiplyMatrices(m, p.rel), col, grp, fixture: k });
+      P.emit.forEach((p, j) => {       // (per 6x6-tile chunk too, so the frustum drops them with the rest: H22)
+        const em = new THREE.Matrix4().multiplyMatrices(m, p.rel), key = fx.node + '|' + j + '|' + chunkOf(em.elements[12], em.elements[14]);
+        let b = emits.get(key); if (!b) emits.set(key, b = { p, node: fx.emitNode || fx.node + '_emit', list: [] });
+        b.list.push({ m: em, col, grp, fixture: k });
       });
       if (fx.state !== 'dead') {
         const def = KIT.fixtures[fx.id] || {}, gk = (fx.state === 'glow' ? 0.4 : 0.3) * Math.min(2.5, fx.k || 1);    // (WP6 calibrates)
         glows.push({ x: fx.x, y: fx.y, z: fx.z, color: (fx.color || [1, 0.8, 0.6]).map(c => c * gk), size: clamp(Math.max(def.W || 0.3, def.H || 0.3) * 1.1, 0.18, 0.9), group: grp });
       }
-      if (fx.cord > 0.005) cords.push(place(fx.ox, fx.oy, fx.oz, 0).scale(V(1, fx.cord, 1)));
+      if (fx.cord > 0.005) { const ck = chunkOf(fx.ox, fx.oz); let l = cords.get(ck); if (!l) cords.set(ck, l = []); l.push(place(fx.ox, fx.oy, fx.oz, 0).scale(V(1, fx.cord, 1))); }
     });
   }
 
@@ -547,10 +585,10 @@ function furnish(level, plan, opts) {
     G.add(im); R.owned.push(im);
   }
   if (glows.length && ML) { const pts = ML.glowPoints(glows); pts.name = 'KitGlow'; pts.userData.kit = { kind: 'glow', count: glows.length, owned: true }; G.add(pts); R.owned.push(pts); }
-  if (cords.length) {
-    const im = new THREE.InstancedMesh(S.cyl, S.cord[tierMat], cords.length);
-    cords.forEach((m, j) => im.setMatrixAt(j, m)); im.instanceMatrix.needsUpdate = true; im.computeBoundingBox(); im.computeBoundingSphere(); im.name = 'KitCords';
-    im.userData.kit = { kind: 'cord', mount: 'ceiling', aabb: boxArr(new THREE.Box3(V(-0.006, 0, -0.006), V(0.006, 1, 0.006))), solid: cords.map(() => -1) };
+  for (const list of cords.values()) {
+    const im = new THREE.InstancedMesh(S.cyl, S.cord[tierMat], list.length);
+    list.forEach((m, j) => im.setMatrixAt(j, m)); im.instanceMatrix.needsUpdate = true; im.computeBoundingBox(); im.computeBoundingSphere(); im.name = 'KitCords';
+    im.userData.kit = { kind: 'cord', mount: 'ceiling', aabb: boxArr(new THREE.Box3(V(-0.006, 0, -0.006), V(0.006, 1, 0.006))), solid: list.map(() => -1) };
     G.add(im); R.owned.push(im);
   }
 
@@ -568,13 +606,28 @@ function furnish(level, plan, opts) {
   R.update(0, 0);
   const cnt = k => R.owned.filter(x => x.userData.kit.kind === k).length;
   R.stats = { instanced: R.owned.filter(x => x.isInstancedMesh).length, instances: R.owned.reduce((a, x) => a + (x.isInstancedMesh ? x.count : 0), 0),
-    merged: merges.size, emissive: emits.size, glows: glows.length, cords: cords.length, anims: R.anims.length, placeholders: R.solids.filter(s => s.placeholder).length,
+    merged: merges.size, emissive: emits.size, glows: glows.length, cords: [...cords.values()].reduce((a, l) => a + l.length, 0), anims: R.anims.length, placeholders: R.solids.filter(s => s.placeholder).length,
     draws: R.owned.length + R.anims.reduce((a, x) => { let n = 0; x.obj.traverse(q => { if (q.isMesh) n++; }); return a + n; }, 0),
     byKind: { solid: cnt('solid'), island: cnt('island'), band: cnt('band'), window: cnt('window'), fixture: cnt('fixture'), placeholder: cnt('placeholder') }, ms: +(now() - t0).toFixed(1) };
   if (level && level.group) level.group.add(G);
-  if (level) level.kit = R;
-  if (kit && o.evict !== false) evict([style, nextStyle(plan.floorIdx)], kit.tier);
+  if (level) { level.kit = R; autoDispose(level); }
+  if (kit && o.evict !== false) evict([style, nextStyle(plan.floorIdx)].concat(keepFor(plan.floorIdx, o.keep)), kit.tier);
   return R;
+}
+
+/* ---------- freeing a floor's kit pieces ---------- */
+// What furnish and exit make for one floor (instance buffers, merged and copied geometry, the glow, the exit's materials) is marked
+// userData.kit like the kit itself, so disposeLevel's traversal (E5) skips it. It is freed here instead: when disposeLevel takes
+// level.group out of the scene (its 'removed' event), or by calling Kit.disposeLevel(level) before. The kit's own pieces stay (H21).
+function disposeLevelKit(level) {
+  if (!level) return;
+  if (level.kit && typeof level.kit.dispose === 'function') level.kit.dispose();
+  const D = level.door; if (D && D.kit && typeof D.dispose === 'function') D.dispose();
+}
+function autoDispose(level) {
+  const g = level && level.group; if (!g || g.userData.kitAutoDispose) return;
+  g.userData.kitAutoDispose = true;
+  g.addEventListener('removed', () => disposeLevelKit(level));
 }
 
 /* ---------- wardrobes (level.js makeWardrobe's contract) ---------- */
@@ -620,7 +673,12 @@ function exitDoor(style, opts) {
   g.name = name; g.userData.kit = info; g.position.set(pos[0], pos[1] || 0, pos[2]); g.rotation.y = ry;
   root.updateWorldMatrix(true, true);
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), relOf = q => new THREE.Matrix4().multiplyMatrices(inv, q.matrixWorld);
-  const cell = o.wallCell || (o.wallCells && face >= 0 ? o.wallCells[face] : null), owned = [], sky = [];
+  let cell = o.wallCell || (o.wallCells && face >= 0 ? o.wallCells[face] : null);
+  if (!cell && face >= 0 && o.plan && o.plan.faces && typeof LightBaker !== 'undefined' && LightBaker.packAtlas) {   // (as furnish works them out)
+    try { cell = LightBaker.packAtlas(o.plan.faces, o.bakeTier || (typeof settings !== 'undefined' ? settings.quality : 'low'), o.plan.faces.map(f => f.h)).cells[face] || null; }
+    catch (e) { console.warn('Kit: no wall atlas for the exit', e.message); }
+  }
+  const owned = [], sky = [];
   const inside = (q, t) => { for (let p = q; p && p !== root; p = p.parent) if (p === t) return true; return false; };
   // the porch and the wall around it (every mesh of the node but the leaf, the boards and the lamp)
   root.traverse(q => {
@@ -633,13 +691,17 @@ function exitDoor(style, opts) {
     const m = new THREE.Mesh(geo, mat); m.matrixAutoUpdate = false; m.matrix.copy(rel); m.userData.kit = info; m.userData.shared = true;
     m.castShadow = role === 'wall' || !role; m.receiveShadow = true; g.add(m); if (role === 'sky') sky.push(m);
   });
-  // the leaf on its hinge (its origin), with its own copy of its material (level.door's lockedMat: disposeLevel frees it, not the kit's)
+  // the leaf on its hinge (its origin), with its own copies of its materials (one per material: wood, brass, wired glass...). level.door's
+  // door is its biggest mesh and lockedMat = openMat that mesh's copy (render.js swaps door.material for openMat); D.dispose frees them all
   const lrel = relOf(leafT), pivot = new THREE.Group(), lp = V(0, 0, 0), lq = new THREE.Quaternion(), ls = V(1, 1, 1);
   lrel.decompose(lp, lq, ls); pivot.position.copy(lp); pivot.quaternion.copy(lq); pivot.userData.kit = info;
   const leaf = leafT.clone(true); leaf.position.set(0, 0, 0); leaf.quaternion.identity(); mark(leaf, info);
-  let lockedMat = null;
+  const copies = new Map(), cp = m => { if (!m) return m; let c = copies.get(m); if (!c) { c = m.clone(); copies.set(m, c); } return c; };
+  let main = null, mainN = -1;
   leaf.traverse(q => { if (!q.isMesh) return; q.castShadow = true; q.receiveShadow = true;
-    if (!lockedMat) lockedMat = q.material.clone(); q.material = lockedMat; });
+    q.material = Array.isArray(q.material) ? q.material.map(cp) : cp(q.material);
+    const n = q.geometry.index ? q.geometry.index.count : q.geometry.attributes.position.count; if (n > mainN) { main = q; mainN = n; } });
+  const lockedMat = main ? [].concat(main.material)[0] : null;
   pivot.add(leaf); g.add(pivot);
   const linv = new THREE.Matrix4().copy(leafT.matrixWorld).invert(), lb = new THREE.Box3();
   leafT.traverse(q => { if (q.isMesh && q.geometry.boundingBox) lb.union(q.geometry.boundingBox.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(linv, q.matrixWorld))); });
@@ -664,7 +726,7 @@ function exitDoor(style, opts) {
     const s = clamp((t - EXIT_T.boards) / EXIT_T.leaf, 0, 1), e = s * s * (3 - 2 * s);
     pivot.quaternion.copy(lq).multiply(new THREE.Quaternion().setFromAxisAngle(UP(), swing * EXIT_T.open * e));
   };
-  const D = { door: leaf, lamp, lockedMat, openMat: lockedMat, open: false, shared: true, kit: true, group: g, leaf: pivot, boards, sky, t: -1,
+  const D = { door: main || leaf, lamp, lockedMat, openMat: lockedMat, open: false, shared: true, kit: true, group: g, leaf: pivot, boards, sky, t: -1,
     lightPos: V(pos[0] + fr[0] * 0.8, 1.7, pos[2] + fr[1] * 0.8),
     // called every frame with powerOn (render.js): opens once, over 2 s; dt defaults to the frame's (lastDt)
     setOpen(on, dt) {
@@ -678,8 +740,9 @@ function exitDoor(style, opts) {
       if (was < EXIT_T.boards && this.t >= EXIT_T.boards && dt < 1 && typeof sfx !== 'undefined' && sfx.creak) sfx.creak(0.25, at);
     },
     update(dt) { if (this.open) this.setOpen(true, dt); },
-    dispose() { lampMat.dispose(); for (const x of owned) x.dispose(); if (lockedMat) lockedMat.dispose(); } };
+    dispose() { lampMat.dispose(); for (const x of owned) x.dispose(); for (const m of copies.values()) m.dispose(); } };
   pose(0);
+  if (o.level) autoDispose(o.level);
   return { group: g, door: D };
 }
 
@@ -696,41 +759,109 @@ function disposeMat(m, seen) {
   for (const k of TEX) { const t = m[k]; if (t && !(t.userData && t.userData.shared) && !seen.has(t)) { seen.add(t); t.dispose(); } }
   m.dispose();
 }
-function upgradeInPlace(level, plan, opts) {
+// Which faces a kit module may now cover. A floor built without its kit (E7) keeps every module face's quad (js/arch.js skipped()),
+// and upgradeInPlace never rebuilds walls, so the face-replacing pieces (windows, the exit with its porch) would sit on a full wall
+// quad: z-fighting, the porch hidden behind it. They are placed only when opts.facesSkipped (the walls were built with the module
+// skips) or opts.walls (Arch.walls' result: those faces' vertices are collapsed here, so the wall there disappears). The trims on
+// those faces (Arch.trims: dado, skirting) are not touched: they still run across a window put in late.
+function collapseFaces(walls, faces) {
+  if (!walls || !walls.faceVerts || !walls.meshes) return 0;
+  let n = 0;
+  for (const fi of faces) {
+    const rec = walls.faceVerts[fi]; if (!rec) continue;
+    for (const pt of rec.parts) {
+      if (pt.group === 'upper') continue;                     // (the band above 3 m stays: no module reaches it)
+      const mesh = walls.meshes[pt.mesh], pa = mesh && mesh.geometry.attributes.position; if (!pa || !pt.count) continue;
+      const x = pa.getX(pt.first), y = pa.getY(pt.first), z = pa.getZ(pt.first);
+      for (let k = pt.first; k < pt.first + pt.count; k++) pa.setXYZ(k, x, y, z);     // (every triangle of the face degenerate: nothing drawn)
+      pa.needsUpdate = true; n++;
+    }
+  }
+  return n;
+}
+// everything an upgrade will swap, built off the scene; commit() puts it in (so it can be compiled first: E2 step 13, H13)
+function prepareUpgrade(level, plan, opts) {
   if (!level) return null;
   plan = plan || (level.kit && level.kit.plan) || level.plan;
   if (!plan) return null;
-  const old = level.kit, o = Object.assign({}, old ? old.opts : {}, opts || {}), kit = o.kit || get(plan.style, o.tier);
+  // (the options the caller gave, this time and before; the defaults below are this upgrade's only, so a later one decides again)
+  const old = level.kit, base = Object.assign({}, old ? old.opts : {}, opts || {}), kit = base.kit || get(plan.style, base.tier);
   if (!kit) return null;
-  o.kit = kit;
-  const R = furnish(level, plan, o);                   // (adds its group to level.group and becomes level.kit)
-  if (old && old !== R) old.dispose();
-  const seen = new Set();
-  // the wardrobes level.js built itself: kit ones in their place (render.js finds them through c.doors)
+  base.kit = kit;
+  const o = Object.assign({}, base), walls = base.walls || null, free = !!(base.facesSkipped || walls);
+  // (windows and the exit replace their face: only where that face is or can be made empty, unless the caller says otherwise)
+  if (base.windows === undefined && !free) o.windows = false;
+  const exitOn = base.exitDoor !== undefined ? base.exitDoor !== false : free;
+  const R = furnish(null, plan, Object.assign({}, o, { evict: false }));
+  R.opts = base;
+  const wards = [];
   if (typeof closets !== 'undefined' && o.wardrobes !== false) for (const c of closets) {
     if (c.kitWardrobe || !c.doors || !c.doors[0]) continue;
-    const prev = c.doors[0].pivot.parent, swingT = c.swingT, par = prev && prev.parent; if (!par) continue;
-    const doors = c.doors, g = wardrobe(c, plan.style, o);
-    if (!g) { c.doors = doors; continue; }
-    c.swingT = swingT; par.remove(prev); par.add(g); disposeTree(prev, seen);
+    const prev = c.doors[0].pivot.parent; if (!prev || !prev.parent) continue;
+    const cc = { x: c.x, y: c.y, ox: c.ox, oy: c.oy }, g = wardrobe(cc, plan.style, o);
+    if (g) wards.push({ c, cc, g, prev });
   }
-  // the exit door: the kit's, open if the old one was
   const D = level.door;
-  if (D && !D.kit && o.exitDoor !== false) {
-    const e = exitDoor(plan.style, Object.assign({ plan }, o));
-    if (e) {
+  const ex = D && !D.kit && exitOn ? exitDoor(plan.style, Object.assign({ plan }, o, { level: null })) : null;
+  const exitFace = ex ? ((plan.modules || []).find(q => q.kind === 'exit') || { face: -1 }).face : -1;
+  const objects = [R.group].concat(wards.map(w => w.g), ex ? [ex.group] : []);
+  let done = false;
+  const commit = () => {
+    if (done) return R; done = true;
+    if (level.group) level.group.add(R.group);
+    level.kit = R; autoDispose(level);
+    if (old && old !== R) old.dispose();
+    const seen = new Set();
+    // the wardrobes level.js built itself: kit ones in their place (render.js finds them through c.doors), open as far as they were
+    for (const w of wards) {
+      const par = w.prev.parent; if (!par) { continue; }
+      const was = w.c.doors;
+      w.cc.doors.forEach((d, k) => { d.open = was[k] ? was[k].open || 0 : 0; });
+      w.c.doors = w.cc.doors; w.c.kitWardrobe = true;
+      par.remove(w.prev); par.add(w.g); disposeTree(w.prev, seen);
+    }
+    // the exit door: the kit's, open if the old one was
+    if (ex && level.door === D) {
       for (const m of [D.door, D.lamp]) if (m && m.parent) { m.parent.remove(m); disposeTree(m, seen); }
       disposeMat(D.openMat, seen); disposeMat(D.lockedMat, seen);
-      (level.group || R.group).add(e.group);
-      if (D.open) e.door.setOpen(true, 10);
-      level.door = e.door;
-    }
-  }
-  if (level.house && typeof level.house.upgrade === 'function') level.house.upgrade(kit, R);
-  return R;
+      (level.group || R.group).add(ex.group);
+      if (D.open) ex.door.setOpen(true, 10);
+      level.door = ex.door;
+    } else if (ex) ex.door.dispose();
+    // the faces now covered: collapse their wall quads when the walls were given
+    const faces = R.items.filter(x => x.kind === 'window' && x.face >= 0).map(x => x.face);
+    if (ex && level.door === ex.door && exitFace >= 0) faces.push(exitFace);
+    R.collapsed = walls ? collapseFaces(walls, faces) : 0;
+    if (level.house && typeof level.house.upgrade === 'function') level.house.upgrade(kit, R);
+    if (o.evict !== false) evict(keepFor(plan.floorIdx, o.keep), kit.tier);
+    return R;
+  };
+  // (thrown away if the floor was left before an async upgrade finished)
+  const cancel = () => { if (done) return; done = true; R.dispose(); if (ex) ex.door.dispose(); };
+  return { R, objects, commit, cancel };
+}
+// sync: swaps right away (the new programs compile on the next frame: use upgradeAsync during play)
+function upgradeInPlace(level, plan, opts) {
+  const U = prepareUpgrade(level, plan, opts);
+  return U ? U.commit() : null;
+}
+// async: compiles the new pieces' programs first (renderer.compileAsync with the scene's lights), then swaps -> Promise<R | null>
+function upgradeAsync(lv, plan, opts) {
+  const U = prepareUpgrade(lv, plan, opts);
+  if (!U) return Promise.resolve(null);
+  const r = typeof renderer !== 'undefined' ? renderer : null, cam = typeof camera !== 'undefined' ? camera : null, sc = typeof scene !== 'undefined' ? scene : null;
+  if (!r || !r.compileAsync || !cam || !sc) return Promise.resolve(U.commit());
+  const tmp = new THREE.Group(); for (const x of U.objects) tmp.add(x);
+  const finish = () => {
+    for (const x of U.objects) tmp.remove(x);
+    const live = liveLevel();                     // (the floor was left meanwhile: level.js makes a new level object every floor)
+    if (live !== undefined && live !== lv) { U.cancel(); return null; }
+    return U.commit();
+  };
+  return r.compileAsync(tmp, cam, sc).then(finish, e => { console.warn('Kit: compileAsync', e && e.message); return finish(); });
 }
 
-const api = { want, preload, ready, kitReady: ready, get, progress, release, evict, tierFor, furnish, wardrobe, exit: exitDoor, upgradeInPlace,
+const api = { want, preload, ready, kitReady: ready, get, progress, release, evict, keep, tierFor, furnish, wardrobe, exit: exitDoor, upgradeInPlace, upgradeAsync, disposeLevel: disposeLevelKit,
   placeholderBox, setReserved, reserved, prims: primsOf, nodeFor, manifest: () => manifest, placeholderArt: true,
   files: () => [...files.values()].map(f => ({ name: f.name, tier: f.tier, state: f.state, loaded: f.loaded, total: f.total })) };
 window.Kit = api;
