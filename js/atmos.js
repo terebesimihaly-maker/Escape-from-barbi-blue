@@ -25,10 +25,11 @@
               side of a tall box most of the slice's rays meet; when every slice gets the same cuts they are one prism. Additive,
               back faces, no depth write, no fog. The fragment shader intersects the view ray with the prism's slabs (opening u, v
               back-projected along the moonlight, in front of the wall, above the floor) analytically and marches STEPS samples
-              (high 8, medium 4) through a window's single prism, ceil(STEPS / strips) through each slice of a split one (so about
-              STEPS per beam either way), each the window's cookie (high only: textures/light/cookies/<type>_<az>.webp, else a
+              (high 8, medium 4) through a window's single prism, STEPS / 2 through each slice of a split one (about 1.5 STEPS
+              through a whole split beam), at the middle of their steps, each the window's cookie (mip-filtered by the spacing) (high only: textures/light/cookies/<type>_<az>.webp, else a
               procedural mullion pattern, each slot's gain set so it passes as much light on average as medium's opening with soft
-              edges) times drifting 3D noise (0.03 m/s), dark where the way back to the window crosses one of the prism's 2 nearest
+              edges) times drifting 3D noise (0.03 m/s; an octave finer than twice the spacing is taken once per pixel, at the
+              middle of its way through the beam), dark where the way back to the window crosses one of the prism's 2 nearest
               tall boxes (a column's shadow; the bake's moon stops there too); fades within 0.6 m of the camera and past 12-14 m.
               Low: none (the bake's floor patches remain).
      Motes    high only: one Points mesh, <= 60 per window and <= 600 per floor, drifting on the GPU, lit only where the cookie lets
@@ -48,6 +49,7 @@
                                               decay 2, eased 0.25 per 60 Hz frame. hidden: today's behaviour at the camera (3.2, or
                                               the number given as hidden, e.g. 3.5; distance dist or 8). A dead or spectating player
                                               keeps today's light too: hidden = 1.2 * scares.dim, dist = 4.5 (render.js:104).
+     bounce.solidAt([x, y, z], env?)          inside a wall tile, a box, under the floor or above the ceiling?
      bounce.cast(origin, dir, maxD?, env?)    the march alone -> {hit, kind 'floor' | 'wall' | 'ceiling' | 'box' | null, p [x,y,z],
                                               n [x,y,z], dist, box (index)}; env {wall(tx, ty), ceil(x, z), solids (u), L} or the game's */
 (function () {
@@ -233,7 +235,7 @@ const patGain = new Map();                                     // (a procedural 
 function cookieAtlas(list) {
   const c = canvas(CELL * ATL, CELL * ATL), g = c.getContext('2d', { willReadFrequently: true });
   g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height);
-  const tex = new THREE.CanvasTexture(c); tex.colorSpace = ''; tex.generateMipmaps = false; tex.minFilter = tex.magFilter = LINEAR; tex.wrapS = tex.wrapT = CLAMP;
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = ''; tex.generateMipmaps = true; tex.minFilter = 1008; tex.magFilter = LINEAR; tex.wrapS = tex.wrapT = CLAMP;   // (1008: LinearMipmapLinear)
   // each slot's gain: medium's soft-edged opening passes OPEN_MEAN of the light, so a cookie passing less is turned up to match
   // and the beam is as bright on both tiers whatever the window (a uniform, so a late Blender cookie only changes numbers)
   const gain = tex.userData.gain = new Array(ATL * ATL).fill(1);
@@ -277,10 +279,12 @@ float unblocked( vec3 X, vec4 b, float h, vec4 N ) {
 }`;
 const COOKIE = `
 uniform sampler2D uCookie;
-float cookie( float slot, vec2 q ) {
+// lod: the atlas's mip level, from how far apart the march's samples land on the cookie (few samples over a long way would
+// otherwise alias the mullions into grain)
+float cookie( float slot, vec2 q, float lod ) {
 #ifdef USE_COOKIE
   q = clamp( q, 0.008, 0.992 ); float col = mod( slot, 4.0 ), row = floor( slot / 4.0 + 0.01 );
-  return texture2D( uCookie, vec2( ( col + q.x ) * 0.25, 1.0 - ( row + 1.0 - q.y ) * 0.25 ) ).r;
+  return textureLod( uCookie, vec2( ( col + q.x ) * 0.25, 1.0 - ( row + 1.0 - q.y ) * 0.25 ), lod ).r;
 #else
   vec2 e = smoothstep( 0.0, 0.06, q ) * smoothstep( 0.0, 0.06, 1.0 - q ); return 0.9 * e.x * e.y;
 #endif
@@ -316,16 +320,26 @@ void main() {
 #else
   float gn = 1.0;
 #endif
-  // this hull's sample count (STEPS for a window's one hull, ceil(STEPS / K) for each of its K slices; the same over the whole hull)
+  // this hull's sample count (STEPS for a window's one hull, STEPS / 2 for each slice of a split one; the same over the whole hull)
   float ns = vH.z, ds = ( s1 - s0 ) / ns;
-  float j = fract( 52.9829189 * fract( dot( gl_FragCoord.xy, vec2( 0.06711056, 0.00583715 ) ) ) ), acc = 0.0;
+  // (samples at the middle of their steps: with the cookie filtered and the noise band-limited to the spacing there is nothing left for
+  //  a per-pixel jitter to hide, and with this few samples it only shows as a fine grid)
+  float j = 0.5, acc = 0.0;
   vec3 drift = uTime * vec3( 0.03, -0.012, 0.021 );
+  float lod = min( log2( max( length( vec2( dot( vU.xyz, rd ), dot( vV.xyz, rd ) ) ) * ds * ${CELL}.0, 1.0 ) ), 5.0 );   // (texels per step; 5: 4 px a cell)
+  // the noise band-limited to the march: an octave whose period (0.45 m, 0.19 m) is under two samples' spacing is taken once, at the
+  // middle of this pixel's way through the beam (smooth from pixel to pixel), instead of at each sample, where the per-pixel jitter
+  // would turn it into grain
+  vec3 Xm = ro + rd * ( 0.5 * ( s0 + s1 ) );
+  float m1 = vn3( ( Xm + drift ) * 2.2 ), m2 = vn3( ( Xm - drift * 0.7 ) * 5.3 );
+  float w1 = 1.0 - smoothstep( 0.1, 0.23, ds ), w2 = 1.0 - smoothstep( 0.04, 0.095, ds );
   for ( int i = 0; i < STEPS; i ++ ) {
     if ( float( i ) >= ns ) break;
     float s = s0 + ( float( i ) + j ) * ds; vec3 X = ro + rd * s;
     vec2 q = vec2( dot( vU.xyz, X ) + vU.w, dot( vV.xyz, X ) + vV.w );
-    float n = vn3( ( X + drift ) * 2.2 ) * 0.65 + vn3( ( X - drift * 0.7 ) * 5.3 ) * 0.35;
-    acc += cookie( vS.z, q ) * gn * unblocked( X, vB0, vH.x, vN ) * unblocked( X, vB1, vH.y, vN ) * ( 0.2 + 1.6 * n * n * n ) * smoothstep( 0.0, 0.6, s ) * ( 1.0 - smoothstep( 12.0, 14.0, s ) );
+    float n1 = w1 > 0.01 ? mix( m1, vn3( ( X + drift ) * 2.2 ), w1 ) : m1, n2 = w2 > 0.01 ? mix( m2, vn3( ( X - drift * 0.7 ) * 5.3 ), w2 ) : m2;
+    float n = n1 * 0.65 + n2 * 0.35;
+    acc += cookie( vS.z, q, lod ) * gn * unblocked( X, vB0, vH.x, vN ) * unblocked( X, vB1, vH.y, vN ) * ( 0.2 + 1.6 * n * n * n ) * smoothstep( 0.0, 0.6, s ) * ( 1.0 - smoothstep( 12.0, 14.0, s ) );
   }
   gl_FragColor = vec4( uMoonCol * ( uMoonK * uDensity * acc * ds ), 1.0 );
   #include <tonemapping_fragment>
@@ -345,7 +359,7 @@ void main() {
   vec2 q = vec2( dot( aU.xyz, p ) + aU.w, dot( aV.xyz, p ) + aV.w ); float dp = dot( aN.xyz, p ) + aN.w;
   float inb = step( 0.0, q.x ) * step( q.x, 1.0 ) * step( 0.0, q.y ) * step( q.y, 1.0 ) * step( 0.0, dp ) * step( 0.02, p.y );
   vec4 mv = modelViewMatrix * vec4( p, 1.0 ); float dist = - mv.z;
-  vA = inb * cookie( aS.z, q ) * unblocked( p, aB0, aH.x, aN ) * unblocked( p, aB1, aH.y, aN ) * smoothstep( 0.25, 0.6, dist ) * ( 1.0 - smoothstep( 10.0, 14.0, dist ) ) * ( 0.55 + 0.45 * sin( uTime * ( 0.5 + aS.w ) + sd * 8.0 ) );
+  vA = inb * cookie( aS.z, q, 0.0 ) * unblocked( p, aB0, aH.x, aN ) * unblocked( p, aB1, aH.y, aN ) * smoothstep( 0.25, 0.6, dist ) * ( 1.0 - smoothstep( 10.0, 14.0, dist ) ) * ( 0.55 + 0.45 * sin( uTime * ( 0.5 + aS.w ) + sd * 8.0 ) );
   gl_Position = projectionMatrix * mv;
   gl_PointSize = vA > 0.004 ? max( 1.5, uPx * uSize / max( dist, 0.05 ) ) : 0.0;
 }`;
@@ -554,10 +568,11 @@ function build(lv, plan, opts) {
         return planes;
       };
       const cuts = []; for (let k = 0; k < K; k++) cuts.push(cutsOf(w.u0 + (w.u1 - w.u0) * k / K, w.u0 + (w.u1 - w.u0) * (k + 1) / K));
-      // when every slice gets the same cuts, one hull for the whole opening is the same shape: then a view ray through the beam
-      // takes STEPS samples, and through K slices ceil(STEPS / K) each, so about STEPS in all either way (C6's N)
+      // when every slice gets the same cuts, one hull for the whole opening is the same shape and a view ray through the beam takes
+      // STEPS samples (C6's N). A split window's slices take max(ceil(STEPS / K), STEPS / 2) each (high 4, medium 2): fewer than
+      // that alias the mullions into speckles, so a ray through all K takes about 1.5 STEPS, not K x STEPS
       const sig = c => c.map(q => q.key).sort().join('|'), one = cuts.every(c => sig(c) === sig(cuts[0])), nk = one ? 1 : K;
-      const steps = Math.max(1, Math.ceil(STEPS / nk)); if (one) nMerged++;
+      const steps = Math.max(Math.ceil(STEPS / nk), STEPS / 2); if (one) nMerged++;
       x.nk = nk; x.slicePlanes = []; x.hullBoxes = [];
       for (let k = 0; k < nk; k++) {
         const ua = w.u0 + (w.u1 - w.u0) * k / nk, ub = w.u0 + (w.u1 - w.u0) * (k + 1) / nk, planes = one ? cuts[0] : cuts[k];

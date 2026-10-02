@@ -125,7 +125,7 @@ for (const tier of ['medium', 'high']) {
   const sh = floors.reduce((s, f) => s + f.tiers[tier].shadowed, 0), sm = floors.reduce((s, f) => s + f.tiers[tier].samples, 0), miss = floors.filter(f => f.tiers[tier].missBox).map(f => [f.style, f.np, f.seed, f.tiers[tier].missBox]);
   console.log(`  ${tier}: ${sh} of ${sm} beam samples inside or behind a tall box; ${floors.filter(f => f.tiers[tier].overflow).length} floors with > 2 boxes in a hull; windows in one hull ${floors.reduce((s, f) => s + f.tiers[tier].merged, 0)} of ${lit.reduce((s, f) => s + f.moonlit, 0)}`);
   check(sh > 0 && !miss.length, `${tier}: every beam point inside or behind a tall box has that box in its hull's shader boxes (darkened)`, miss);
-  const want = tier === 'high' ? [8, 3] : [4, 2];
+  const want = tier === 'high' ? [8, 4] : [4, 2];
   check(lit.every(f => f.tiers[tier].hullSteps.every(n => want.includes(n))), `${tier}: ${want[0]} samples through a window's single hull, ${want[1]} through each of 3 slices`, [...new Set(floors.flatMap(f => f.tiers[tier].hullSteps))]);
 }
 check(floors.some(f => f.np === 4 && f.moonlit > 0), '4-player floors with moonlit windows are covered');

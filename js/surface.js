@@ -435,6 +435,14 @@ function build(lv) {
   lap('tile');
   /* ovAlbedo: shade (floor line, inside corners, box contact) x what the 2D canvas paints (decals, rug fringes, her prints' tint) */
   const alb = new Uint8ClampedArray(np * 4), cvs = canvas(w, h), g = ctx2d(cvs);
+  // (the tiles the canvas paints on: only those are read back, the rest of the canvas is white)
+  const dirty = new Uint8Array(n), mark = (x, z, r) => { for (let ty = Math.max(0, Math.floor((z - r) / L)); ty <= Math.min(GH - 1, Math.floor((z + r) / L)); ty++)
+    for (let tx = Math.max(0, Math.floor((x - r) / L)); tx <= Math.min(GW - 1, Math.floor((x + r) / L)); tx++) dirty[idx(tx, ty)] = 1; };
+  for (const q of (P.decalSources && P.decalSources.floor) || []) mark(q.x, q.z, Math.max(0.4, q.size));
+  for (const r of P.rugs || []) mark(r.x, r.z, Math.hypot(r.w, r.l) / 2 + 0.15);
+  for (const [x, z] of herPrints) mark(x, z, 0.2);
+  // (d.decals in game units, painted at PT per tile: a stain, petals, or a word in a 9 px font about 3.5 px a letter, with its drip)
+  for (const d of E.decals) mark(d.x * UM, d.y * UM, Math.max(0.8, ((d.text ? String(d.text).length * 3.5 : 0) + (d.s || 0) * 1.8 + 8) * L / PT));
   if (g) {
     g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
     g.setTransform(ppmX, 0, 0, ppmY, 0, 0);
@@ -454,16 +462,28 @@ function build(lv) {
     g.setTransform(1, 0, 0, 1, 0, 0);
   }
   lap('canvas');
-  // (the canvas colours are sRGB; the shade is linear: decode, multiply, encode)
-  const pix = g ? g.getImageData(0, 0, w, h).data : null, [X0, X1, FX] = resTab(w, ww), [Y0, Y1, FY] = resTab(h, wh);
-  for (let j = 0; j < h; j++) { const r0 = Y0[j] * ww, r1 = Y1[j] * ww, fy = FY[j];
-    for (let i = 0; i < w; i++) { let s;
-      if (up) { const fx = FX[i], a = shade[r0 + X0[i]], b = shade[r0 + X1[i]], c = shade[r1 + X0[i]], d = shade[r1 + X1[i]], t = a + (b - a) * fx; s = t + (c + (d - c) * fx - t) * fy; }
-      else s = shade[j * ww + i];
-      const o = (j * w + i) * 4, s4 = s * 4095 + 0.5;
-      if (pix && (pix[o] & pix[o + 1] & pix[o + 2]) !== 255) { alb[o] = ENC[(DEC[pix[o]] * s4) | 0]; alb[o + 1] = ENC[(DEC[pix[o + 1]] * s4) | 0]; alb[o + 2] = ENC[(DEC[pix[o + 2]] * s4) | 0]; }
-      else alb[o] = alb[o + 1] = alb[o + 2] = ENC[s4 | 0];
-      alb[o + 3] = 255; } }
+  // (the canvas colours are sRGB; the shade is linear: decode, multiply, encode. First the shade alone everywhere (High: scaled up
+  // from the work grid as linear bytes), then the painted tiles read back from the canvas and multiplied in)
+  const A32 = new Uint32Array(alb.buffer), GREY = new Uint32Array(256), V = up ? new Uint8Array(np) : null;
+  for (let v = 0; v < 256; v++) { const e = ENC[Math.round(v / 255 * 4095)]; GREY[v] = (0xFF000000 | (e << 16) | (e << 8) | e) >>> 0; }
+  if (!up) for (let k = 0; k < np; k++) { const e = ENC[(shade[k] * 4095 + 0.5) | 0]; A32[k] = (0xFF000000 | (e << 16) | (e << 8) | e) >>> 0; }
+  else {
+    const S8 = new Uint8Array(nw); for (let k = 0; k < nw; k++) S8[k] = shade[k] * 255 + 0.5;
+    const [X0, X1, FXf] = resTab(w, ww), [Y0, Y1, FYf] = resTab(h, wh), FX = Int32Array.from(FXf, f => Math.round(f * 256)), FY = Int32Array.from(FYf, f => Math.round(f * 256));
+    for (let j = 0; j < h; j++) { const r0 = Y0[j] * ww, r1 = Y1[j] * ww, fy = FY[j], gy = 256 - fy, o = j * w;
+      for (let i = 0; i < w; i++) { const fx = FX[i], gx = 256 - fx, x0 = X0[i], x1 = X1[i];
+        const v = ((S8[r0 + x0] * gx + S8[r0 + x1] * fx) * gy + (S8[r1 + x0] * gx + S8[r1 + x1] * fx) * fy + 32768) >> 16;
+        V[o + i] = v; A32[o + i] = GREY[v]; } } }
+  if (g) for (let ty = 0; ty < GH; ty++) for (let tx = 0; tx < GW; tx++) {
+    if (!dirty[idx(tx, ty)] || (tx && dirty[idx(tx - 1, ty)])) continue;
+    let tx1 = tx; while (tx1 + 1 < GW && dirty[idx(tx1 + 1, ty)]) tx1++;           // (a run of painted tiles along the row: one read)
+    const i0 = Math.floor(tx * L * ppmX), i1 = Math.min(w, Math.floor((tx1 + 1) * L * ppmX)), j0 = Math.floor(ty * L * ppmY), j1 = Math.min(h, Math.floor((ty + 1) * L * ppmY));
+    if (i1 <= i0 || j1 <= j0) continue;
+    const rw = i1 - i0, pix = g.getImageData(i0, j0, rw, j1 - j0).data, P32 = new Uint32Array(pix.buffer, pix.byteOffset, rw * (j1 - j0));
+    for (let j = j0; j < j1; j++) for (let i = i0; i < i1; i++) { const q = (j - j0) * rw + (i - i0); if (P32[q] === 0xFFFFFFFF) continue;
+      const k = j * w + i, o = k * 4, p4 = q * 4, s4 = (up ? V[k] / 255 : shade[k]) * 4095 + 0.5;
+      alb[o] = ENC[(DEC[pix[p4]] * s4) | 0]; alb[o + 1] = ENC[(DEC[pix[p4 + 1]] * s4) | 0]; alb[o + 2] = ENC[(DEC[pix[p4 + 2]] * s4) | 0]; }
+  }
 
   lap('albedo');
   /* ovCeil: half size, the plan's ceiling decals over white */
