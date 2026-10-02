@@ -1063,211 +1063,260 @@ def _pattern_image(name, arr):
     rgba = np.concatenate([c[..., :3], np.ones((h, w, 1), np.float32)], -1)[::-1]
     im.pixels.foreach_set(rgba.astype(np.float32).ravel()); im.pack(); return im
 
-def damask(px=1024, seed=3):
-    """a damask repeat two strips wide (half drop): a mirrored medallion of acanthus scrolls, a palmette and a vase, framed
-       by an ogee of leaves, small sprigs between. Returns (motif 0..1, outline 0..1) arrays, 2 px wide per px high cell."""
+def damask(px=1024, seed=7, strip=0.5625, rep=0.6):
+    """a Victorian damask repeat two strips wide (half drop), drawn as ornament: a palmette of lobed acanthus leaves with
+       veins rising from a cup, big leaves curling down from it, C-scrolls with leaflets ending in spirals and rosettes, flower
+       sprays, all framed by an ogee vine of leaves and berries that joins its neighbours at rosettes; mirrored. Returns an
+       (h, w, 3) array: R the motif (the fill block), G its detail lines (the second block), B the ink's pooled rim."""
     from PIL import Image, ImageDraw, ImageFilter
-    rnd = random.Random(seed); S = 4; Wc, Hc = px * S, int(px * S * 0.53 / 0.5625)
-    cell = Image.new('L', (Wc, Hc), 0); d = ImageDraw.Draw(cell)
+    S = 4; Wc, Hc = px * S, int(round(px * S * rep / strip))
+    fill = Image.new('L', (Wc, Hc), 0); line = Image.new('L', (Wc, Hc), 0)
+    D = {'F': ImageDraw.Draw(fill), 'L': ImageDraw.Draw(line)}; asp = Wc / Hc
     def P(x, y): return (x * Wc, y * Hc)
-    def leaf(x, y, ang, L, w, curl=0.0, notch=0):
-        pts = []; n = 26
-        for side in (1, -1):
-            for i in range(n + 1):
-                t = i / n if side == 1 else 1 - i / n
-                ww = w * math.sin(math.pi * t) ** 0.8 * (1 + (0.25 * math.sin(t * math.pi * (notch * 2 + 1)) if notch else 0))
-                a = ang + curl * t * t
-                cx = x + math.cos(ang) * L * t + math.cos(a + math.pi / 2) * ww * side * 0.5 * 0
-                px_ = x + L * t * math.cos(ang + curl * t * 0.5) - side * ww * math.sin(ang + curl * t)
-                py_ = y + L * t * math.sin(ang + curl * t * 0.5) + side * ww * math.cos(ang + curl * t)
-                pts.append(P(px_, py_))
-        d.polygon(pts, fill=255)
-    def scroll(x, y, ang, r0, turns, w0, w1, sign=1):
-        pts_l, pts_r = [], []; n = 120
+    def stroke(pts, w0, w1=None, to='F', val=255):
+        w1 = w0 if w1 is None else w1; L, R = [], []; n = len(pts)
+        for i, (x, y) in enumerate(pts):
+            a = pts[max(0, i - 1)]; b = pts[min(n - 1, i + 1)]
+            dx, dy = (b[0] - a[0]) * Wc, (b[1] - a[1]) * Hc; l = math.hypot(dx, dy) or 1
+            nx, ny = -dy / l, dx / l; w = (w0 + (w1 - w0) * i / max(1, n - 1)) * Wc
+            L.append((x * Wc + nx * w, y * Hc + ny * w)); R.append((x * Wc - nx * w, y * Hc - ny * w))
+        D[to].polygon(L + R[::-1], fill=val)
+    def bez(p0, p1, p2, p3, n=40):
+        out = []
         for i in range(n + 1):
-            t = i / n; a = ang + sign * turns * 2 * math.pi * t; r = r0 * (1 - 0.82 * t)
-            cx, cy = x + r * math.cos(a), y + r * math.sin(a) * (Wc / Hc)
-            w = w0 + (w1 - w0) * t; nx, ny = math.cos(a), math.sin(a) * (Wc / Hc)
-            pts_l.append(P(cx + nx * w, cy + ny * w)); pts_r.append(P(cx - nx * w, cy - ny * w))
-        d.polygon(pts_l + pts_r[::-1], fill=255)
-    # (draw the left half, mirror it)
+            t = i / n; u = 1 - t
+            out.append((u ** 3 * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t ** 3 * p3[0],
+                        u ** 3 * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t ** 3 * p3[1]))
+        return out
+    def spiral(cx, cy, r0, a0, turns, w0, w1, sign=1, n=90):
+        stroke([(cx + r0 * (1 - 0.85 * i / n) * math.cos(a0 + sign * turns * 2 * math.pi * i / n),
+                 cy + r0 * (1 - 0.85 * i / n) * math.sin(a0 + sign * turns * 2 * math.pi * i / n) * asp) for i in range(n + 1)], w0, w1)
+    def leaf(x, y, ang, L, w, curl=0.0, serr=0, vein=True):
+        n = 40; mx, my = x, y; pts = [(mx, my)]; left, right = [], []
+        for i in range(1, n + 1):
+            a = ang + curl * i / n; mx += L / n * math.cos(a); my += L / n * math.sin(a) * asp; pts.append((mx, my))
+        for i, (mx, my) in enumerate(pts):
+            t = i / n; a = ang + curl * t
+            ww = w * math.sin(math.pi * t ** 0.75) ** 0.65 * (1.0 - 0.25 * t)
+            if serr: ww *= 0.86 + 0.24 * abs(math.sin(t * math.pi * serr))                      # (scalloped lobes: acanthus)
+            nx, ny = -math.sin(a), math.cos(a) * asp
+            left.append((mx + nx * ww, my + ny * ww)); right.append((mx - nx * ww, my - ny * ww))
+        D['F'].polygon([P(*p) for p in left + right[::-1]], fill=255)
+        if vein:
+            stroke(pts[2:-4], w * 0.09, w * 0.03, to='L')
+            for k in range(3, n - 6, 7):
+                mx, my = pts[k]; a = ang + curl * k / n
+                for side in (1, -1):
+                    stroke([(mx, my), (mx + math.cos(a + side * 0.7) * w * 1.6, my + math.sin(a + side * 0.7) * w * 1.6 * asp)], w * 0.05, w * 0.02, to='L')
+    def disc(x, y, r, val=255, to='F'): D[to].ellipse([P(x - r, y - r * asp), P(x + r, y + r * asp)], fill=val)
+    def rosette(x, y, r, petals=8):
+        for k in range(petals): leaf(x, y, 2 * math.pi * k / petals, r, r * 0.33, vein=False)
+        disc(x, y, r * 0.28, 0); disc(x, y, r * 0.18, 255)
+        for k in range(petals):
+            a = 2 * math.pi * (k + 0.5) / petals
+            stroke([(x + math.cos(a) * r * 0.32, y + math.sin(a) * r * 0.32 * asp), (x + math.cos(a) * r * 0.75, y + math.sin(a) * r * 0.75 * asp)], r * 0.025, r * 0.01, to='L')
     cx = 0.5
-    # vase and stem
-    d.ellipse([P(cx - 0.055, 0.70), P(cx + 0.055, 0.80)], fill=255); d.polygon([P(cx - 0.03, 0.80), P(cx + 0.03, 0.80), P(cx + 0.05, 0.86), P(cx - 0.05, 0.86)], fill=255)
-    d.rectangle([P(cx - 0.008, 0.40), P(cx + 0.008, 0.72)], fill=255)
-    # palmette: leaves fanned up from the stem
-    for k, a in enumerate((-90, -112, -134, -156, -176)):
-        L = 0.20 - k * 0.025; leaf(cx, 0.44, math.radians(a), L, 0.035 - k * 0.003, curl=-0.4 if a < -100 else 0.0)
-    leaf(cx, 0.44, math.radians(-90), 0.24, 0.03)
-    # acanthus scrolls from the vase outward and up
-    scroll(cx - 0.17, 0.62, math.radians(10), 0.13, 0.95, 0.022, 0.006, 1)
-    scroll(cx - 0.12, 0.30, math.radians(-30), 0.08, 0.8, 0.016, 0.005, -1)
-    for t in np.linspace(0.1, 0.9, 6):
-        a = math.radians(10) + 0.95 * 2 * math.pi * t * 0.6; r = 0.13 * (1 - 0.6 * t)
-        leaf(cx - 0.17 + r * math.cos(a), 0.62 + r * math.sin(a) * (Wc / Hc), a + 1.2, 0.07 * (1 - 0.5 * t), 0.02, curl=0.8, notch=2)
-    # the ogee frame: a continuous tapering vine with leaflets alternating off it, buds where the frames meet
-    vine_l, vine_r = [], []
-    for i in range(161):
-        t = i / 160; x = cx - 0.43 * math.sin(math.pi * t) ** 0.85; y = 0.02 + 0.96 * t
-        dx = -0.43 * 0.85 * math.pi * math.cos(math.pi * t) * max(1e-3, math.sin(math.pi * t)) ** -0.15 / Wc * Hc; dy = 0.96
-        nl = math.hypot(dx, dy); nx, ny = -dy / nl, dx / nl; w = 0.0055 + 0.003 * math.sin(math.pi * t)
-        vine_l.append(P(x + nx * w, y + ny * w * Wc / Hc)); vine_r.append(P(x - nx * w, y - ny * w * Wc / Hc))
-        if i % 9 == 4 and 0.06 < t < 0.94:
-            side = 1 if (i // 9) % 2 else -1; ang = math.atan2(dy, dx) + side * 1.0
-            leaf(x, y, ang, 0.06 + 0.02 * math.sin(math.pi * t), 0.017, curl=-side * 0.9, notch=2)
-    d.polygon(vine_l + vine_r[::-1], fill=255)
-    for (x, y, r) in ((cx - 0.02, 0.03, 0.02), (cx - 0.02, 0.97, 0.02)):
-        d.ellipse([P(x - r, y - r * Wc / Hc), P(x + r, y + r * Wc / Hc)], fill=255)
-    # veins: dark lines cut through the palmette and the big leaves
-    for k, a in enumerate((-90, -112, -134, -156)):
-        L = (0.24 if k == 0 else 0.20 - (k - 1) * 0.025) * 0.85; ang = math.radians(a)
-        d.line([P(cx, 0.44), P(cx + L * math.cos(ang), 0.44 + L * math.sin(ang))], fill=0, width=max(2, Wc // 700))
-    d.ellipse([P(cx - 0.03, 0.73), P(cx + 0.03, 0.77)], fill=0)
-    left = cell.crop((0, 0, Wc // 2, Hc)); cell.paste(left.transpose(Image.FLIP_LEFT_RIGHT), (Wc // 2, 0))
-    # sprig at the corners (the half drop's medallion): small four-leaf flower
-    sp = Image.new('L', (Wc, Hc), 0); ds = ImageDraw.Draw(sp)
-    for a in range(4):
-        ang = math.radians(45 + 90 * a); L = 0.07
-        pts = [P(0.5 + math.cos(ang + s * 0.5) * L * f * 0.5 * (Hc / Wc if False else 1), 0.5 + math.sin(ang + s * 0.5) * L * f * (Wc / Hc)) for s, f in ((0, 0), (1, 1), (0, 1.6), (-1, 1))]
-        ds.polygon(pts, fill=255)
-    ds.ellipse([P(0.48, 0.5 - 0.02 * Wc / Hc), P(0.52, 0.5 + 0.02 * Wc / Hc)], fill=0)
-    sp = sp.resize((Wc // 2, Hc // 2), Image.LANCZOS)
-    for ox, oy in ((-Wc // 4, -Hc // 4), (3 * Wc // 4, -Hc // 4), (-Wc // 4, 3 * Hc // 4), (3 * Wc // 4, 3 * Hc // 4)):
-        cell.paste(255, (ox, oy), sp)
-    a = np.asarray(cell.resize((px, int(px * 0.53 / 0.5625)), Image.LANCZOS), np.float32) / 255
-    # two strips side by side, the second dropped half a repeat
-    two = np.concatenate([a, np.roll(a, a.shape[0] // 2, axis=0)], axis=1)
-    from PIL import Image as I2
-    blur = np.asarray(I2.fromarray((two * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(px / 400)), np.float32) / 255
-    outline = np.clip(np.abs(two - blur) * 3.0, 0, 1)
-    return two, outline
+    for k, a in enumerate((-90, -106, -122, -138, -154, -170)):                                     # the palmette
+        leaf(cx, 0.62, math.radians(a), (0.25, 0.23, 0.2, 0.17, 0.14, 0.12)[k], (0.042, 0.04, 0.037, 0.033, 0.03, 0.026)[k],
+             curl=(0.0, -0.2, -0.4, -0.65, -0.95, -1.3)[k], serr=4)
+    leaf(cx, 0.645, math.radians(175), 0.19, 0.05, curl=-2.3, serr=5); leaf(cx, 0.66, math.radians(150), 0.12, 0.03, curl=-1.4, serr=3)
+    stroke(bez((cx, 0.64), (cx - 0.004, 0.7), (cx + 0.004, 0.74), (cx, 0.79)), 0.012, 0.007)        # the stem and knop
+    disc(cx, 0.795, 0.03); disc(cx, 0.795, 0.016, 0); rosette(cx, 0.585, 0.045, 10)
+    sc = bez((cx - 0.01, 0.80), (cx - 0.22, 0.86), (cx - 0.36, 0.62), (cx - 0.26, 0.45), 50); stroke(sc, 0.013, 0.008)   # the C-scroll
+    spiral(cx - 0.21, 0.47, 0.055, math.pi * 1.05, 0.9, 0.008, 0.004, 1); rosette(cx - 0.215, 0.47, 0.028, 7)
+    for i in range(6, 46, 7):
+        x, y = sc[i]; x2, y2 = sc[i + 1]; a = math.atan2((y2 - y) / asp, x2 - x); side = 1 if (i // 7) % 2 else -1
+        leaf(x, y, a + side * 0.9, 0.065 - i * 0.0006, 0.018, curl=-side * 0.9, serr=3)
+    t1 = bez((cx - 0.21, 0.42), (cx - 0.24, 0.34), (cx - 0.20, 0.27), (cx - 0.25, 0.20), 30); stroke(t1, 0.006, 0.004)   # the flower spray
+    rosette(cx - 0.25, 0.20, 0.032, 6)
+    leaf(cx - 0.225, 0.33, math.radians(-170), 0.07, 0.022, curl=1.0, serr=3); leaf(cx - 0.215, 0.30, math.radians(-20), 0.06, 0.02, curl=-0.9, serr=3)
+    for (bx_, by_, ba) in ((cx - 0.33, 0.24, -150), (cx - 0.12, 0.22, -40)):
+        stroke(bez((cx - 0.23, 0.26), (bx_ + 0.03, by_ + 0.05), (bx_, by_ + 0.03), (bx_, by_), 20), 0.004, 0.003)
+        for d_ in (-0.5, 0.0, 0.5): leaf(bx_, by_, math.radians(ba) + d_, 0.035, 0.012, vein=False)
+    og = bez((cx, 0.02), (cx - 0.24, 0.12), (cx - 0.48, 0.30), (cx - 0.5, 0.5), 40) + bez((cx - 0.5, 0.5), (cx - 0.48, 0.70), (cx - 0.24, 0.88), (cx, 0.98), 40)[1:]
+    stroke(og, 0.009, 0.009)                                                                      # the ogee vine
+    for i in range(4, len(og) - 4, 6):
+        x, y = og[i]; x2, y2 = og[i + 1]; a = math.atan2((y2 - y) / asp, x2 - x); side = 1 if (i // 6) % 2 else -1
+        leaf(x, y, a + side * 1.0, 0.06, 0.02, curl=-side * 0.9, serr=3)
+        if (i // 6) % 3 == 0: disc(x + math.cos(a - side * 1.3) * 0.025, y + math.sin(a - side * 1.3) * 0.025 * asp, 0.006)
+    rosette(cx, 0.02, 0.03, 8); rosette(cx, 0.98, 0.03, 8)
+    for im in (fill, line):
+        left = im.crop((0, 0, Wc // 2, Hc)); im.paste(left.transpose(Image.FLIP_LEFT_RIGHT), (Wc // 2, 0))
+    a = np.asarray(fill.resize((px, Hc // S), Image.LANCZOS), np.float32) / 255
+    l = np.asarray(line.resize((px, Hc // S), Image.LANCZOS), np.float32) / 255 * a
+    two = np.concatenate([a, np.roll(a, a.shape[0] // 2, axis=0)], axis=1); two_l = np.concatenate([l, np.roll(l, l.shape[0] // 2, axis=0)], axis=1)
+    bl = np.asarray(Image.fromarray((two * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(px / 500)), np.float32) / 255
+    rim = np.clip((two - bl) * 2.5, 0, 1) * two                                                    # (block-printed ink pools at the edge)
+    return np.stack([two, two_l, rim], -1)
 
 # ================================================================ painted wood (wainscot, skirting, frames)
-def paint_mat(name, W, H, color='#d8ccb0', under='#5d6b4f', wood='#a07a4e', wv=True, chips=0.6, gloss=0.35, scuff=0.0, age=1.0, stain=0.0):
-    """old oil paint over wood: brush marks along each piece (the 'gpos' attribute: z along the grain), many coats softening
-       every edge, chipped on the edges and where knocked to an older green coat and then the wood, yellowed, scuffed low
-       (scuff: up to that height, m), grime in the corners, dust on the ledges. Variant B (stain > 0): water-stained, more chipped."""
+def paint_mat(name, W, H, color='#d6cbb2', under='#5f6d52', primer='#8a5a3c', wood='#9c774c', wv=True, chips=1.0, gloss=0.32, scuff=0.0, age=1.0, stain=0.0, up=1):
+    """old oil paint, coat over coat, on wood: brush ridges along each piece (the 'gpos' attribute, z along the grain), its
+       edges softened by the coats, yellowed unevenly, crazed in patches; chipped in clusters where things knocked it (on the
+       edges there, and ragged flakes off the faces) through an older green coat and the red-brown primer to the wood; grime
+       in the corners, dust on the ledges (faces whose normal points up: up = 1 for y on a wall, 2 for z), kick marks up to
+       scuff m. Variant B (stain > 0): water-stained and more chipped."""
     m = kitlib.Mat(name); T = Tor(m, W, H, wv); g = m.attr('gpos', True); pr = m.attr('prand'); V = variant(m)
     c = lin(color); cav = look(m, 'CAV', W, H); edge = look(m, 'EDGE', W, H)
-    brush = noise3(m, vmul(m, g, (900, 900, 6)), 1.0, 3, 0.6); brush2 = noise3(m, vmul(m, g, (160, 160, 1.5)), 1.0, 3, 0.5)
-    col = m.mix(m.remap(T.noise(3.0, 4, 0.55), 0.3, 0.75, 0.0, 0.35 * age), c, (c[0] * 0.9, c[1] * 0.84, c[2] * 0.66))   # (yellowed unevenly)
-    col = m.mix(m.remap(brush2, 0.3, 0.7, 0.0, 0.12), col, m.hsv(col, 0.5, 1.0, 0.9))
-    col = m.hsv(col, 0.5, 1.0, m.remap(pr, 0, 1, 0.96, 1.03))
-    h = m.math('ADD', m.math('MULTIPLY', brush, 0.00006), m.math('MULTIPLY', brush2, 0.00004))
-    alligator = T.voronoi(160, 'Distance', 'DISTANCE_TO_EDGE', off=2.0)                       # (old oil paint crazes)
-    craze = m.math('MULTIPLY', m.remap(alligator, 0.03, 0.0), m.remap(T.noise(2.0, 3, off=5.0), 0.5, 0.7, 0.0, 0.8 * age))
-    col = m.mix(m.math('MULTIPLY', craze, 0.5), col, m.hsv(col, 0.5, 1.1, 0.55)); h = m.math('SUBTRACT', h, m.math('MULTIPLY', craze, 0.00008))
-    # chips: on the edges and in ragged patches, to an older coat, then to the wood
-    ch = m.math('ADD', m.math('MULTIPLY', edge, chips * 0.5 * (1.0 + 0.4 * stain)), m.math('MULTIPLY', m.math('SUBTRACT', T.noise(22, 5, 0.65, off=1.0), 0.5), 1.1))
-    ch = m.math('ADD', ch, m.math('MULTIPLY', V, m.math('MULTIPLY', m.remap(T.noise(1.2, 3, off=8.0), 0.5, 0.75), 0.35 * stain)))
-    c1 = m.remap(ch, 0.42, 0.47, smooth=True); c2 = m.remap(ch, 0.56, 0.6, smooth=True)
-    col = m.mix(c1, col, m.mix(m.remap(T.noise(40, 3), 0.3, 0.7), lin(under), m.hsv(m.mix(0.0, lin(under), lin(under)), 0.5, 0.8, 1.2))); col = m.mix(c2, col, m.mix(0.4, lin(wood), (0.05, 0.035, 0.022)))
-    h = m.math('SUBTRACT', h, m.math('ADD', m.math('MULTIPLY', c1, 0.00025), m.math('MULTIPLY', c2, 0.00025)))
-    rough = m.remap(T.noise(12, 3), 0.3, 0.7, gloss, gloss + 0.15); rough = m.mixf(c1, rough, 0.6); rough = m.mixf(c2, rough, 0.8)
-    # grime in the corners, dust on the ledges (up: +y on a wall, +z on a floor: the cavity carries both), scuffs low down
-    gr = m.math('MULTIPLY', m.remap(cav, 0.85, 0.35, smooth=True), m.remap(T.noise(25, 4), 0.3, 0.7, 0.3, 1.0))
-    col = m.mix(m.math('MULTIPLY', gr, 0.55), col, (0.09, 0.075, 0.055)); rough = m.mixf(gr, rough, 0.8)
+    brush = noise3(m, vmul(m, g, (650, 650, 4.5)), 1.0, 3, 0.6); brush2 = noise3(m, vmul(m, g, (120, 120, 1.2)), 1.0, 3, 0.5)
+    col = m.mix(m.remap(T.noise(2.5, 4, 0.55), 0.3, 0.75, 0.0, 0.45 * age), c, (c[0] * 0.9, c[1] * 0.83, c[2] * 0.64))      # (yellowed unevenly)
+    col = m.mix(m.remap(brush2, 0.3, 0.7, 0.0, 0.1), col, m.hsv(col, 0.5, 1.0, 0.92)); col = m.mix(m.remap(brush, 0.3, 0.7, 0.0, 0.06), col, m.hsv(col, 0.5, 1.0, 0.94))
+    col = m.hsv(col, 0.5, 1.0, m.remap(pr, 0, 1, 0.97, 1.03))
+    h = m.math('ADD', m.math('MULTIPLY', brush, 0.0001), m.math('MULTIPLY', brush2, 0.00005))
+    rough = m.math('ADD', m.remap(T.noise(10, 3), 0.3, 0.7, gloss, gloss + 0.14), m.math('MULTIPLY', brush, 0.08))
+    alli = T.voronoi(150, 'Distance', 'DISTANCE_TO_EDGE', off=2.0)                                 # (crazing, in patches)
+    craze = m.math('MULTIPLY', m.remap(alli, 0.03, 0.0), m.remap(T.noise(1.8, 3, off=5.0), 0.55, 0.7, 0.0, age))
+    col = m.mix(m.math('MULTIPLY', craze, 0.55), col, m.hsv(col, 0.5, 1.1, 0.5)); h = m.math('SUBTRACT', h, m.math('MULTIPLY', craze, 0.0001))
+    # chips: clustered where knocked; ragged flakes; deeper chips reach the older coats, the primer, the wood
+    knock = m.remap(T.noise(2.0, 3, 0.5, off=1.0), 0.52, 0.72, smooth=True)
+    if scuff: knock = m.math('MAXIMUM', knock, m.math('MULTIPLY', m.remap(T.y, scuff, 0.0), 0.8))
+    flake = T.noise(24, 5, 0.65, off=1.0)
+    ch = m.math('ADD', m.math('MULTIPLY', m.math('MULTIPLY', edge, knock), 0.55 * chips * (1.0 + 0.5 * stain)), m.math('MULTIPLY', m.math('SUBTRACT', flake, 0.5), 1.0))
+    ch = m.math('ADD', ch, m.math('MULTIPLY', knock, 0.18 * chips))
+    ch = m.math('ADD', ch, m.math('MULTIPLY', V, m.math('MULTIPLY', m.remap(T.noise(1.2, 3, off=8.0), 0.5, 0.75), 0.3 * stain)))
+    c1 = m.remap(ch, 0.48, 0.5, smooth=True); c2 = m.remap(ch, 0.58, 0.6, smooth=True); c3 = m.remap(ch, 0.66, 0.68, smooth=True)
+    uc = m.mix(m.remap(T.noise(40, 3), 0.3, 0.7), lin(under), m.hsv(m.mix(0.0, lin(under), lin(under)), 0.5, 0.85, 1.2))
+    col = m.mix(c1, col, uc); col = m.mix(c2, col, lin(primer)); col = m.mix(c3, col, m.mix(0.35, lin(wood), (0.06, 0.04, 0.025)))
+    h = m.math('SUBTRACT', h, m.math('ADD', m.math('MULTIPLY', c1, 0.00015), m.math('ADD', m.math('MULTIPLY', c2, 0.0001), m.math('MULTIPLY', c3, 0.00015))))
+    rough = m.mixf(c1, rough, 0.5); rough = m.mixf(c2, rough, 0.75); rough = m.mixf(c3, rough, 0.82)
+    col = m.mix(m.math('MULTIPLY', m.math('SUBTRACT', c1, m.remap(ch, 0.52, 0.54)), 0.5), col, m.hsv(col, 0.5, 1.0, 0.55))   # (the chip's shadowed lip)
+    # grime in the corners, dust on the ledges, kick marks low down
+    gr = m.math('MULTIPLY', m.remap(cav, 0.9, 0.4, smooth=True), m.remap(T.noise(25, 4), 0.3, 0.7, 0.4, 1.0))
+    col = m.mix(m.math('MULTIPLY', gr, 0.7), col, (0.08, 0.065, 0.05)); rough = m.mixf(gr, rough, 0.8)
+    col = m.mix(m.remap(T.noise(1.6, 4, 0.6, off=19.0), 0.4, 0.85, 0.0, 0.4 * age), col, m.hsv(col, 0.5, 0.9, 0.78))   # (handled, smoked, dusted for a century)
+    nrm = sep(m, m.geo('Normal'))[up]
+    ledge = m.math('MULTIPLY', m.remap(nrm, 0.4, 0.9, smooth=True), m.remap(T.noise(30, 4, off=12.0), 0.3, 0.7, 0.35, 0.8))
+    col = m.mix(ledge, col, lin('#8c8478')); rough = m.mixf(ledge, rough, 0.9)
     if scuff:
         low = m.remap(T.y, scuff, 0.0, smooth=True)
-        sc = m.math('MULTIPLY', low, m.remap(T.noise(28, 3, 0.5, off=21.0), 0.66, 0.74))          # (black kick marks: periodic, as everything here)
-        col = m.mix(m.math('MULTIPLY', sc, 0.6), col, (0.04, 0.035, 0.03))
-        col = m.mix(m.math('MULTIPLY', low, m.remap(T.noise(4, 4, off=3.0), 0.4, 0.8, 0.0, 0.5)), col, m.hsv(col, 0.5, 0.8, 0.6))
+        kicks = m.math('MULTIPLY', low, m.remap(T.noise(28, 3, 0.5, off=21.0), 0.66, 0.74))
+        col = m.mix(m.math('MULTIPLY', kicks, 0.6), col, (0.04, 0.035, 0.03))
+        col = m.mix(m.math('MULTIPLY', low, m.remap(T.noise(4, 4, off=3.0), 0.4, 0.8, 0.0, 0.45)), col, m.hsv(col, 0.5, 0.85, 0.7))
     if stain:
-        st = m.math('MULTIPLY', m.remap(T.noise(1.3, 4, 0.6, off=12.0), 0.5, 0.65, smooth=True), V)
-        tide = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(T.noise(1.3, 4, 0.6, off=12.0), 0.62, 0.65), m.remap(T.noise(1.3, 4, 0.6, off=12.0), 0.68, 0.65)), V)
+        sn = T.noise(1.3, 4, 0.6, off=12.0)
+        st = m.math('MULTIPLY', m.remap(sn, 0.5, 0.65, smooth=True), V)
+        tide = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(sn, 0.62, 0.65), m.remap(sn, 0.68, 0.65)), V)
         col = m.mix(m.math('ADD', m.math('MULTIPLY', st, 0.35 * stain), m.math('MULTIPLY', tide, 0.6 * stain)), col, m.mix(1.0, col, (0.55, 0.42, 0.26), 'MULTIPLY'))
     return finish(m, col, rough, h)
 
-def paper_mat(name, W, H, motif, outline, ground='#b4948c', ink='#a07c77', line='#87645f', strip=0.5625, rep=0.53, y0=0.93, wv=False):
-    """wallpaper on old lime plaster: the printed pattern (the motif in a satin ink a shade darker, a fine darker outline), paper
-       fibre, butt joints every strip with a hairline of plaster, the plaster's lumps showing through; faded, yellowed,
-       grimy where hands go (just above the rail), foxed, dirtier at the top. Variant B: water stains running down, mould
-       and the paper torn at the joints to its pale backing and the plaster (kept off the tile's edges)."""
-    m = kitlib.Mat(name); T = Tor(m, W, H, wv); V = variant(m)
-    x, y = T.x, T.y
-    uvw = comb(m, m.math('DIVIDE', x, 2 * strip), m.math('DIVIDE', m.math('SUBTRACT', y, y0), rep), 0.0)
-    ti = m.n('ShaderNodeTexImage', interpolation='Cubic', extension='REPEAT'); ti.image = motif; m.l(uvw, ti.inputs['Vector'])
-    to = m.n('ShaderNodeTexImage', interpolation='Cubic', extension='REPEAT'); to.image = outline; m.l(uvw, to.inputs['Vector'])
-    mo = sep(m, ti.outputs['Color'])[0]; ol = sep(m, to.outputs['Color'])[0]
-    misreg = m.remap(T.noise(30, 3), 0.3, 0.7, 0.85, 1.0)                                        # (the ink laid unevenly)
-    col = m.mix(m.math('MULTIPLY', mo, misreg), lin(ground), lin(ink)); col = m.mix(m.math('MULTIPLY', ol, 0.35), col, lin(line))
-    fib = T.noise(900, 3, 0.7); fib2 = T.noise(140, 4, 0.6)
-    col = m.mix(m.remap(fib2, 0.3, 0.7, 0.0, 0.1), col, m.hsv(col, 0.5, 1.0, 0.9))
-    h = m.math('ADD', m.math('MULTIPLY', mo, 0.00012), m.math('MULTIPLY', fib, 0.00004))
-    lump = T.noise(6, 4, 0.5, off=4.0); h = m.math('ADD', h, m.math('MULTIPLY', lump, 0.0012))   # (the plaster under the paper)
-    rough = m.mixf(mo, 0.82, 0.55)
-    # butt joints every strip: a hairline, the edges lifting a little and dirtier
+def paper_mat(name, W, H, pattern, ground='#b39189', ink='#9d7672', pool='#7d5550', line='#cdb3a4', strip=0.5625, rep=0.6, y0=0.93, wv=False):
+    """wallpaper on old lime plaster: a two-block print (the fill a satin ink a shade darker on a matte ground ruled with a
+       fine satin stripe, its detail lines in a paler second block a hair out of register, the ink pooled darker at the motif's
+       edges and laid unevenly), paper fibre, butt joints every strip with their edges lifting; faded and yellowed unevenly,
+       foxed, greasy where hands go above the rail, dusty on the ledge over the rail, sooted toward the ceiling. Variant B: a
+       broad water bloom from above with several tide lines, the paper bleached inside it, mould at its edges and low down,
+       the joints lifting (kept off the tile's edges)."""
+    m = kitlib.Mat(name); T = Tor(m, W, H, wv); V = variant(m); x, y = T.x, T.y
+    def tex(dx, dy):
+        t = m.n('ShaderNodeTexImage', interpolation='Cubic', extension='REPEAT'); t.image = pattern
+        m.l(comb(m, m.math('DIVIDE', m.math('ADD', x, dx), 2 * strip), m.math('DIVIDE', m.math('SUBTRACT', m.math('ADD', y, dy), y0), rep), 0.0), t.inputs['Vector'])
+        r, g_, b = sep(m, t.outputs['Color']); return r, g_, b
+    mo, _, rim = tex(0.0, 0.0); _, li, _ = tex(0.0007, -0.0005)
+    dens = m.math('MULTIPLY', m.remap(T.noise(45, 4, 0.6), 0.25, 0.75, 0.72, 1.06), m.remap(T.noise(3, 3, off=2.0), 0.3, 0.7, 0.9, 1.04))
+    col = m.mix(m.math('MINIMUM', 1.0, m.math('MULTIPLY', mo, dens)), lin(ground), lin(ink))
+    col = m.mix(m.math('MULTIPLY', rim, 0.55), col, lin(pool)); col = m.mix(m.math('MULTIPLY', li, 0.32), col, lin(line))
+    stripe = m.math('ADD', 0.5, m.math('MULTIPLY', m.math('SINE', m.math('MULTIPLY', x, 2 * math.pi / 0.0012)), 0.5))
+    ground_ = m.math('SUBTRACT', 1.0, mo)
+    fib = T.noise(700, 3, 0.7); fib2 = T.noise(130, 4, 0.6)
+    col = m.mix(m.remap(fib2, 0.3, 0.7, 0.0, 0.08), col, m.hsv(col, 0.5, 1.0, 0.9)); col = m.mix(m.remap(fib, 0.3, 0.7, 0.0, 0.05), col, m.hsv(col, 0.5, 1.0, 1.08))
+    col = m.mix(m.math('MULTIPLY', m.math('MULTIPLY', stripe, ground_), 0.06), col, m.hsv(col, 0.5, 1.0, 1.12))
+    h = m.math('ADD', m.math('MULTIPLY', mo, 0.00006), m.math('ADD', m.math('MULTIPLY', fib, 0.00003), m.math('MULTIPLY', m.math('MULTIPLY', stripe, ground_), 0.000025)))
+    rough = m.mixf(mo, m.mixf(stripe, 0.9, 0.8), 0.62)
+    # the joints: a hairline, the edges lifting and dirtier
     fx = m.math('FRACT', m.math('DIVIDE', x, strip)); dj = m.math('MULTIPLY', m.math('MINIMUM', fx, m.math('SUBTRACT', 1.0, fx)), strip)
-    joint = m.remap(dj, 0.0004, 0.0001); lift = m.math('MULTIPLY', m.remap(dj, 0.004, 0.0), m.remap(T.noise(4, 3, off=2.0), 0.45, 0.7))
-    col = m.mix(m.math('MULTIPLY', lift, 0.3), col, m.hsv(col, 0.5, 1.0, 0.8)); col = m.mix(joint, col, (0.32, 0.29, 0.25))
-    h = m.math('ADD', h, m.math('SUBTRACT', m.math('MULTIPLY', lift, 0.0002), m.math('MULTIPLY', joint, 0.0003)))
-    # age: faded and yellowed, foxing, hand grime above the rail, soot toward the ceiling
-    col = m.mix(m.remap(T.noise(1.0, 3, 0.5, off=7.0), 0.3, 0.7, 0.15, 0.45), col, m.mix(1.0, m.hsv(col, 0.5, 0.65, 1.08), (1.0, 0.93, 0.78), 'MULTIPLY'))
-    fox = m.math('MULTIPLY', m.remap(T.voronoi(55, 'Distance', off=3.0), 0.09, 0.03, smooth=True), m.remap(T.noise(3, 2, off=9.0), 0.58, 0.7))
-    col = m.mix(m.math('MULTIPLY', fox, 0.5), col, m.mix(1.0, col, (0.62, 0.45, 0.3), 'MULTIPLY'))
-    hands = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(y, y0, y0 + 0.12, smooth=True), m.remap(y, 1.55, 1.05, smooth=True)), m.remap(T.noise(3.5, 4, off=1.0), 0.45, 0.75, 0.0, 0.55))
-    col = m.mix(hands, col, m.hsv(col, 0.5, 0.7, 0.68)); rough = m.mixf(hands, rough, 0.5)
-    soot = m.math('MULTIPLY', m.remap(y, 2.2, 3.0, smooth=True), m.remap(T.noise(1.5, 3, off=6.0), 0.3, 0.7, 0.2, 0.55))
-    col = m.mix(soot, col, m.hsv(col, 0.5, 0.5, 0.6))
-    # B: water down from above (tide-marked), mould low and high, the paper torn at the joints
-    fade = edge_fade(m, W, H, 0.10, 0.28, T, wv=False)
-    wn = m.math('ADD', T.noise(0.9, 3, 0.5, off=17.0), m.math('MULTIPLY', m.remap(y, 1.0, 3.0), 0.35))   # (more of it the higher up: it came through the ceiling)
-    wn = m.math('ADD', wn, m.math('MULTIPLY', m.math('SUBTRACT', T.noise(9, 4, 0.6, off=3.0), 0.5), 0.06))
-    run = m.math('MULTIPLY', m.remap(wn, 0.68, 0.76, smooth=True), m.math('MULTIPLY', fade, V))
-    tide = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(wn, 0.66, 0.685), m.remap(wn, 0.72, 0.69)), m.math('MULTIPLY', fade, V))
-    col = m.mix(m.math('MULTIPLY', run, 0.4), col, m.mix(1.0, col, (0.78, 0.64, 0.45), 'MULTIPLY')); col = m.mix(m.math('MULTIPLY', tide, 0.75), col, m.mix(1.0, col, (0.5, 0.38, 0.24), 'MULTIPLY'))
-    mould = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(T.voronoi(260, 'Distance', off=5.0), 0.25, 0.05), m.remap(T.noise(2.2, 4, off=11.0), 0.55, 0.72)), m.math('MULTIPLY', fade, V))
-    col = m.mix(mould, col, (0.03, 0.035, 0.025))
-    tear = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(dj, 0.09, 0.0), m.remap(T.noise(3.0, 5, 0.65, off=13.0), 0.58, 0.68, smooth=True)), m.math('MULTIPLY', fade, V))
-    torn = m.remap(tear, 0.45, 0.5, smooth=True); backing = m.remap(tear, 0.35, 0.45, smooth=True)
-    col = m.mix(m.math('SUBTRACT', backing, torn), col, m.hsv(col, 0.5, 0.3, 1.25)); col = m.mix(torn, col, m.mix(m.remap(lump, 0.3, 0.7), lin('#b9ad98'), lin('#9c8f7b')))
-    col = m.mix(m.math('MULTIPLY', m.math('MULTIPLY', m.remap(tear, 0.5, 0.6), m.remap(tear, 0.7, 0.6)), 0.6), col, (0.06, 0.05, 0.04))   # (the shadow under the torn lip)
-    h = m.math('SUBTRACT', h, m.math('MULTIPLY', torn, 0.0003)); rough = m.mixf(torn, rough, 0.9)
+    jn = T.noise(4, 3, off=2.0)
+    joint = m.remap(dj, 0.0005, 0.0001); lift = m.math('MULTIPLY', m.remap(dj, 0.005, 0.0), m.remap(jn, 0.45, 0.7))
+    col = m.mix(m.math('MULTIPLY', lift, 0.25), col, m.hsv(col, 0.5, 1.0, 0.82)); col = m.mix(joint, col, (0.3, 0.27, 0.23))
+    h = m.math('ADD', h, m.math('SUBTRACT', m.math('MULTIPLY', lift, 0.00025), m.math('MULTIPLY', joint, 0.0003)))
+    # age
+    col = m.mix(m.remap(T.noise(0.9, 3, 0.5, off=7.0), 0.3, 0.7, 0.3, 0.65), col, m.mix(1.0, m.hsv(col, 0.5, 0.7, 1.0), (0.95, 0.86, 0.7), 'MULTIPLY'))
+    col = m.mix(m.remap(T.noise(2.6, 4, 0.6, off=27.0), 0.5, 0.8, 0.0, 0.5), col, m.mix(1.0, col, (0.86, 0.76, 0.6), 'MULTIPLY'))   # (browned in patches)
+    fox = m.math('MULTIPLY', m.remap(T.voronoi(55, 'Distance', off=3.0), 0.12, 0.03, smooth=True), m.remap(T.noise(3, 2, off=9.0), 0.52, 0.66))
+    col = m.mix(m.math('MULTIPLY', fox, 0.45), col, m.mix(1.0, col, (0.62, 0.45, 0.3), 'MULTIPLY'))
+    hands = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(y, y0 + 0.05, y0 + 0.2, smooth=True), m.remap(y, 1.65, 1.15, smooth=True)), m.remap(T.noise(3.5, 4, off=1.0), 0.4, 0.75, 0.0, 0.7))
+    col = m.mix(hands, col, m.hsv(col, 0.5, 0.7, 0.62)); rough = m.mixf(hands, rough, 0.6)
+    ledge = m.math('MULTIPLY', m.remap(y, y0 + 0.06, y0 + 0.03), m.remap(y, y0 + 0.02, y0 + 0.03))
+    col = m.mix(m.math('MULTIPLY', ledge, 0.4), col, m.hsv(col, 0.5, 0.6, 0.75))
+    soot = m.math('MULTIPLY', m.remap(y, 1.9, 3.0, smooth=True), m.remap(T.noise(1.4, 3, off=6.0), 0.3, 0.7, 0.35, 0.75))
+    col = m.mix(soot, col, m.hsv(col, 0.5, 0.55, 0.62))
+    # B: the water bloom, mould, lifting joints
+    fade = edge_fade(m, W, H, 0.10, 0.3, T, wv=False)
+    wn = m.math('ADD', T.noise(0.7, 2, 0.45, off=17.0), m.math('MULTIPLY', m.remap(y, 1.0, 3.0), 0.32))
+    wn = m.math('ADD', wn, m.math('MULTIPLY', m.math('SUBTRACT', T.noise(6, 2, 0.5, off=3.0), 0.5), 0.025))
+    inside = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(wn, 0.66, 0.70, smooth=True), fade), V)
+    tides = None
+    for lv, k in ((0.665, 0.85), (0.735, 0.3)):
+        t_ = m.math('MULTIPLY', m.remap(wn, lv - 0.006, lv, smooth=True), m.remap(wn, lv + 0.03, lv, smooth=True))
+        tides = m.math('MULTIPLY', t_, k) if tides is None else m.math('MAXIMUM', tides, m.math('MULTIPLY', t_, k))
+    tides = m.math('MULTIPLY', m.math('MULTIPLY', tides, fade), V)
+    col = m.mix(m.math('MULTIPLY', inside, 0.6), col, m.mix(1.0, m.hsv(col, 0.5, 0.55, 1.04), (0.95, 0.84, 0.64), 'MULTIPLY'))
+    near_t = m.math('MULTIPLY', inside, m.remap(wn, 0.76, 0.67))                            # (the water carried the dirt to its edge)
+    col = m.mix(m.math('MULTIPLY', near_t, 0.55), col, m.mix(1.0, col, (0.8, 0.66, 0.46), 'MULTIPLY'))
+    col = m.mix(m.math('MULTIPLY', tides, 0.85), col, m.mix(1.0, col, (0.5, 0.36, 0.2), 'MULTIPLY'))
+    mz = m.math('MAXIMUM', m.math('MULTIPLY', m.remap(wn, 0.6, 0.66), m.remap(wn, 0.72, 0.66)), m.math('MULTIPLY', m.remap(y, y0 + 0.4, y0), 0.8))
+    mould = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(T.voronoi(230, 'Distance', off=5.0), 0.28, 0.06), m.math('MULTIPLY', mz, m.remap(T.noise(2.5, 4, off=11.0), 0.5, 0.7))), m.math('MULTIPLY', fade, V))
+    col = m.mix(m.math('MULTIPLY', m.remap(mould, 0.0, 0.4), 0.35), col, m.mix(1.0, col, (0.6, 0.62, 0.55), 'MULTIPLY')); col = m.mix(mould, col, (0.025, 0.028, 0.022))
+    jl = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(dj, 0.006, 0.0), m.remap(jn, 0.5, 0.62)), m.math('MULTIPLY', fade, V))
+    col = m.mix(m.math('MULTIPLY', jl, 0.5), col, m.hsv(col, 0.5, 0.8, 0.6))
     return finish(m, col, rough, h)
 
-def wainscot(G, W, paint, top=0.93, pitch=0.75, stile=0.09, base=0.28, field=(0.31, 0.79), rail=(0.80, 0.90), fz=-0.012):
-    """raised panels between stiles and rails: the frame's face on the wall plane (z 0), the panels sunk behind it, their fields
-       raised on bevelled margins, a rounded cap at the rail height (the moulding js/arch.js sweeps sits on it)"""
-    gp = lambda c, k=0: (c.x * 0.001 + k, c.z, c.y)                   # (grain up the stiles)
-    gh = lambda c, k=0: (c.y * 0.001 + k, c.z, c.x)                   # (grain along the rails)
-    def add_box(sx, sy, sz, cx, cy, cz, grain, bev=0.003):
-        k = random.uniform(-50, 50); G.add(xform(box(sx, sy, sz, bev, 2), (cx, cy, cz)), paint, {'gpos': (lambda c, k=k: grain(c, k)), 'prand': random.random()})
-    add_box(W + 0.02, base, 0.02, W / 2, base / 2, -0.01, gh)                                      # bottom rail
-    add_box(W + 0.02, rail[1] - rail[0], 0.02, W / 2, (rail[0] + rail[1]) / 2, -0.01, gh)          # top rail
-    n = round(W / pitch)
-    for i in range(n):
+def profile_x(prof, x0, x1):
+    """a moulding run along x: prof [(y, z)...] anticlockwise seen from +x, from x0 to x1 (capped)"""
+    bm = bmesh.new(); a = [bm.verts.new((x0, yy, zz)) for yy, zz in prof]; b = [bm.verts.new((x1, yy, zz)) for yy, zz in prof]
+    n = len(prof); bm.faces.new(a[::-1]); bm.faces.new(b)
+    for i in range(n): bm.faces.new((a[i], a[(i + 1) % n], b[(i + 1) % n], b[i]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)                 # (outward, whichever way the profile ran)
+    return bm
+
+def wainscot(G, W, paint, top=0.93, pitch=0.75, stile=0.095, base=0.28, rail=(0.80, 0.885), fz=-0.012):
+    """raised panels between stiles and rails: the frame's face on the wall plane (z 0) with paint-softened edges, the panels
+       set back, their fields raised on bevelled margins, an ovolo sticking round each opening, a moulded cap at the rail height
+       (the moulding js/arch.js sweeps sits on it)"""
+    gp = lambda c, k=0: (c.x * 0.001 + k, c.z, c.y); gh = lambda c, k=0: (c.y * 0.001 + k, c.z, c.x)
+    def add_box(sx, sy, sz, cx, cy, cz, grain, bev=0.005, segs=4):
+        k = random.uniform(-50, 50); G.add(xform(box(sx, sy, sz, bev, segs), (cx, cy, cz)), paint, {'gpos': (lambda c, k=k: grain(c, k)), 'prand': random.random()})
+    add_box(W + 0.02, base, 0.02, W / 2, base / 2, -0.01, gh)
+    add_box(W + 0.02, rail[1] - rail[0], 0.02, W / 2, (rail[0] + rail[1]) / 2, -0.01, gh)
+    for i in range(round(W / pitch)):
         x0 = i * pitch
-        add_box(stile, rail[0] - base + 0.004, 0.02, x0, (base + rail[0]) / 2, -0.01, gp)          # stile (wraps at x = 0)
-        # the panel: a field raised on bevelled margins, set back behind the frame
+        add_box(stile, rail[0] - base + 0.004, 0.02, x0, (base + rail[0]) / 2, -0.01, gp)
         a0, a1 = x0 + stile / 2 + 0.006, x0 + pitch - stile / 2 - 0.006; b0, b1 = base + 0.006, rail[0] - 0.006
         mg = 0.045; bm = bmesh.new()
         O = [bm.verts.new(v) for v in ((a0, b0, fz - 0.004), (a1, b0, fz - 0.004), (a1, b1, fz - 0.004), (a0, b1, fz - 0.004))]
         I = [bm.verts.new(v) for v in ((a0 + mg, b0 + mg, fz + 0.006), (a1 - mg, b0 + mg, fz + 0.006), (a1 - mg, b1 - mg, fz + 0.006), (a0 + mg, b1 - mg, fz + 0.006))]
         bm.faces.new(I)
         for k in range(4): bm.faces.new((O[k], O[(k + 1) % 4], I[(k + 1) % 4], I[k]))
-        bmesh.ops.bevel(bm, geom=[e for e in bm.edges if all(v in I for v in e.verts)], offset=0.004, segments=2, affect='EDGES')
+        bmesh.ops.bevel(bm, geom=[e for e in bm.edges if all(v in I for v in e.verts)], offset=0.006, segments=3, affect='EDGES')
         k = random.uniform(-50, 50); G.add(bm, paint, {'gpos': (lambda c, k=k: gp(c, k)), 'prand': random.random()})
-        # the sticking: a small ovolo where frame meets panel (a bevelled strip round the opening)
-        for (sx, sy, cx, cy) in ((a1 - a0, 0.012, (a0 + a1) / 2, b0 + 0.004), (a1 - a0, 0.012, (a0 + a1) / 2, b1 - 0.004),
-                                 (0.012, b1 - b0, a0 + 0.004, (b0 + b1) / 2), (0.012, b1 - b0, a1 - 0.004, (b0 + b1) / 2)):
-            add_box(sx, sy, 0.012, cx, cy, -0.006, gh if sx > sy else gp, bev=0.005)
-    # the cap: a rounded rail at the rail height, standing 12 mm proud
-    bm = box(W + 0.02, 0.05, 0.024, 0.011, 4); k = random.uniform(-50, 50)
-    G.add(xform(bm, (W / 2, top, 0.0)), paint, {'gpos': (lambda c, k=k: gh(c, k)), 'prand': random.random()})
-    # the plaster behind everything (in the joints)
+        for (sx, sy, cx, cy) in ((a1 - a0, 0.014, (a0 + a1) / 2, b0 + 0.004), (a1 - a0, 0.014, (a0 + a1) / 2, b1 - 0.004),
+                                 (0.014, b1 - b0, a0 + 0.004, (b0 + b1) / 2), (0.014, b1 - b0, a1 - 0.004, (b0 + b1) / 2)):
+            add_box(sx, sy, 0.012, cx, cy, -0.006, gh if sx > sy else gp, bev=0.0055, segs=5)
+    # the cap: a fillet, an ovolo nosing and a cove under it, 14 mm proud
+    prof = [(top - 0.032, -0.02), (top - 0.032, -0.002), (top - 0.024, 0.0), (top - 0.018, 0.002)]
+    prof += [(top - 0.012 + 0.012 * math.sin(a), 0.002 + 0.012 * math.cos(a) * 0.95) for a in [math.radians(v) for v in range(-80, 91, 6)]]
+    prof += [(top + 0.012, 0.006), (top + 0.022, 0.004), (top + 0.03, 0.0), (top + 0.03, -0.02)]
+    k = random.uniform(-50, 50); G.add(profile_x(prof, -0.4, W + 0.4), paint, {'gpos': (lambda c, k=k: gh(c, k)), 'prand': random.random()}, wrap=False)
     G.add(grid(-0.4, W + 0.4, -0.1, top + 0.1, 2, 2, -0.02), flatmat('wainscot_back', (0.03, 0.025, 0.02), 0.9), {'gpos': (0, 0, 0), 'prand': 0.5}, wrap=False)
+
+def plaster_grid(x0, x1, y0, y1, W, step=0.012, amp=0.0012, seed=0.0):
+    """the paper's ground: lath-and-plaster that was never quite flat (periodic across the tile, free up it)"""
+    nx = int(round((x1 - x0) / step)); ny = int(round((y1 - y0) / step)); bm = grid(x0, x1, y0, y1, nx, ny, 0.0)
+    for v in bm.verts:
+        x, y = v.co.x, v.co.y
+        v.co.z = amp * (pnoise(x, y, W, 3.0, 1.1, seed) + 0.45 * pnoise(x, y, W, 3.0, 3.5, seed + 3.3) + 0.15 * pnoise(x, y, W, 3.0, 11.0, seed + 7.1))
+    return bm
 
 def wood_wall():
     """the nursery's wall: dusty-rose damask paper over a painted raised-panel wainscot, the cap at 0.93 m (B5's dado)"""
     W, H = TW, FH; top = float(TRIMS['wood']['dado']); G = Geo(W, H, wv=False)
-    mo, ol = damask(1024); MI, OI = _pattern_image('damask_motif', mo), _pattern_image('damask_outline', ol)
-    PAPER = paper_mat('wood_paper', W, H, MI, OI, y0=top)
-    PAINT = paint_mat('wood_wainscot', W, H, '#d6cbb2', '#5f6d52', '#9c774c', wv=False, chips=0.55, scuff=0.45, stain=1.0)
-    G.add(grid(-0.4, W + 0.4, top, H + 0.3, 8, 8, 0.0), PAPER, {'gpos': (0, 0, 0), 'prand': 0.5}, wrap=False)
+    PAT = _pattern_image('damask', damask(1024))
+    PAPER = paper_mat('wood_paper', W, H, PAT, y0=top)
+    PAINT = paint_mat('wood_wainscot', W, H, '#cabb9b', '#5f6d52', '#8a5a3c', '#9c774c', wv=False, chips=1.3, scuff=0.45, stain=1.0, age=1.4)
+    G.add(plaster_grid(-0.4, W + 0.4, top - 0.01, H + 0.3, W, seed=2.0), PAPER, {'gpos': (0, 0, 0), 'prand': 0.5}, wrap=False, smooth=True)
     wainscot(G, W, PAINT, top)
     return {'geo': G.build('wood_wall'), 'W': W, 'H': H, 'variants': 2, 'wv': False, 'ao': 0.12, 'cav': 0.012, 'pom': 0.03,
             'heights': {'dado': top, 'skirting': TRIMS['wood']['skirting']['h'], 'panels': [0.31, 0.79], 'paper_from': top},
-            'notes': 'damask paper over raised-panel wainscot, cap rail baked at the dado height; B: stained, mould, paper torn at joints'}
+            'notes': 'damask paper over raised-panel wainscot, cap rail baked at the dado height; B: a water bloom from above, mould, lifting joints'}
 
 # ================================================================ running a set
 SIZES = {'floor': (2048, 2048), 'wall': (2048, 2731), 'upper': (1024, 1365), 'ceil': (1024, 1024), 'service': (1024, 1365),
@@ -1361,6 +1410,33 @@ def render(path, w, h, samples=128):
     sc.view_settings.view_transform = 'AgX'; sc.view_settings.look = 'AgX - Base Contrast'
     sc.render.image_settings.file_format = 'PNG'; bpy.ops.render.render(write_still=True); return path
 
+def room_view(style, kind, entry):
+    """a corner of the style's room the way a photographer would stand in it: two walls (the back one A, B, A), the style's
+       floor, a plain skirting at the style's height, daylight through a window off to the right and a warm lamp; eye 1.6 m"""
+    from PIL import Image
+    sc = kitlib.reset(); d = os.path.join(TMP, 'sheets', 'surf'); man = manifest_load()['styles'].get(style, {})
+    W, H = TW, FH; walls = man.get('wall') if kind != 'wall' else entry; floor = man.get('floor')
+    if not walls: return None
+    wA, wB = ship_mat('wallA', walls, 0), ship_mat('wallB', walls, 1)
+    for i, mt in enumerate((wA, wB, wA)): quad(f'back{i}', (i * W, 2 * W, 0), (W, 0, 0), (0, 0, H), mat=mt)          # (faces -y)
+    for j, mt in enumerate((wA, wA)): quad(f'left{j}', (0, (j + 1) * W, 0), (0, -W, 0), (0, 0, H), mat=mt)          # (faces +x)
+    if floor:
+        fA, fB = ship_mat('floorA', floor, 0), ship_mat('floorB', floor, 1)
+        for i in range(3):
+            for j in range(2): quad(f'fl{i}{j}', (i * W, j * W, 0), (W, 0, 0), (0, W, 0), mat=fB if (i, j) == (1, 0) else fA)
+    sk = TRIMS.get(style, {}).get('skirting', {}); sh, sd = sk.get('h', 0.15), sk.get('d', 0.025)
+    skm = flatmat('skirt', (0.32, 0.27, 0.21) if style in ('wood', 'attic', 'workshop') else (0.55, 0.53, 0.5), 0.6)
+    for (x0, y0, x1, y1) in ((0, 2 * W - sd, 3 * W, 2 * W), (0, 0, sd, 2 * W)):
+        bm = box(x1 - x0, y1 - y0, sh, 0.004, 2); xform(bm, ((x0 + x1) / 2, (y0 + y1) / 2, sh / 2)); me = bpy.data.meshes.new('skirt'); bm.to_mesh(me); bm.free()
+        o = kitlib.link(bpy.data.objects.new('skirt', me)); me.materials.append(skm)
+    quad('ceil', (0, 0, H), (0, 2 * W, 0), (3 * W, 0, 0), mat=flatmat('ceilm', (0.6, 0.58, 0.54), 0.9))
+    sky = sc.world; sky.use_nodes = True; bg = sky.node_tree.nodes['Background']; bg.inputs['Color'].default_value = (0.5, 0.56, 0.66, 1); bg.inputs['Strength'].default_value = 0.05
+    win = lamp('window', 'AREA', 700, loc=(3 * W - 0.05, 1.0, 1.6), rot=(0, math.radians(-90), 0), size=1.2, color=(0.88, 0.93, 1.0))
+    win.data.shape = 'RECTANGLE'; win.data.size = 1.3; win.data.size_y = 1.6
+    lamp('lamp', 'POINT', 60, loc=(1.1, 2 * W - 0.6, 1.7), size=0.08, color=(1.0, 0.72, 0.45))
+    cam_at((3.2, 0.7, 1.6), (0.9, 2 * W - 0.3, 1.25), 22)
+    out = render(os.path.join(d, f'{style}_{kind}_room.png'), 1350, 900, 256); print('room', out, flush=True); return out
+
 def sheet(style, kind, entry):
     """flat colour, a lit 3 x 3 tiling (floors: A and B mixed; walls: A, B, A), a grazing-light close-up: one PNG"""
     from PIL import Image, ImageDraw
@@ -1428,7 +1504,9 @@ def sheet(style, kind, entry):
     Wt = sum(t.width for t in tiles); out = Image.new('RGB', (Wt, S + 30), (22, 22, 24)); x = 0
     for t in tiles: out.paste(t, (x, 30)); x += t.width
     ImageDraw.Draw(out).text((8, 8), f'{style} {kind}   {W:.2f} x {H:.2f} m   {entry["px"]["hi"]} px   pom {entry["pom"]} m   seams {json.dumps(entry["seam"].get("color"))}', fill=(230, 230, 230))
-    p = os.path.join(d, f'{style}_{kind}.png'); out.save(p); print('sheet', p, f'{time.time() - t0:.0f}s', flush=True); return p
+    p = os.path.join(d, f'{style}_{kind}.png'); out.save(p); print('sheet', p, f'{time.time() - t0:.0f}s', flush=True)
+    if kind in ('wall', 'floor'): room_view(style, kind, entry)
+    return p
 
 # ================================================================ main
 SETS = {}

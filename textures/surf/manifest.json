@@ -310,6 +310,102 @@
     ],
     "tiles": "uv",
     "variants": 2
+   },
+   "wall": {
+    "ao_m": 0.12,
+    "bake_s": {
+     "ao": 9.9,
+     "cav": 7.4,
+     "colA": 5.7,
+     "colB": 6.5,
+     "col_shift": 8.2,
+     "dn_ao": 2.3,
+     "dn_cav": 2.2,
+     "height": 3.7,
+     "normal": 6.5,
+     "normal_shift": 7.7,
+     "rough": 5.6,
+     "total": 75.1,
+     "zgeo": 3.3
+    },
+    "files": {
+     "color": "wood/wall_color",
+     "normal": "wood/wall_normal",
+     "orh": "wood/wall_orh"
+    },
+    "heights": {
+     "dado": 0.93,
+     "panels": [
+      0.31,
+      0.79
+     ],
+     "paper_from": 0.93,
+     "skirting": 0.18
+    },
+    "notes": "damask paper over raised-panel wainscot, cap rail baked at the dado height; B: a water bloom from above, mould, lifting joints",
+    "pom": 0.03,
+    "preview": false,
+    "px": {
+     "hi": [
+      4096,
+      2731
+     ],
+     "lo": [
+      1024,
+      682
+     ],
+     "md": [
+      2048,
+      1365
+     ]
+    },
+    "px_normal_orh": {
+     "hi": [
+      2048,
+      2731
+     ],
+     "lo": [
+      512,
+      682
+     ],
+     "md": [
+      1024,
+      1365
+     ]
+    },
+    "px_per_m": 910,
+    "seam": {
+     "AB": 0.0166,
+     "BA": 0.0166,
+     "color": {
+      "inner_u": 0.0046,
+      "inner_v": 0.0052,
+      "u": 0.0166,
+      "v": 0.1224
+     },
+     "normal": {
+      "inner_u": 0.004,
+      "inner_v": 0.0041,
+      "u": 0.0569,
+      "v": 0.2176
+     },
+     "orh": {
+      "inner_u": 0.0044,
+      "inner_v": 0.0039,
+      "u": 0.0219,
+      "v": 0.2006
+     },
+     "shift": {
+      "color": 0.0001,
+      "normal": 0.0007
+     }
+    },
+    "size_m": [
+     2.25,
+     3.0
+    ],
+    "tiles": "u",
+    "variants": 2
    }
   },
   "workshop": {
