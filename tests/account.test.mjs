@@ -74,6 +74,21 @@ await p.evaluate(() => document.querySelector('#pfCtl .ch[data-k=hairStyle][data
 const savedLater = await (async () => { for (let i = 0; i < 60; i++) { sv = await server(); if (sv.players[0].look.hairStyle === 'short') return true; await new Promise(r => setTimeout(r, 250)); } return false; })();
 check(savedLater, 'a change is saved to your account a moment later');
 
+console.log('== changing your username');
+check(await p.evaluate(() => !document.getElementById('pfNameSave').classList.contains('hidden') && document.getElementById('pfNameLbl').textContent === 'Username' && document.getElementById('pfNameIn').value === 'Tester_1'), 'signed in, the profile shows your username with "Save name"');
+await p.evaluate(() => api('efbb_sign_up', { p_username: 'Other_1', p_password: 'secret99', p_look: {} }));   // (someone else's account)
+await fill(p, '#pfNameIn', 'other_1'); await click(p, '#pfNameSave');
+check(await until(p, () => /taken/.test(document.getElementById('pfAcct').textContent), null, 10000) && await p.evaluate(() => account.user === 'Tester_1'), 'a name someone else has (any capitals): "That username is taken", nothing changes');
+await fill(p, '#pfNameIn', 'x!'); await click(p, '#pfNameSave');
+check(await until(p, () => /3 to 16/.test(document.getElementById('pfAcct').textContent), null, 10000), 'a name that breaks the rules: told what a username can be');
+await fill(p, '#pfNameIn', 'Renamed_9'); await click(p, '#pfNameSave');
+check(await until(p, () => account.user === 'Renamed_9' && document.getElementById('pfName').textContent === 'Renamed_9' && /now Renamed_9/.test(document.getElementById('pfAcct').textContent), null, 10000), 'a free name: your username is changed (shown on the menu chip too)');
+sv = await server();
+check(sv.players.some(q => q.username === 'Renamed_9') && !sv.players.some(q => q.username === 'Tester_1'), 'the server has the new name');
+check(await p.evaluate(async () => (await api('efbb_me', { p_token: account.token })).username === 'Renamed_9' && JSON.parse(localStorage.getItem('bb_session')).user === 'Renamed_9' && myName === 'Renamed_9'), 'still signed in under the new name; your nametag in multiplayer follows');
+await fill(p, '#pfNameIn', 'Tester_1'); await click(p, '#pfNameSave');
+check(await until(p, () => account.user === 'Tester_1', null, 10000), 'and back again');
+
 console.log('== next time: signed in by itself');
 await open();
 check(await until(p, () => account.token && !document.getElementById('title').classList.contains('hidden') && document.getElementById('auth').classList.contains('hidden'), null, 15000), 'opening the game again: straight in as Tester_1');

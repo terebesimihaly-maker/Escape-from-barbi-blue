@@ -118,7 +118,8 @@ function renderAccountLine(err) {
   const el = $('pfAcct');
   if (account.token) el.textContent = 'Signed in as ' + account.user + (err ? ' · not saved: ' + (AUTH_ERRORS[err] || err) : ' · your character is saved to your account');
   else el.textContent = 'Playing as a guest: your character is kept on this device only.';
-  show('pfSignOut', !!account.token); show('pfSignUp', !account.token); show('pfNameRow', !account.token);
+  show('pfSignOut', !!account.token); show('pfSignUp', !account.token); show('pfNameSave', !!account.token);
+  $('pfNameLbl').textContent = account.token ? 'Username' : 'Name';
 }
 const hexOf = n => '#' + (n >>> 0).toString(16).padStart(6, '0');
 // the controls: a row of colour swatches (plus your own colour), or a row of choices
@@ -158,7 +159,23 @@ $('pfRandom').onclick = () => { setLook(PlayerModel.randomLook(Math.random().toS
 $('pfFace').onclick = () => { setLook(Object.assign({}, account.look, { seed: Math.random().toString(36).slice(2, 10) })); focusOn('seed'); };   // (a new face; the rest stays)
 $('pfSignOut').onclick = () => signedOut('Signed out.');
 $('pfSignUp').onclick = () => { closePanel(); authMode = 'up'; showAuth('Create an account and your character comes with you.'); };
-$('pfNameIn').addEventListener('input', e => { saveName(e.target.value); $('mpName').value = myName; });
+// your name: a guest's is kept on this device as you type; signed in, it's your username, changed on the server with "Save name"
+// (the same rules as a new account: 3 to 16 letters, numbers or _, and nobody else may have it)
+$('pfNameIn').addEventListener('input', e => { if (account.token) return; saveName(e.target.value); $('mpName').value = myName; });
+$('pfNameIn').addEventListener('keydown', e => { if (e.key === 'Enter' && account.token) { e.preventDefault(); renameAccount(); } });
+$('pfNameSave').onclick = () => renameAccount();
+async function renameAccount() {
+  const name = $('pfNameIn').value.trim(), btn = $('pfNameSave');
+  if (!account.token || name === account.user) return;
+  btn.disabled = true; $('pfAcct').textContent = 'Changing your username…';
+  const r = await api('efbb_rename', { p_token: account.token, p_username: name }); btn.disabled = false;
+  if (r.error === 'bad_session') { signedOut('You were signed out. Sign in again to change your username.'); return; }
+  if (r.error || !r.username) { $('pfAcct').textContent = AUTH_ERRORS[r.error] || AUTH_ERRORS.server; $('pfNameIn').value = account.user; return; }
+  account.user = r.username;
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify({ user: account.user, token: account.token })); } catch (e) {}
+  saveName(account.user); $('mpName').value = myName; updateProfileChip();
+  $('pfAcct').textContent = 'Your username is now ' + account.user + '.';
+}
 
 /* ---------- the 3D preview (its own small renderer, made the first time the profile opens; it only draws while it's open) ---------- */
 const pv = { r: null, scene: null, cam: null, fig: null, raf: 0, on: false, yaw: 0.35, drag: null, pinch: null, t: 0, dirty: false, zoom: 0, zoomT: 0 };
