@@ -156,6 +156,99 @@
     ],
     "tiles": "uv",
     "variants": 2
+   },
+   "wall": {
+    "ao_m": 0.12,
+    "bake_s": {
+     "ao": 22.0,
+     "cav": 21.3,
+     "colA": 18.5,
+     "colB": 11.6,
+     "col_shift": 15.5,
+     "dn_ao": 4.0,
+     "dn_cav": 3.8,
+     "height": 8.8,
+     "normal": 17.2,
+     "normal_shift": 16.9,
+     "rough": 18.4,
+     "total": 174.7,
+     "zgeo": 7.3
+    },
+    "files": {
+     "color": "concrete/wall_color",
+     "normal": "concrete/wall_normal",
+     "orh": "concrete/wall_orh"
+    },
+    "heights": {
+     "course_m": 0.075,
+     "courses": 40,
+     "damp_m": 0.78,
+     "skirting": 0.1
+    },
+    "notes": "English bond handmade brick, recessed lime mortar, rising damp to ~0.8 m with a salt line; B: limewashed, flaking",
+    "pom": 0.02,
+    "preview": false,
+    "px": {
+     "hi": [
+      4096,
+      2731
+     ],
+     "lo": [
+      1024,
+      682
+     ],
+     "md": [
+      2048,
+      1365
+     ]
+    },
+    "px_normal_orh": {
+     "hi": [
+      2048,
+      2731
+     ],
+     "lo": [
+      512,
+      682
+     ],
+     "md": [
+      1024,
+      1365
+     ]
+    },
+    "px_per_m": 910,
+    "seam": {
+     "AB": 0.0085,
+     "BA": 0.0085,
+     "color": {
+      "inner_u": 0.0097,
+      "inner_v": 0.0118,
+      "u": 0.0085,
+      "v": 0.0685
+     },
+     "normal": {
+      "inner_u": 0.0157,
+      "inner_v": 0.0227,
+      "u": 0.015,
+      "v": 0.0166
+     },
+     "orh": {
+      "inner_u": 0.0097,
+      "inner_v": 0.0159,
+      "u": 0.0108,
+      "v": 0.0415
+     },
+     "shift": {
+      "color": 0.0003,
+      "normal": 0.0009
+     }
+    },
+    "size_m": [
+     2.25,
+     3.0
+    ],
+    "tiles": "u",
+    "variants": 2
    }
   },
   "tile": {
@@ -232,6 +325,106 @@
      2.25
     ],
     "tiles": "uv",
+    "variants": 2
+   },
+   "wall": {
+    "ao_m": 0.12,
+    "bake_s": {
+     "ao": 9.6,
+     "cav": 9.1,
+     "colA": 12.2,
+     "colB": 13.7,
+     "col_shift": 13.6,
+     "dn_ao": 3.2,
+     "dn_cav": 2.5,
+     "height": 6.3,
+     "normal": 11.3,
+     "normal_shift": 12.4,
+     "rough": 12.5,
+     "total": 120.0,
+     "zgeo": 4.5
+    },
+    "files": {
+     "color": "tile/wall_color",
+     "normal": "tile/wall_normal",
+     "orh": "tile/wall_orh"
+    },
+    "heights": {
+     "border": [
+      0.6,
+      0.75
+     ],
+     "capping": [
+      0.825,
+      0.904
+     ],
+     "dado": 0.87,
+     "paper_from": 0.9,
+     "skirting": 0.25
+    },
+    "notes": "bottle-green glazed tile dado with a transfer-printed border and moulded capping at the dado height, red damask above; B: water on the paper, salt on the tiles",
+    "pom": 0.02,
+    "preview": false,
+    "px": {
+     "hi": [
+      4096,
+      2731
+     ],
+     "lo": [
+      1024,
+      682
+     ],
+     "md": [
+      2048,
+      1365
+     ]
+    },
+    "px_normal_orh": {
+     "hi": [
+      2048,
+      2731
+     ],
+     "lo": [
+      512,
+      682
+     ],
+     "md": [
+      1024,
+      1365
+     ]
+    },
+    "px_per_m": 910,
+    "seam": {
+     "AB": 0.0132,
+     "BA": 0.0132,
+     "color": {
+      "inner_u": 0.0059,
+      "inner_v": 0.0063,
+      "u": 0.0132,
+      "v": 0.056
+     },
+     "normal": {
+      "inner_u": 0.0052,
+      "inner_v": 0.0046,
+      "u": 0.0787,
+      "v": 0.0725
+     },
+     "orh": {
+      "inner_u": 0.0078,
+      "inner_v": 0.0066,
+      "u": 0.0449,
+      "v": 0.2431
+     },
+     "shift": {
+      "color": 0.0002,
+      "normal": 0.0006
+     }
+    },
+    "size_m": [
+     2.25,
+     3.0
+    ],
+    "tiles": "u",
     "variants": 2
    }
   },
