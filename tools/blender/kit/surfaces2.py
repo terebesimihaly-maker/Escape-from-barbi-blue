@@ -841,6 +841,218 @@ def concrete_floor():
     return {'geo': G.build('concrete_floor'), 'W': W, 'H': H, 'variants': 2, 'ao': 0.1, 'cav': 0.015, 'pom': 0.008,
             'notes': 'hand-trowelled slab, tooled joints along the tile edges; B: the cement skin worn off along a path'}
 
+# ================================================================ ATTIC style
+JOIST = 0.45                                                       # (attic joists: every 0.45 m, five to a tile)
+
+def pine_mat(name, W, H, early='#9a7550', late='#4c2f17', dust='#837e74', dusty=0.2, nails=True, worn='#5e4129', board_w=0.2, along_x=True):
+    """old Baltic pine, never finished: tight rings (pale earlywood fading into a sharp dark latewood band), flat-sawn
+       cathedrals and straight quartersawn stripes ('qs'), knots with the rings bent round them and resin bleeding along the
+       grain, faint saw marks across each board, the soft earlywood worn below the latewood (raised grain), splits at a
+       few ends ('spl': where across), darkened with age, grey with dust, rust bleeding from the nails at every joist
+       crossing, whitewash splashes, a roof-leak stain. Variant B: the dust walked off a path, the wood burnished darker."""
+    m = kitlib.Mat(name); T = Tor(m, W, H); g = m.attr('gpos', True); pr = m.attr('prand'); qs = m.attr('qs'); V = variant(m)
+    bx = m.attr('bx'); bl = m.attr('bl'); bL = m.attr('bL'); spl = m.attr('spl'); bw = m.attr('bw')
+    gx, gy, gz = sep(m, g)
+    pr2 = m.math('FRACT', m.math('MULTIPLY', pr, 7.31)); pr3 = m.math('FRACT', m.math('MULTIPLY', pr, 13.7)); pr4 = m.math('FRACT', m.math('MULTIPLY', pr, 3.17))
+    def wob(sc, amp, det=3):
+        return m.math('MULTIPLY', m.math('SUBTRACT', noise3(m, vmul(m, g, sc), 1.0, det, 0.5), 0.5), amp)
+    # knots: a few per board, the rings swirling round them
+    sp = comb(m, m.math('ADD', bl, m.math('MULTIPLY', pr, 41.0)), m.math('ADD', m.math('MULTIPLY', bx, m.math('MULTIPLY', bw, 0.5)), m.math('MULTIPLY', pr, 13.0)), 0.0)
+    kv = m.n('ShaderNodeTexVoronoi', i_Scale=1.0, i_Randomness=0.9); m.l(m.map(sp, (2.2, 5.0, 1.0)), kv.inputs['Vector'])
+    kd = m.math('DIVIDE', kv.outputs['Distance'], 5.0); ksel = m.remap(sep(m, kv.outputs['Color'])[0], 0.62, 0.66)
+    krad = m.mixf(sep(m, kv.outputs['Color'])[1], 0.006, 0.016)
+    kin = m.math('MULTIPLY', m.remap(m.math('DIVIDE', kd, krad), 1.0, 0.85, smooth=True), ksel)
+    bend = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(m.math('DIVIDE', kd, krad), 5.0, 1.0, smooth=True), ksel), m.math('MULTIPLY', krad, 1.4))
+    r = m.math('ADD', vlen(m, comb(m, gx, gy, 0.0)), m.math('ADD', wob((2.2, 2.2, 0.16), 0.02), m.math('ADD', wob((12, 12, 0.9), 0.006), m.math('ADD', wob((60, 60, 4), 0.0015), m.math('ADD', wob((1.5, 1.5, 1.2), 0.008), wob((30, 30, 2.5), 0.003))))))
+    r = m.math('ADD', r, bend)
+    yr = noise3(m, comb(m, m.math('MULTIPLY', r, 20.0), m.math('MULTIPLY', pr, 40.0), 0.0), 1.0, 2, 0.5)
+    ring = m.math('FRACT', m.math('ADD', m.math('MULTIPLY', r, m.remap(pr, 0, 1, 170, 320)), m.math('MULTIPLY', m.math('SUBTRACT', yr, 0.5), 6.0)))
+    lws = m.remap(noise3(m, vmul(m, g, (25, 25, 1.5)), 1.0, 3, 0.55), 0.3, 0.7, 0.35, 0.72)       # (where the latewood starts: its width wanders)
+    lw = m.math('POWER', m.math('MINIMUM', 1.0, m.math('MAXIMUM', 0.0, m.math('DIVIDE', m.math('SUBTRACT', ring, lws), m.math('SUBTRACT', 0.98, lws)))), 1.4)
+    col = m.mix(m.math('MULTIPLY', lw, m.math('MULTIPLY', m.remap(pr3, 0, 1, 0.6, 0.95), m.remap(noise3(m, vmul(m, g, (18, 18, 0.8)), 1.0, 2), 0.3, 0.7, 0.75, 1.05))), lin(early), lin(late))
+    col = m.mix(m.remap(noise3(m, vmul(m, g, (36, 36, 0.45)), 1.0, 4, 0.55), 0.2, 0.8), m.hsv(col, 0.5, 0.95, 0.86), m.hsv(col, 0.5, 1.05, 1.12))
+    fibre = noise3(m, vmul(m, g, (380, 380, 5)), 1.0, 3, 0.65)
+    col = m.mix(m.remap(fibre, 0.25, 0.75), m.hsv(col, 0.5, 1.0, 0.86), m.hsv(col, 0.5, 1.0, 1.08))   # (fibre)
+    col = m.hsv(col, m.remap(pr, 0, 1, 0.488, 0.512), m.remap(pr3, 0, 1, 0.82, 1.08), m.remap(pr2, 0, 1, 0.8, 1.12))
+    col = m.hsv(col, 0.5, 1.0, m.math('ADD', 1.0, m.math('MULTIPLY', m.math('DIVIDE', bl, m.math('MAXIMUM', bL, 0.1)), m.remap(pr4, 0, 1, -0.2, 0.2))))
+    kcol = m.mix(m.remap(m.math('FRACT', m.math('ADD', m.math('MULTIPLY', m.math('DIVIDE', kd, krad), 5.0), m.math('MULTIPLY', noise3(m, vmul(m, g, (200, 200, 200)), 1.0, 2), 1.5))), 0.3, 0.8), lin('#2c1a0c'), lin('#4a2c12'))
+    col = m.mix(kin, col, kcol); col = m.mix(m.math('MULTIPLY', m.remap(m.math('DIVIDE', kd, krad), 1.15, 0.95), ksel), col, (0.05, 0.03, 0.015))   # (the dark rim of the knot)
+    resin = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(m.math('DIVIDE', kd, krad), 6.0, 1.0, smooth=True), ksel), m.remap(noise3(m, vmul(m, g, (90, 90, 2)), 1.0, 3), 0.5, 0.7))
+    col = m.mix(m.math('MULTIPLY', resin, 0.6), col, m.hsv(col, 0.48, 1.25, 0.6))
+    # saw marks across the board (a circular saw's arcs), faint
+    sx_, sy_, _ = sep(m, sp)
+    arc = m.math('SINE', m.math('MULTIPLY', m.math('ADD', sx_, m.math('MULTIPLY', m.math('MULTIPLY', sy_, sy_), 0.8)), 2 * math.pi / 0.0035))
+    saw = m.math('MULTIPLY', m.math('ADD', m.math('MULTIPLY', arc, 0.5), 0.5), m.remap(noise3(m, vmul(m, g, (8, 8, 0.6)), 1.0, 2), 0.4, 0.7, 0.0, 0.7))
+    col = m.mix(m.math('MULTIPLY', saw, 0.12), col, m.hsv(col, 0.5, 1.0, 0.82))
+    # raised grain: the latewood stands, the earlywood is worn down; knots stand proud
+    h = m.math('ADD', m.math('MULTIPLY', lw, 0.00022), m.math('MULTIPLY', saw, 0.00005))
+    h = m.math('ADD', h, m.math('MULTIPLY', kin, 0.0002))
+    rough = m.mixf(lw, 0.8, 0.68)
+    # splits at a few ends, along the grain
+    endd = m.math('SUBTRACT', m.math('MULTIPLY', bL, 0.5), m.math('ABSOLUTE', bl))
+    split = m.math('MULTIPLY', m.remap(m.math('ABSOLUTE', m.math('SUBTRACT', bx, spl)), 0.035, 0.0), m.remap(m.math('DIVIDE', endd, m.mixf(pr2, 0.05, 0.22)), 1.0, 0.0, smooth=True))
+    split = m.math('MULTIPLY', split, m.remap(m.math('ABSOLUTE', m.math('SUBTRACT', bx, spl)), 0.035, 0.0))
+    col = m.mix(split, col, (0.02, 0.014, 0.01)); h = m.math('SUBTRACT', h, m.math('MULTIPLY', split, 0.002))
+    col = m.mix(m.remap(endd, 0.006, 0.0, smooth=True), col, m.hsv(col, 0.5, 1.1, 0.6))       # (end grain, darker)
+    # age: darker toward amber-brown, unevenly; nails bleed rust at every joist crossing
+    col = m.mix(1.0, col, (0.86, 0.8, 0.72), 'MULTIPLY')
+    col = m.mix(m.remap(T.noise(1.0, 3, 0.5), 0.3, 0.75, 0.25, 0.65), col, m.mix(1.0, m.hsv(col, 0.5, 0.75, 1.0), (0.78, 0.68, 0.58), 'MULTIPLY'))
+    if nails:
+        fx = m.math('SUBTRACT', m.math('FRACT', m.math('DIVIDE', T.x if along_x else T.y, JOIST)), 0.5)
+        dn = m.math('SQRT', m.math('ADD', m.math('POWER', m.math('MULTIPLY', fx, JOIST), 2.0),
+                                   m.math('POWER', m.math('MULTIPLY', m.math('SUBTRACT', m.math('ABSOLUTE', bx), 0.62), m.math('MULTIPLY', bw, 0.5)), 2.0)))
+        hn = noise3(m, vmul(m, g, (120, 120, 120)), 1.0, 3)
+        halo = m.math('MULTIPLY', m.remap(m.math('ADD', dn, m.math('MULTIPLY', m.math('SUBTRACT', hn, 0.5), 0.01)), 0.022, 0.003, smooth=True), m.remap(hn, 0.2, 0.7, 0.4, 1.0))
+        black = m.remap(dn, 0.007, 0.0025, smooth=True)
+        col = m.mix(m.math('MULTIPLY', halo, 0.75), col, m.mix(0.55, m.hsv(col, 0.5, 1.1, 0.5), lin('#4a2410'))); col = m.mix(m.math('MULTIPLY', black, 0.7), col, (0.03, 0.025, 0.02))
+    # whitewash splashes, a roof-leak stain with its tide line
+    ws = m.math('MULTIPLY', m.remap(T.voronoi(9.0, 'Distance', off=81.0), 0.06, 0.03, smooth=True), m.remap(T.noise(0.8, 2, off=83.0), 0.62, 0.68))
+    ws = m.math('MULTIPLY', ws, m.remap(T.noise(60, 3, off=84.0), 0.3, 0.6))
+    col = m.mix(m.math('MULTIPLY', ws, 0.85), col, lin('#d8d4c8')); rough = m.mixf(ws, rough, 0.9); h = m.math('ADD', h, m.math('MULTIPLY', ws, 0.0002))
+    lk = T.noise(0.7, 4, 0.55, off=91.0)
+    leak = m.remap(lk, 0.6, 0.66, smooth=True); ltide = m.math('MULTIPLY', m.remap(lk, 0.585, 0.6), m.remap(lk, 0.63, 0.61))
+    col = m.mix(m.math('MULTIPLY', leak, 0.45), col, m.mix(1.0, col, (0.6, 0.52, 0.45), 'MULTIPLY')); col = m.mix(m.math('MULTIPLY', ltide, 0.55), col, m.mix(1.0, col, (0.45, 0.36, 0.28), 'MULTIPLY'))
+    # the edges worn pale and round, dirt in the gaps' lips, dust over everything that isn't walked on
+    cav = look(m, 'CAV', W, H); edge = look(m, 'EDGE', W, H)
+    col = m.mix(m.math('MULTIPLY', edge, 0.3), col, m.hsv(col, 0.5, 0.8, 1.15))
+    gr = m.math('MULTIPLY', m.remap(cav, 0.95, 0.45, smooth=True), m.remap(T.noise(25, 4), 0.3, 0.7, 0.5, 1.0))
+    col = m.mix(m.math('MULTIPLY', gr, 0.85), col, (0.035, 0.03, 0.025)); rough = m.mixf(gr, rough, 0.9)
+    wear = m.math('MULTIPLY', m.math('MULTIPLY', edge_fade(m, W, H, 0.10, 0.55, T), m.remap(m.math('ADD', T.noise(0.9, 3, 0.45), m.math('MULTIPLY', T.noise(9, 3), 0.15)), 0.3, 0.62, smooth=True)), V)
+    dn_ = m.math('ADD', T.noise(1.5, 4, 0.6, off=6.0), m.math('MULTIPLY', T.noise(14, 3, off=7.0), 0.3))
+    dl = m.math('MULTIPLY', m.remap(dn_, 0.35, 0.95, 0.15 * dusty, 2.2 * dusty, smooth=True), m.math('SUBTRACT', 1.0, m.math('MULTIPLY', wear, 0.95)))   # (thin on the boards, thick in drifts)
+    dl = m.math('MULTIPLY', dl, m.math('MULTIPLY', m.remap(cav, 0.6, 1.0, 1.6, 1.0), m.math('ADD', 1.0, m.math('MULTIPLY', m.math('SUBTRACT', 1.0, lw), 0.35))))
+    col = m.mix(dl, col, lin(dust)); rough = m.mixf(dl, rough, 0.92)
+    col = m.mix(m.math('MULTIPLY', wear, 0.45), col, m.mix(0.3, m.hsv(col, 0.5, 0.9, 0.86), lin(worn))); rough = m.mixf(m.math('MULTIPLY', wear, 0.8), rough, 0.55)
+    h = m.math('ADD', h, m.math('MULTIPLY', m.math('MULTIPLY', lw, wear), 0.0001))
+    return finish(m, col, rough, h)
+
+def iron_mat(name, W, H, col='#2b2724'):
+    """old cut-nail heads and iron: black, rusted at the edges"""
+    m = kitlib.Mat(name); T = Tor(m, W, H); n = T.noise(400, 3, 0.6); rr = T.noise(80, 4, 0.6, off=3.0)
+    c = m.mix(m.remap(rr, 0.4, 0.7), lin(col), lin('#5a2f16')); c = m.mix(m.remap(n, 0.3, 0.7, 0.0, 0.3), c, m.hsv(c, 0.5, 1.0, 1.4))
+    return finish(m, c, m.remap(rr, 0.3, 0.7, 0.55, 0.9), m.math('MULTIPLY', n, 0.0001), metal=m.remap(rr, 0.55, 0.4, 0.0, 0.6))
+
+def split_widths(total, n, lo, hi):
+    w = [random.uniform(lo, hi) for _ in range(n)]; k = total / sum(w); return [x * k for x in w]
+
+def attic_floor():
+    """the attic's floor: wide rough pine boards of uneven width, butted over the joists (every 0.45 m), face-nailed at every
+       joist, cupped, wide dusty gaps, a few ends lifted"""
+    W = H = TW; G = Geo(W, H); t = 0.022
+    P = pine_mat('attic_floor', W, H); IR = iron_mat('attic_nail', W, H); D = gapdirt_mat('attic_gap', W, H, '#24201b')
+    widths = split_widths(H, 11, 0.17, 0.24); y = 0.0
+    for wbd in widths:
+        nj = random.choice((2, 3, 4, 5)); off = random.randrange(5); x = (off + 0.5) * JOIST
+        lens = []; left = 5
+        while left > 0:
+            k = min(left, random.choice((2, 3, 4, 5))); lens.append(k * JOIST); left -= k
+        for L in lens:
+            gx, gy = random.uniform(0.001, 0.003), random.uniform(0.002, 0.007)
+            cup = random.uniform(0.0004, 0.0014)
+            bm = board(x, y, L, wbd, t, gx, gy, cup=cup, bevel=0.0018, nx=0.06, ny=10)
+            xc, yc = x + L / 2, y + wbd / 2; lift = random.choice((0.0, 0.0, 0.0, random.uniform(0.0005, 0.0018)))
+            dz = random.gauss(0, 0.0004); tilt = random.gauss(0, 0.0015)
+            bm = deform(bm, lambda c, xc=xc, yc=yc, dz=dz, tilt=tilt, lift=lift, L=L: (c.x, c.y, c.z + dz + (c.y - yc) * tilt + lift * max(0.0, (abs(c.x - xc) - L / 2 + 0.25) / 0.25) ** 2))
+            qsn = 1.0 if random.random() < 0.15 else 0.0; d0 = random.uniform(0.1, 0.3) if not qsn else random.uniform(0.08, 0.3)
+            o3 = (random.uniform(-0.02, 0.02), random.uniform(-90, 90)); tl = math.tan(math.radians(random.uniform(0.15, 1.0))) * random.choice((-1, 1))
+            if qsn: gp = lambda c, xc=xc, yc=yc, d0=d0, o=o3, tl=tl: (d0 + (c.y - yc), c.z * 3 + (c.x - xc) * tl * 0.3, c.x - xc + o[1])
+            else: gp = lambda c, xc=xc, yc=yc, d0=d0, o=o3, tl=tl: (c.y - yc + o[0], d0 + c.z + (c.x - xc) * tl, c.x - xc + o[1])
+            wb = wbd - gy
+            G.add(bm, P, {'gpos': gp, 'prand': random.random(), 'qs': qsn, 'bL': L - gx, 'bw': wb, 'spl': random.uniform(-0.6, 0.6) if random.random() < 0.25 else 9.0,
+                          'bx': (lambda c, yc=yc, wb=wb: (c.y - yc) / (wb / 2)), 'bl': (lambda c, xc=xc: c.x - xc)})
+            # cut nails at every joist the board crosses, two across it (and at both ends)
+            for k in range(int(round(L / JOIST)) + 1):
+                jx = x + k * JOIST + (0.012 if k == 0 else (-0.012 if k == round(L / JOIST) else 0.0))
+                for s in (-1, 1):
+                    ny_ = yc + s * 0.62 * wb / 2; top = -cup * (1 - 0.62 ** 2) + random.choice((-0.0005, -0.0003, -0.0002, 0.0, 0.0006))   # (most set just below the face, one or two proud)
+                    nb = box(0.0052, 0.0038, 0.004, 0.0004, 1); xform(nb, (jx + random.gauss(0, 0.0015), ny_ + random.gauss(0, 0.001), top - 0.002), (0, 0, random.uniform(-0.3, 0.3)))
+                    nb = deform(nb, lambda c, xc=xc, yc=yc, dz=dz, tilt=tilt: (c.x, c.y, c.z + dz + (c.y - yc) * tilt))
+                    G.add(nb, IR, {'gpos': (0, 0, 0), 'prand': 0.5, 'qs': 0.0, 'bL': 1.0, 'bw': 0.2, 'spl': 9.0, 'bx': 0.0, 'bl': 0.0})
+            x += L
+        y += wbd
+    G.add(grid(-0.4, W + 0.4, -0.4, H + 0.4, 4, 4, -0.009), D, {'gpos': (0, 0, 0), 'prand': 0.5, 'qs': 0.0, 'bL': 1.0, 'bw': 0.2, 'spl': 9.0, 'bx': 0.0, 'bl': 0.0}, wrap=False)
+    return {'geo': G.build('attic_floor'), 'W': W, 'H': H, 'variants': 2, 'ao': 0.1, 'cav': 0.012, 'pom': 0.008,
+            'notes': 'wide rough pine boards (11 to a tile, uneven widths) butted over joists every 0.45 m, face-nailed; B: the dust walked off a path'}
+
+# ================================================================ WORKSHOP style
+def quarry_mat(name, W, H, reds=('#7a3b26', '#8b4b31', '#5e2d1e', '#6c3727'), blue='#38322f', worn='#94604a'):
+    """unglazed quarry tiles: fired clay in a run of red-browns, now and then a Staffordshire blue, kiln flashing across one
+       side, grog specks and pits, lime bloom, worn pale on their high edges and corners, a few cracked ('crack'), dirt in
+       every low place, oil spots. Variant B: oil-soaked: dark, saturated, glossy blotches that have wicked along the joints."""
+    m = kitlib.Mat(name); T = Tor(m, W, H); g = m.attr('gpos', True); pr = m.attr('prand'); lp = m.attr('lpos', True); crk = m.attr('crack'); V = variant(m)
+    bl_ = m.attr('blue')
+    pr2 = m.math('FRACT', m.math('MULTIPLY', pr, 7.31)); pr3 = m.math('FRACT', m.math('MULTIPLY', pr, 13.7)); pr4 = m.math('FRACT', m.math('MULTIPLY', pr, 3.17))
+    lx, ly, lz = sep(m, lp)
+    col = m.mix(m.remap(pr, 0.0, 0.5), lin(reds[0]), lin(reds[1])); col = m.mix(m.remap(pr, 0.5, 1.0), col, lin(reds[2]))
+    col = m.mix(m.remap(pr2, 0.75, 0.95), col, lin(reds[3]))
+    col = m.mix(bl_, col, lin(blue))
+    # kiln flashing: darker across one side of the tile, cloudy
+    fd = m.math('ADD', m.math('MULTIPLY', lx, m.math('SUBTRACT', m.math('MULTIPLY', pr3, 2.0), 1.0)), m.math('MULTIPLY', ly, m.math('SUBTRACT', m.math('MULTIPLY', pr4, 2.0), 1.0)))
+    flash = m.math('MULTIPLY', m.remap(m.math('ADD', fd, m.math('MULTIPLY', m.math('SUBTRACT', noise3(m, vmul(m, g, (6, 6, 6)), 1.0, 4), 0.5), 0.8)), 0.0, 0.7, smooth=True), m.remap(pr2, 0.2, 0.6, 0.2, 0.8))
+    col = m.mix(flash, col, m.hsv(col, 0.5, 1.1, 0.62))
+    cl = noise3(m, vmul(m, g, (4, 4, 4)), 1.0, 5, 0.6); col = m.mix(m.remap(cl, 0.3, 0.7, 0.0, 0.35), col, m.hsv(col, 0.5, 0.95, 1.15))
+    # grog: specks lighter and darker; pits
+    gv = m.n('ShaderNodeTexVoronoi', i_Scale=1.0, i_Randomness=1.0); m.l(vmul(m, g, (300, 300, 300)), gv.inputs['Vector'])
+    gs = m.remap(gv.outputs['Distance'], 0.3, 0.1); gc_ = sep(m, gv.outputs['Color'])[0]
+    col = m.mix(m.math('MULTIPLY', gs, m.remap(gc_, 0.6, 0.9)), col, m.hsv(col, 0.5, 0.6, 1.5)); col = m.mix(m.math('MULTIPLY', gs, m.remap(gc_, 0.3, 0.1)), col, m.hsv(col, 0.5, 1.0, 0.45))
+    pv = m.n('ShaderNodeTexVoronoi', i_Scale=1.0, i_Randomness=1.0); m.l(vmul(m, g, (90, 90, 90)), pv.inputs['Vector'])
+    pit = m.math('MULTIPLY', m.remap(pv.outputs['Distance'], 0.12, 0.04, smooth=True), m.remap(noise3(m, vmul(m, g, (5, 5, 5)), 1.0, 2), 0.45, 0.7))
+    col = m.mix(m.math('MULTIPLY', pit, 0.7), col, m.hsv(col, 0.5, 1.0, 0.4))
+    fine = T.noise(240, 3, 0.6); col = m.mix(m.remap(fine, 0.25, 0.75), m.hsv(col, 0.5, 1.0, 0.9), m.hsv(col, 0.5, 1.0, 1.1))
+    h = m.math('ADD', m.math('MULTIPLY', cl, 0.0003), m.math('SUBTRACT', m.math('MULTIPLY', fine, 0.00012), m.math('MULTIPLY', pit, 0.0005)))
+    rough = m.remap(fine, 0.3, 0.7, 0.74, 0.9)
+    # lime bloom, a haze on some tiles
+    bloom = m.math('MULTIPLY', m.remap(T.noise(1.3, 4, off=4.0), 0.55, 0.75), m.remap(noise3(m, vmul(m, g, (20, 20, 20)), 1.0, 3), 0.3, 0.7, 0.4, 1.0))
+    col = m.mix(m.math('MULTIPLY', bloom, 0.35), col, lin('#c8bfb0'))
+    # cracks
+    cr = ridge(m, comb(m, m.math('ADD', lx, m.math('MULTIPLY', ly, 0.5)), ly, m.math('MULTIPLY', pr, 50.0)), 3.0, 4, 0.55, 300.0)
+    crack = m.math('MULTIPLY', cr, crk)
+    col = m.mix(m.math('MULTIPLY', crack, 0.9), col, (0.03, 0.02, 0.015)); h = m.math('SUBTRACT', h, m.math('MULTIPLY', crack, 0.0008))
+    # worn pale on the edges and corners (the high places), dirt in the low, oil spots
+    cav = look(m, 'CAV', W, H); edge = look(m, 'EDGE', W, H)
+    ew = m.math('MULTIPLY', edge, m.remap(noise3(m, vmul(m, g, (40, 40, 40)), 1.0, 4, 0.6), 0.3, 0.7, 0.1, 0.6))   # (the arrises worn pale, raggedly)
+    col = m.mix(ew, col, m.mix(0.5, col, lin(worn))); rough = m.mixf(m.math('MULTIPLY', ew, 0.8), rough, 0.6)
+    col = m.mix(1.0, col, (0.88, 0.84, 0.82), 'MULTIPLY')                                  # (decades of workshop grime in the clay)
+    gr = m.math('MULTIPLY', m.remap(cav, 0.95, 0.45, smooth=True), m.remap(T.noise(25, 4), 0.3, 0.7, 0.5, 1.0))
+    col = m.mix(m.math('MULTIPLY', gr, 0.85), col, (0.035, 0.026, 0.02)); rough = m.mixf(gr, rough, 0.9)
+    dirt = m.math('ADD', m.remap(T.noise(1.6, 4, 0.6, off=6.0), 0.35, 0.85, 0.0, 0.55), m.math('MULTIPLY', m.remap(cav, 0.99, 0.85), 0.3))
+    col = m.mix(dirt, col, m.hsv(col, 0.5, 0.6, 0.6))
+    os_ = m.math('MULTIPLY', m.remap(T.voronoi(7.0, 'Distance', off=7.0), 0.07, 0.03, smooth=True), m.remap(T.noise(1.0, 2, off=8.0), 0.55, 0.65))
+    col = m.mix(m.math('MULTIPLY', os_, 0.8), col, m.mix(1.0, col, (0.3, 0.25, 0.22), 'MULTIPLY')); rough = m.mixf(os_, rough, 0.35)
+    # B: oil-soaked: dark, saturated, glossy, wicked along the joints
+    on = m.math('ADD', T.noise(1.1, 5, 0.6, off=31.0), m.math('MULTIPLY', m.remap(cav, 1.0, 0.6), 0.25))
+    soak = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(on, 0.42, 0.62, smooth=True), edge_fade(m, W, H, 0.10, 0.5, T)), V)
+    rim = m.math('MULTIPLY', m.math('MULTIPLY', m.remap(on, 0.38, 0.43), m.remap(on, 0.5, 0.44)), m.math('MULTIPLY', edge_fade(m, W, H, 0.10, 0.5, T), V))
+    col = m.mix(m.math('MULTIPLY', soak, 0.9), col, m.hsv(m.mix(1.0, col, (0.32, 0.25, 0.2), 'MULTIPLY'), 0.5, 1.2, 1.0)); rough = m.mixf(soak, rough, 0.28)
+    col = m.mix(m.math('MULTIPLY', rim, 0.4), col, m.mix(1.0, col, (0.55, 0.45, 0.38), 'MULTIPLY'))
+    return finish(m, col, rough, h)
+
+def workshop_floor():
+    """the workshop's floor: 0.15 m quarry tiles (15 to a tile), pressed, a little domed and irregular, in wide cement joints;
+       a few blue tiles, chipped corners, cracked tiles"""
+    W = H = TW; n = 15; s = W / n; G = Geo(W, H)
+    Q = quarry_mat('workshop_floor', W, H); GR = grout_mat('workshop_grout', W, H, '#58534c', '#1c1916')
+    for i in range(n):
+        for j in range(n):
+            a = s - random.uniform(0.006, 0.009); b_ = s - random.uniform(0.006, 0.009); t = 0.018
+            bm = box(a, b_, t, random.uniform(0.0018, 0.0028), 3)
+            cuts(bm, 0, [-a / 2 + a * k / 6 for k in range(1, 6)]); cuts(bm, 1, [-b_ / 2 + b_ * k / 6 for k in range(1, 6)])
+            dome = random.uniform(0.0002, 0.0008)
+            deform(bm, lambda c, a=a, b_=b_, dome=dome: (c.x, c.y, c.z + (dome * (1 - (2 * c.x / a) ** 2) * (1 - (2 * c.y / b_) ** 2) if c.z > 0 else 0.0)))
+            if random.random() < 0.1:
+                cx, cy = random.choice((-1, 1)), random.choice((-1, 1)); r = random.uniform(0.004, 0.012)
+                co = Vector((cx * a / 2, cy * b_ / 2, t / 2)); no = Vector((cx, cy, random.uniform(0.7, 1.4))).normalized()
+                bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=co - no * r * 0.8, plane_no=no, clear_outer=True)
+                bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary])
+            cx, cy = (i + 0.5) * s + random.gauss(0, 0.0008), (j + 0.5) * s + random.gauss(0, 0.0008)
+            xform(bm, (cx, cy, -t / 2 + max(-0.001, random.gauss(0, 0.0004))), (random.gauss(0, 0.002), random.gauss(0, 0.002), random.gauss(0, 0.012)))
+            off = Vector((random.uniform(-40, 40), random.uniform(-40, 40), random.uniform(-40, 40)))
+            G.add(bm, Q, {'gpos': (lambda c, cx=cx, cy=cy, off=off: (c.x - cx + off.x, c.y - cy + off.y, off.z)), 'lpos': (lambda c, cx=cx, cy=cy: ((c.x - cx) / s, (c.y - cy) / s, 0.0)),
+                          'prand': random.random(), 'crack': 1.0 if random.random() < 0.04 else 0.0, 'blue': 1.0 if random.random() < 0.07 else 0.0})
+    G.add(grid(-0.4, W + 0.4, -0.4, H + 0.4, 4, 4, -0.003), GR, {'gpos': (0, 0, 0), 'lpos': (0, 0, 0), 'prand': 0.5, 'crack': 0.0, 'blue': 0.0}, wrap=False)
+    return {'geo': G.build('workshop_floor'), 'W': W, 'H': H, 'variants': 2, 'ao': 0.08, 'cav': 0.012, 'pom': 0.006,
+            'notes': '0.15 m red quarry tiles (15 per tile), wide cement joints, a few blue; B: oil-soaked'}
+
 # ================================================================ printed patterns (drawn in Python, printed by the shader)
 def _pattern_image(name, arr):
     """a float array (h, w) or (h, w, 3), row 0 at the top -> a Non-Color Blender image (repeat)"""
@@ -1231,4 +1443,6 @@ if __name__ == '__main__':
     SETS['wood'] = {'floor': wood_floor, 'wall': wood_wall}
     SETS['tile'] = {'floor': tile_floor}
     SETS['concrete'] = {'floor': concrete_floor}
+    SETS['attic'] = {'floor': attic_floor}
+    SETS['workshop'] = {'floor': workshop_floor}
     main()

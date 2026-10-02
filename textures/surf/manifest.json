@@ -4,6 +4,83 @@
  "faceH": 3.0,
  "kit": 1,
  "styles": {
+  "attic": {
+   "floor": {
+    "ao_m": 0.1,
+    "bake_s": {
+     "ao": 4.3,
+     "cav": 4.3,
+     "colA": 5.0,
+     "colB": 5.5,
+     "col_shift": 5.0,
+     "dn_ao": 1.6,
+     "dn_cav": 1.5,
+     "height": 2.2,
+     "normal": 5.1,
+     "normal_shift": 5.1,
+     "rough": 4.9,
+     "total": 49.0,
+     "zgeo": 1.2
+    },
+    "files": {
+     "colorA": "attic/floor_colorA",
+     "colorB": "attic/floor_colorB",
+     "normal": "attic/floor_normal",
+     "orh": "attic/floor_orh"
+    },
+    "notes": "wide rough pine boards (11 to a tile, uneven widths) butted over joists every 0.45 m, face-nailed; B: the dust walked off a path",
+    "pom": 0.008,
+    "preview": false,
+    "px": {
+     "hi": [
+      2048,
+      2048
+     ],
+     "lo": [
+      512,
+      512
+     ],
+     "md": [
+      1024,
+      1024
+     ]
+    },
+    "px_per_m": 910,
+    "seam": {
+     "AB": 0.0008,
+     "AB_v": 0.0032,
+     "BA": 0.0008,
+     "color": {
+      "inner_u": 0.0015,
+      "inner_v": 0.0168,
+      "u": 0.0008,
+      "v": 0.0032
+     },
+     "normal": {
+      "inner_u": 0.005,
+      "inner_v": 0.0103,
+      "u": 0.0045,
+      "v": 0.0114
+     },
+     "orh": {
+      "inner_u": 0.0018,
+      "inner_v": 0.0127,
+      "u": 0.002,
+      "v": 0.0092
+     },
+     "shift": {
+      "color": 0.0003,
+      "normal": 0.0023
+     }
+    },
+    "size_m": [
+     2.25,
+     2.25
+    ],
+    "tiles": "uv",
+    "variants": 2
+   }
+  },
   "concrete": {
    "floor": {
     "ao_m": 0.1,
@@ -225,6 +302,83 @@
      "shift": {
       "color": 0.0004,
       "normal": 0.0014
+     }
+    },
+    "size_m": [
+     2.25,
+     2.25
+    ],
+    "tiles": "uv",
+    "variants": 2
+   }
+  },
+  "workshop": {
+   "floor": {
+    "ao_m": 0.08,
+    "bake_s": {
+     "ao": 4.1,
+     "cav": 4.2,
+     "colA": 3.2,
+     "colB": 3.4,
+     "col_shift": 3.3,
+     "dn_ao": 1.5,
+     "dn_cav": 1.6,
+     "height": 1.7,
+     "normal": 3.2,
+     "normal_shift": 3.3,
+     "rough": 3.1,
+     "total": 37.5,
+     "zgeo": 1.4
+    },
+    "files": {
+     "colorA": "workshop/floor_colorA",
+     "colorB": "workshop/floor_colorB",
+     "normal": "workshop/floor_normal",
+     "orh": "workshop/floor_orh"
+    },
+    "notes": "0.15 m red quarry tiles (15 per tile), wide cement joints, a few blue; B: oil-soaked",
+    "pom": 0.006,
+    "preview": false,
+    "px": {
+     "hi": [
+      2048,
+      2048
+     ],
+     "lo": [
+      512,
+      512
+     ],
+     "md": [
+      1024,
+      1024
+     ]
+    },
+    "px_per_m": 910,
+    "seam": {
+     "AB": 0.0021,
+     "AB_v": 0.0026,
+     "BA": 0.0021,
+     "color": {
+      "inner_u": 0.0072,
+      "inner_v": 0.0071,
+      "u": 0.0021,
+      "v": 0.0026
+     },
+     "normal": {
+      "inner_u": 0.0097,
+      "inner_v": 0.0097,
+      "u": 0.0132,
+      "v": 0.0149
+     },
+     "orh": {
+      "inner_u": 0.0125,
+      "inner_v": 0.0125,
+      "u": 0.0112,
+      "v": 0.0132
+     },
+     "shift": {
+      "color": 0.0002,
+      "normal": 0.0004
      }
     },
     "size_m": [
