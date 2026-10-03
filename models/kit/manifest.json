@@ -8,23 +8,23 @@
    "wood": 30208768,
    "tile": 18937564,
    "concrete": 22599604,
-   "attic": 10358868,
-   "workshop": 13133700,
+   "attic": 21727848,
+   "workshop": 13133696,
    "common": 1079148
   },
   "md": {
    "wood": 12034604,
    "tile": 8290628,
    "concrete": 9175348,
-   "attic": 3664540,
-   "workshop": 4611144,
+   "attic": 8061800,
+   "workshop": 4611152,
    "common": 400148
   },
   "lo": {
    "wood": 6461872,
-   "tile": 4718888,
+   "tile": 4704996,
    "concrete": 4724976,
-   "attic": 1915056,
+   "attic": 4153372,
    "workshop": 2490096,
    "common": 188652
   }
@@ -156,28 +156,28 @@
    "id": "box_stack",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_box_stack"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.45,
+     -0.444,
      0.0,
-     0.0
+     0.0023
     ],
     [
-     0.45,
-     1.2,
-     0.44
+     0.4455,
+     1.2015,
+     0.4361
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 630,
+    "md": 630,
+    "lo": 630
    }
   },
   "Band_ceilingrose": {
@@ -337,28 +337,28 @@
    "id": "cobweb_card",
    "mount": "corner",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_cobweb_card"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
      0.0,
-     2.2,
+     2.248,
      0.0
     ],
     [
-     0.44,
-     2.7,
-     0.44
+     0.42,
+     2.698,
+     0.43
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 100,
+    "md": 100,
+    "lo": 58
    }
   },
   "Band_coffer_rose": {
@@ -643,28 +643,28 @@
    "id": "frames_leaning",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_frames_leaning"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.55,
+     -0.525,
      0.0,
-     0.0
+     0.0121
     ],
     [
-     0.55,
-     0.95,
-     0.22
+     0.53,
+     0.8455,
+     0.2261
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 320,
+    "md": 320,
+    "lo": 320
    }
   },
   "Band_fuse_box": {
@@ -916,28 +916,28 @@
    "id": "leaning_mirror",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_leaning_mirror"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.35,
-     0.0,
-     0.0
+     -0.31,
+     0.0013,
+     0.0235
     ],
     [
-     0.35,
-     1.6,
-     0.3
+     0.31,
+     1.5773,
+     0.3083
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 564,
+    "md": 564,
+    "lo": 564
    }
   },
   "Band_limb_hooks": {
@@ -976,28 +976,28 @@
    "id": "mannequin",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_mannequin"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.21,
-     0.0,
-     0.0
+     -0.165,
+     0.016,
+     0.0491
     ],
     [
-     0.21,
-     1.75,
-     0.42
+     0.1933,
+     1.72,
+     0.3877
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1004,
+    "md": 1004,
+    "lo": 768
    }
   },
   "Band_metal_shelf": {
@@ -1817,28 +1817,28 @@
    "id": "rolled_rug",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_rolled_rug"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.2,
-     0.0,
-     0.0
+     -0.2027,
+     -0.0082,
+     0.0071
     ],
     [
-     0.2,
-     1.7,
-     0.4
+     0.1724,
+     1.6855,
+     0.3123
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 768,
+    "md": 768,
+    "lo": 666
    }
   },
   "Band_service_shelf": {
@@ -1907,28 +1907,28 @@
    "id": "suitcase_pile",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_suitcase_pile"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.4,
+     -0.3859,
      0.0,
-     0.0
+     -0.0071
     ],
     [
-     0.4,
-     0.9,
-     0.44
+     0.3859,
+     0.8902,
+     0.4335
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1898,
+    "md": 1898,
+    "lo": 1898
    }
   },
   "Band_tool_wall": {
@@ -2264,9 +2264,9 @@
    "id": "chimney_breast",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_chimney_breast_H400"
    ],
    "uv1": false,
    "children": [],
@@ -2279,13 +2279,13 @@
     [
      0.495,
      4.0,
-     0.495
+     0.503
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 548,
+    "md": 548,
+    "lo": 492
    },
    "slot": "pocket",
    "foot": [
@@ -4072,28 +4072,28 @@
    "id": "isl_dress_forms",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_isl_attic_dress_forms_toy_circle"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
      -0.8,
-     0.0,
-     -0.65
+     -0.0119,
+     -0.6428
     ],
     [
      0.8,
-     1.65,
-     0.65
+     1.6324,
+     0.647
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 5308,
+    "md": 5308,
+    "lo": 3946
    },
    "slot": "island",
    "foot": [
@@ -4333,7 +4333,7 @@
    "tris": {
     "hi": 7952,
     "md": 7952,
-    "lo": 5098
+    "lo": 3976
    },
    "slot": "island",
    "foot": [
@@ -4391,28 +4391,28 @@
    "id": "isl_servant_bed",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_isl_attic_servant_bed_trunk_pile"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.95,
-     0.0,
-     -0.7
+     -0.9354,
+     -0.0027,
+     -0.68
     ],
     [
-     0.95,
+     0.9554,
      1.0,
-     0.7
+     0.69
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 5854,
+    "md": 5854,
+    "lo": 2927
    },
    "slot": "island",
    "foot": [
@@ -4430,9 +4430,9 @@
    "id": "isl_sheeted_armoire",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_isl_attic_sheeted_armoire_sheeted_sofa"
    ],
    "uv1": false,
    "children": [],
@@ -4440,18 +4440,18 @@
     [
      -0.65,
      0.0,
-     -0.65
+     -0.6592
     ],
     [
      0.65,
-     2.0,
-     0.65
+     2.0004,
+     0.635
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 6820,
+    "md": 6820,
+    "lo": 3410
    },
    "slot": "island",
    "foot": [
@@ -4469,9 +4469,9 @@
    "id": "isl_sheeted_sofa",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_isl_attic_sheeted_armoire_sheeted_sofa"
    ],
    "uv1": false,
    "children": [],
@@ -4483,14 +4483,14 @@
     ],
     [
      0.95,
-     1.9,
+     1.891,
      0.65
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 4898,
+    "md": 4898,
+    "lo": 3570
    },
    "slot": "island",
    "foot": [
@@ -4626,28 +4626,28 @@
    "id": "isl_toy_circle",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_isl_attic_dress_forms_toy_circle"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.85,
-     0.0,
-     -0.85
+     -0.845,
+     -0.008,
+     -0.845
     ],
     [
-     0.85,
+     0.845,
      0.4,
-     0.85
+     0.845
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 6698,
+    "md": 6698,
+    "lo": 3340
    },
    "slot": "island",
    "foot": [
@@ -4665,9 +4665,9 @@
    "id": "isl_trunk_pile",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_isl_attic_servant_bed_trunk_pile"
    ],
    "uv1": false,
    "children": [
@@ -4675,20 +4675,20 @@
    ],
    "aabb": [
     [
-     -0.85,
+     -0.8496,
      0.0,
-     -0.65
+     -0.6441
     ],
     [
-     0.85,
-     1.3,
-     0.65
+     0.8496,
+     1.3002,
+     0.6508
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 7320,
+    "md": 7320,
+    "lo": 3660
    },
    "slot": "island",
    "foot": [
@@ -6127,9 +6127,9 @@
    "id": "iron_bed_sheeted",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_iron_bed_sheeted"
    ],
    "uv1": false,
    "children": [],
@@ -6137,18 +6137,18 @@
     [
      -0.475,
      0.0,
-     0.0
+     -0.0054
     ],
     [
      0.475,
      1.0,
-     2.0
+     2.0004
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 3764,
+    "md": 3764,
+    "lo": 1973
    },
    "slot": "wall",
    "foot": [
@@ -6444,28 +6444,28 @@
    "id": "sheet_chair",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_sheet_chair_v0"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.475,
-     0.0,
-     -0.475
+     -0.47,
+     0.009,
+     -0.47
     ],
     [
-     0.475,
-     1.1,
-     0.475
+     0.47,
+     1.11,
+     0.47
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 2476,
+    "md": 2476,
+    "lo": 2152
    },
    "slot": "pocket",
    "foot": [
@@ -6483,28 +6483,28 @@
    "id": "sheet_chair",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_sheet_chair_v1"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.475,
-     0.0,
-     -0.475
+     -0.47,
+     0.02,
+     -0.47
     ],
     [
-     0.475,
-     1.1,
-     0.475
+     0.47,
+     1.11,
+     0.47
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 4064,
+    "md": 4064,
+    "lo": 3579
    },
    "slot": "pocket",
    "foot": [
@@ -6522,28 +6522,28 @@
    "id": "sheet_sofa",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_sheet_sofa"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
      -0.475,
-     0.0,
+     0.01,
      -1.1
     ],
     [
      0.475,
-     0.95,
+     0.955,
      1.1
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 4240,
+    "md": 4240,
+    "lo": 2119
    },
    "slot": "bar",
    "foot": [
@@ -6561,9 +6561,9 @@
    "id": "sheet_tall",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_sheet_tall_v0"
    ],
    "uv1": false,
    "children": [],
@@ -6575,14 +6575,14 @@
     ],
     [
      0.495,
-     1.95,
-     0.35
+     1.9581,
+     0.3497
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 3472,
+    "md": 3472,
+    "lo": 1735
    },
    "slot": "pocket",
    "foot": [
@@ -6600,28 +6600,28 @@
    "id": "sheet_tall",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_sheet_tall_v1"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.495,
+     -0.4938,
      0.0,
      -0.35
     ],
     [
      0.495,
-     1.95,
+     1.9629,
      0.35
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 3572,
+    "md": 3572,
+    "lo": 2248
    },
    "slot": "pocket",
    "foot": [
@@ -6679,28 +6679,28 @@
    "id": "steamer_trunk",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_steamer_trunk_v0"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.475,
+     -0.48,
      0.0,
-     -0.275
+     -0.2692
     ],
     [
-     0.475,
-     0.65,
-     0.275
+     0.48,
+     0.665,
+     0.2692
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1870,
+    "md": 1870,
+    "lo": 1870
    },
    "slot": "pocket",
    "foot": [
@@ -6718,28 +6718,28 @@
    "id": "steamer_trunk",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_steamer_trunk_v1"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.475,
+     -0.48,
      0.0,
-     -0.275
+     -0.265
     ],
     [
-     0.475,
-     0.65,
-     0.275
+     0.48,
+     0.655,
+     0.272
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1848,
+    "md": 1848,
+    "lo": 1848
    },
    "slot": "pocket",
    "foot": [
@@ -6835,9 +6835,9 @@
    "id": "truss_post",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_truss_post"
    ],
    "uv1": false,
    "children": [],
@@ -6850,13 +6850,13 @@
     [
      0.125,
      2.6,
-     0.125
+     0.145
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1340,
+    "md": 1340,
+    "lo": 1340
    },
    "slot": "pocket",
    "foot": [

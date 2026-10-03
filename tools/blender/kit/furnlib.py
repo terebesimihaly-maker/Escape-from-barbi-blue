@@ -290,7 +290,7 @@ def cloth_drape(colliders, size, segs, loc, frames=90, rot=0.0, mass=0.2, bend=0
     sc = bpy.context.scene; tmp = []
     for i, cb in enumerate(colliders):
         me = bpy.data.meshes.new(f'_col{i}'); cb.to_mesh(me); o = kitlib.link(bpy.data.objects.new(f'_col{i}', me)); tmp.append(o)
-        o.modifiers.new('c', 'COLLISION'); o.collision.thickness_outer = 0.006; o.collision.cloth_friction = 8.0
+        o.modifiers.new('c', 'COLLISION'); o.collision.thickness_outer = 0.012; o.collision.cloth_friction = 10.0
     if floor:
         fb = bmesh.new(); vs = [fb.verts.new((x, y, 0.0)) for x, y in ((-6, -6), (6, -6), (6, 6), (-6, 6))]; fb.faces.new(vs)
         me = bpy.data.meshes.new('_floor'); fb.to_mesh(me); fb.free(); o = kitlib.link(bpy.data.objects.new('_floor', me)); tmp.append(o)

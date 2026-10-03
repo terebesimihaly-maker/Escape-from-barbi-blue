@@ -109,7 +109,7 @@ def _lo_decimate(style, roots):
     for r in roots:
         meshes = [o for o in [r] + list(r.children_recursive) if o.type == 'MESH']
         t = sum(kitlib.tris(o) for o in meshes)
-        if not t or 0.92 * budget[r.name] / t >= 0.65: continue            # (meshopt's half is enough above that; it stalls short of it below)
+        if not t or 0.92 * budget[r.name] / t >= 0.85: continue            # (meshopt manages a light trim; on a piece that is all seams it stalls short of anything more)
         ratio = min(0.5, 0.92 * budget[r.name] / t)
         for o in meshes:
             if o.data.users > 1: o.data = o.data.copy()
