@@ -7,23 +7,23 @@
   "hi": {
    "wood": 30208768,
    "tile": 18937564,
-   "concrete": 11265116,
+   "concrete": 22599604,
    "attic": 10358868,
-   "workshop": 13133704,
+   "workshop": 13133700,
    "common": 1079148
   },
   "md": {
    "wood": 12034604,
    "tile": 8290628,
-   "concrete": 3800680,
-   "attic": 3664544,
-   "workshop": 4611152,
+   "concrete": 9175348,
+   "attic": 3664540,
+   "workshop": 4611144,
    "common": 400148
   },
   "lo": {
    "wood": 6461872,
    "tile": 4718888,
-   "concrete": 1813412,
+   "concrete": 4724976,
    "attic": 1915056,
    "workshop": 2490096,
    "common": 188652
@@ -66,28 +66,28 @@
    "id": "barrel",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_barrel"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.21,
+     -0.208,
      0.0,
-     0.0
+     0.002
     ],
     [
-     0.21,
+     0.208,
      0.62,
-     0.42
+     0.418
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 776,
+    "md": 776,
+    "lo": 776
    }
   },
   "Band_bell_board": {
@@ -277,28 +277,28 @@
    "id": "coal_bin",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_coal_bin"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
      -0.45,
-     0.0,
-     0.0
+     -0.0093,
+     -0.002
     ],
     [
      0.45,
      0.8,
-     0.44
+     0.4324
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1756,
+    "md": 1756,
+    "lo": 1756
    }
   },
   "Band_coat_hooks": {
@@ -673,28 +673,28 @@
    "id": "fuse_box",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_fuse_box"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.225,
-     1.45,
-     0.0
+     -0.2188,
+     1.4613,
+     0.0012
     ],
     [
-     0.225,
-     2.0,
-     0.18
+     0.227,
+     2.0043,
+     0.1852
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 876,
+    "md": 876,
+    "lo": 368
    }
   },
   "Band_gilt_mirror": {
@@ -1006,9 +1006,10 @@
    "id": "metal_shelf",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_metal_shelf",
+    "Glass"
    ],
    "uv1": false,
    "children": [],
@@ -1025,9 +1026,9 @@
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 2247,
+    "md": 2247,
+    "lo": 2167
    }
   },
   "Band_night_stand": {
@@ -1726,9 +1727,9 @@
    "id": "pegboard",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_pegboard"
    ],
    "uv1": false,
    "children": [],
@@ -1741,13 +1742,13 @@
     [
      0.6,
      1.85,
-     0.15
+     0.0829
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 2248,
+    "md": 2248,
+    "lo": 2218
    }
   },
   "Band_puppet_theatre": {
@@ -2026,9 +2027,9 @@
    "id": "utility_sink",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_utility_sink"
    ],
    "uv1": false,
    "children": [],
@@ -2036,18 +2037,18 @@
     [
      -0.3,
      0.0,
-     0.0
+     -0.0084
     ],
     [
      0.3,
-     1.1,
+     1.1006,
      0.44
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1428,
+    "md": 1428,
+    "lo": 1366
    }
   },
   "Band_wall_clock": {
@@ -2116,28 +2117,28 @@
    "id": "water_heater",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_water_heater"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.21,
+     -0.2109,
      0.0,
-     0.0
+     -0.0059
     ],
     [
      0.21,
-     1.6,
+     1.6027,
      0.42
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1410,
+    "md": 1410,
+    "lo": 1306
    }
   },
   "Col_brick_pier_H270": {
@@ -2146,28 +2147,28 @@
    "id": "brick_pier",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_brick_pier_H270"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.35,
+     -0.353,
      0.0,
-     -0.35
+     -0.353
     ],
     [
-     0.35,
+     0.353,
      2.7,
-     0.35
+     0.367
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1196,
+    "md": 1196,
+    "lo": 1162
    },
    "slot": "pocket",
    "foot": [
@@ -2185,28 +2186,28 @@
    "id": "brick_pier",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_brick_pier_H300"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.35,
+     -0.353,
      0.0,
-     -0.35
+     -0.353
     ],
     [
-     0.35,
+     0.353,
      3.0,
-     0.35
+     0.367
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1416,
+    "md": 1416,
+    "lo": 1368
    },
    "slot": "pocket",
    "foot": [
@@ -2224,28 +2225,28 @@
    "id": "brick_pier",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_brick_pier_H330"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.35,
+     -0.353,
      0.0,
-     -0.35
+     -0.353
     ],
     [
-     0.35,
+     0.353,
      3.3,
-     0.35
+     0.367
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1064,
+    "md": 1064,
+    "lo": 1008
    },
    "slot": "pocket",
    "foot": [
@@ -2419,9 +2420,9 @@
    "id": "stanchion",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_stanchion_H300"
    ],
    "uv1": false,
    "children": [],
@@ -2438,9 +2439,9 @@
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1262,
+    "md": 1262,
+    "lo": 1024
    },
    "slot": "pocket",
    "foot": [
@@ -2458,9 +2459,9 @@
    "id": "stanchion",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_stanchion_H330"
    ],
    "uv1": false,
    "children": [],
@@ -2477,9 +2478,9 @@
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1346,
+    "md": 1346,
+    "lo": 1108
    },
    "slot": "pocket",
    "foot": [
@@ -3866,9 +3867,9 @@
    "id": "isl_boiler",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_isl_concrete_boiler_washtubs"
    ],
    "uv1": false,
    "children": [
@@ -3876,20 +3877,20 @@
    ],
    "aabb": [
     [
-     -0.95,
-     0.0,
-     -0.75
+     -0.9448,
+     -0.0112,
+     -0.74
     ],
     [
-     0.95,
-     3.4,
-     0.75
+     0.94,
+     3.4002,
+     0.7616
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 5866,
+    "md": 5866,
+    "lo": 5414
    },
    "slot": "island",
    "foot": [
@@ -3907,28 +3908,28 @@
    "id": "isl_crate_stack",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_isl_concrete_crate_stack_shelving_double"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.8,
+     -0.7898,
      0.0,
-     -0.65
+     -0.6318
     ],
     [
-     0.8,
-     1.5,
-     0.65
+     0.8008,
+     1.488,
+     0.6361
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 8876,
+    "md": 8876,
+    "lo": 4438
    },
    "slot": "island",
    "foot": [
@@ -4507,28 +4508,29 @@
    "id": "isl_shelving_double",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_isl_concrete_crate_stack_shelving_double",
+    "Glass"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.925,
+     -0.92,
      0.0,
-     -0.65
+     -0.64
     ],
     [
-     0.925,
+     0.92,
      2.0,
-     0.65
+     0.64
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 9135,
+    "md": 9135,
+    "lo": 4560
    },
    "slot": "island",
    "foot": [
@@ -4787,28 +4789,28 @@
    "id": "isl_washtubs",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_isl_concrete_boiler_washtubs"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
      -0.9,
-     0.0,
-     -0.65
+     -0.004,
+     -0.645
     ],
     [
      0.9,
-     1.4,
-     0.65
+     1.398,
+     0.6468
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 4080,
+    "md": 4080,
+    "lo": 3479
    },
    "slot": "island",
    "foot": [
@@ -4826,28 +4828,28 @@
    "id": "isl_wine_rack",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_isl_concrete_wine_rack"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.925,
-     0.0,
-     -0.65
+     -0.9288,
+     0.0017,
+     -0.6488
     ],
     [
-     0.925,
-     1.9,
-     0.65
+     0.9288,
+     1.8818,
+     0.6488
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 19846,
+    "md": 19846,
+    "lo": 5518
    },
    "slot": "island",
    "foot": [
@@ -5689,9 +5691,9 @@
    "id": "boiler_wall",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_boiler_wall"
    ],
    "uv1": false,
    "children": [
@@ -5699,20 +5701,20 @@
    ],
    "aabb": [
     [
-     -0.495,
+     -0.4994,
      0.0,
      0.0
     ],
     [
-     0.495,
-     3.4,
-     1.4
+     0.4951,
+     3.4011,
+     1.4016
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 3902,
+    "md": 3902,
+    "lo": 3488
    },
    "slot": "wall",
    "foot": [
@@ -5730,9 +5732,9 @@
    "id": "chest_freezer",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_chest_freezer"
    ],
    "uv1": false,
    "children": [],
@@ -5740,18 +5742,18 @@
     [
      -0.495,
      0.0,
-     -0.33
+     -0.3471
     ],
     [
-     0.495,
+     0.4964,
      0.88,
-     0.33
+     0.3435
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 954,
+    "md": 954,
+    "lo": 918
    },
    "slot": "pocket",
    "foot": [
@@ -5769,28 +5771,28 @@
    "id": "crate_stack",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_crate_stack_v0"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.45,
+     -0.4599,
      0.0,
-     -0.45
+     -0.4426
     ],
     [
-     0.45,
+     0.4599,
      1.0,
-     0.45
+     0.4426
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 2420,
+    "md": 2420,
+    "lo": 2420
    },
    "slot": "pocket",
    "foot": [
@@ -5808,28 +5810,28 @@
    "id": "crate_stack",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_crate_stack_v1"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.45,
+     -0.4599,
      0.0,
-     -0.45
+     -0.4426
     ],
     [
-     0.45,
+     0.4599,
      1.6,
-     0.45
+     0.4426
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 3916,
+    "md": 3916,
+    "lo": 3916
    },
    "slot": "pocket",
    "foot": [
@@ -6637,28 +6639,29 @@
    "id": "shelf_rack",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_shelf_rack",
+    "Glass"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.3,
+     -0.305,
      0.0,
      -1.55
     ],
     [
-     0.3,
+     0.305,
      2.0,
      1.55
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 9440,
+    "md": 9440,
+    "lo": 8956
    },
    "slot": "bar",
    "foot": [

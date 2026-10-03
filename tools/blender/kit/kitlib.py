@@ -439,6 +439,8 @@ def wood(name, species='beech', finish='varnish', stain=None, age=1.0, paint=Non
     col = m.hsv(col, m.remap(pr, 0, 1, 0.47, 0.53), m.remap(pr, 0, 1, 0.85, 1.15), m.remap(pr, 0, 1, 0.74, 1.16))   # (no two parts cut from the same board)
     h = m.math('ADD', m.math('MULTIPLY', ring, 0.35), m.math('MULTIPLY', fib, 0.25))
     bare = m.hsv(col, 0.5, 0.75, 0.9)                       # (old bare wood: greyed, a little darker than fresh)
+    if stain and finish == 'bare':                          # (weathered: the stain's hue and greyness taken, the grain's light and dark kept)
+        bare = m.mix(0.5, m.hsv(m.mix(0.75, bare, lin(stain), 'COLOR'), 0.5, 1.0, 0.8), m.mix(1.0, bare, lin(stain), 'MULTIPLY'))
     rough = m.remap(fib, 0.3, 0.7, 0.62, 0.78)
     if finish == 'varnish':
         # the stain takes its hue and saturation, the grain keeps its light and dark (multiplying warm by warm by warm would

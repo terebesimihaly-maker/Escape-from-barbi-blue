@@ -91,6 +91,7 @@ def bake_objs(name, objs, px=2048, alpha=None, double=False, spread=False):
     files = kitlib.bake_set(objs, name, px, 64)
     if spread:
         for i, o in enumerate(objs): o.location.x -= 4.0 * i
+        bpy.context.view_layer.update()
     mat = kitlib.baked_material('Kit_' + name, files, double=double, alpha=alpha)
     for o in objs:
         o.data.materials.clear(); o.data.materials.append(mat); o.data.polygons.foreach_set('material_index', [0] * len(o.data.polygons))
@@ -170,7 +171,7 @@ def build_simple(node, asset, builder, mats, rnd_seed, px=2048):
     """one node from a builder(G, M, rnd): built, baked into its own set; G.sockets [(name, loc)] become empties under it"""
     rnd = random.Random(rnd_seed); M = mats(); G = S.Geo(1, 1, False, False); builder(G, M, rnd)
     body = build_obj(node, G); pivs = getattr(G, 'pivots', [])
-    files = bake_objs(asset, [body] + [ob for _, ob, _ in pivs], px)              # (animated parts share the piece's texture set)
+    files = bake_objs(asset, [body] + [ob for _, ob, _ in pivs], px, double=getattr(G, 'double', False), alpha=getattr(G, 'alpha', None))   # (animated parts share the piece's texture set; G.double: cloth seen from both sides; G.alpha: a card)
     body = bpy.data.objects[node] if node in bpy.data.objects else body
     body.name = node; body.data.name = node; body['kit'] = 'band' if node.startswith('Band_') else 'solid'
     for nm, loc in getattr(G, 'sockets', []):                               # (empties: a fixture's place, where the game seats a doll)
@@ -189,12 +190,12 @@ def run(style, asset, nodes_builders, wall=False):
     json.dump(info, open(os.path.join(TMP, f'furn_{style}_{asset}.json'), 'w'), indent=1)
     kitlib.register(f'furn_{style}_{asset}', roots); print(f'{asset}: {time.time() - t0:.0f}s', flush=True)
 
-def islands(style, build_fn, ids):
+def islands(style, build_fn, ids, double=False):
     """islands: build_fn(want) -> (specs [(name, statics, pivot obj, pivot name, pivot point, junk)], new parts, M); the new parts baked
        together, the reused pieces joined in, the animated part on its pivot; one registration per island"""
     t0 = time.time(); kitlib.reset()
     specs, new_parts, M = build_fn(lambda k: k in ids)
-    files = bake_objs(f'isl_{style}_' + '_'.join(sorted(i[4:] for i in ids))[:60], new_parts, 2048, spread=True) if new_parts else None
+    files = bake_objs(f'isl_{style}_' + '_'.join(sorted(i[4:] for i in ids))[:60], new_parts, 2048, spread=True, double=double) if new_parts else None
     roots = []; info = {}
     for spec in specs:
         name, statics, piv, piv_name, piv_loc, junk = spec[:6]; socks = spec[6] if len(spec) > 6 else []
@@ -210,7 +211,7 @@ def islands(style, build_fn, ids):
         print(f'  {name}: {info[name]}, box {footprint_check([body] + [c for c in body.children if c.type == "MESH"], None, None)}', flush=True)
     for o in list(bpy.data.objects):                                     # (whatever came along from the appended files and isn't used)
         if o not in roots and o.parent not in roots and o.type in ('EMPTY',): bpy.data.objects.remove(o)
-    if '--sheets' in sys.argv: print('sheet', sheet(f'islands_{style}', roots, style))
+    if '--sheets' in sys.argv: print('sheet', sheet(f'islands_{style}' + ('' if len(roots) > 3 else '_' + '_'.join(r.name[4:] for r in roots)), roots, style))
     blend = os.path.join(TMP, f'furn_{style}_islands_' + '_'.join(sorted(r.name[4:] for r in roots)) + '.blend')
     kitlib.register(f'furn_{style}_islands_tmp', roots, blend=blend)
     reg = os.path.join(TMP, 'assets', f'furn_{style}_islands_tmp.json'); r_ = json.load(open(reg)); os.remove(reg)
@@ -270,3 +271,48 @@ def rod(G, mat, pts, r, sides=8, attrs=None, caps=(True, True), sub=1, smooth=Tr
             f = bm.faces.new(rings[i]); f.normal_update()
             if f.normal.dot(T[i] * sg) < 0: f.normal_flip()
     G.add(bm, mat, attrs or ma(), smooth=smooth, wrap=False)
+
+class Moved:
+    """a stand-in for a Geo: each part added to it is moved by mx first (its gpos functions still see the part's own frame, so slots
+       and grain stay put); sockets set on it come out moved by moved_sockets()"""
+    def __init__(s, G, mx): s.G = G; s.mx = Matrix(mx); s.inv = s.mx.inverted(); s.sockets = []
+    def add(s, bm, mat, attrs=None, smooth=False, wrap=True):
+        bmesh.ops.transform(bm, matrix=s.mx, verts=bm.verts)
+        if s.mx.determinant() < 0: bmesh.ops.reverse_faces(bm, faces=bm.faces)
+        a2 = {k: ((lambda c, f=v: f(tuple(s.inv @ Vector(c)))) if callable(v) and k != 'opos' else v) for k, v in (attrs or {}).items()}
+        s.G.add(bm, mat, a2, smooth=smooth, wrap=wrap)
+    def moved_sockets(s): return [(n, tuple(s.mx @ Vector(p))) for n, p in s.sockets]
+
+def cloth_drape(colliders, size, segs, loc, frames=90, rot=0.0, mass=0.2, bend=0.4, tilt=(0.0, 0.0), floor=True, shrink=0.0, wind=None):
+    """a dust sheet: a cloth size (sx, sy) m in segs (nx, ny) quads, turned rot about z, tilted (rx, ry), dropped from loc onto the
+       colliders (bmeshes, world coordinates; and the floor) and let settle under Blender's cloth solver for frames.
+       -> (bmesh of the settled sheet in world coordinates, {rounded vertex position: (u, v) on the flat sheet in m})"""
+    sc = bpy.context.scene; tmp = []
+    for i, cb in enumerate(colliders):
+        me = bpy.data.meshes.new(f'_col{i}'); cb.to_mesh(me); o = kitlib.link(bpy.data.objects.new(f'_col{i}', me)); tmp.append(o)
+        o.modifiers.new('c', 'COLLISION'); o.collision.thickness_outer = 0.006; o.collision.cloth_friction = 8.0
+    if floor:
+        fb = bmesh.new(); vs = [fb.verts.new((x, y, 0.0)) for x, y in ((-6, -6), (6, -6), (6, 6), (-6, 6))]; fb.faces.new(vs)
+        me = bpy.data.meshes.new('_floor'); fb.to_mesh(me); fb.free(); o = kitlib.link(bpy.data.objects.new('_floor', me)); tmp.append(o)
+        o.modifiers.new('c', 'COLLISION'); o.collision.thickness_outer = 0.004; o.collision.cloth_friction = 20.0
+    nx, ny = segs; sx, sy = size; sb = bmesh.new(); V = {}
+    for j in range(ny + 1):
+        for i in range(nx + 1): V[i, j] = sb.verts.new(((i / nx - 0.5) * sx, (j / ny - 0.5) * sy, 0.0))
+    for j in range(ny):
+        for i in range(nx): sb.faces.new((V[i, j], V[i + 1, j], V[i + 1, j + 1], V[i, j + 1]))
+    flat = [tuple(v.co.xy) for v in sb.verts]
+    me = bpy.data.meshes.new('_sheet'); sb.to_mesh(me); sb.free(); cl = kitlib.link(bpy.data.objects.new('_sheet', me)); tmp.append(cl)
+    cl.matrix_world = Matrix.Translation(Vector(loc)) @ Matrix.Rotation(rot, 4, 'Z') @ Matrix.Rotation(tilt[0], 4, 'X') @ Matrix.Rotation(tilt[1], 4, 'Y')
+    md = cl.modifiers.new('cloth', 'CLOTH'); s = md.settings
+    s.quality = 8; s.mass = mass; s.tension_stiffness = 12; s.compression_stiffness = 12; s.shear_stiffness = 6; s.bending_stiffness = bend; s.air_damping = 1.0
+    if shrink: s.shrink_min = shrink
+    md.collision_settings.distance_min = 0.005; md.collision_settings.use_self_collision = True; md.collision_settings.self_distance_min = 0.003
+    md.collision_settings.collision_quality = 4
+    md.point_cache.frame_start = 1; md.point_cache.frame_end = frames
+    for f in range(1, frames + 1): sc.frame_set(f)
+    dg = bpy.context.evaluated_depsgraph_get(); ev = cl.evaluated_get(dg); m2 = ev.to_mesh(); mw = cl.matrix_world.copy()
+    out = bmesh.new(); out.from_mesh(m2); bmesh.ops.transform(out, matrix=mw, verts=out.verts); ev.to_mesh_clear()
+    out.verts.ensure_lookup_table(); uv = {tuple(round(c, 5) for c in v.co): flat[v.index] for v in out.verts}
+    sc.frame_set(1)
+    for o in tmp: bpy.data.objects.remove(o)
+    return out, uv
