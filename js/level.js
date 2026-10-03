@@ -55,10 +55,14 @@ function buildLevel() {
       vertexColors: true, color: new THREE.Color().setScalar(wallKind(F) === 'tile' ? 2.2 : wallKind(F) === 'attic' ? 1.4 : 1) }));
     walls.castShadow = walls.receiveShadow = true; G.add(walls); walls.material.userData.wallSurface = true; wallMat = walls.material;
   }
-  // the house around the maze: lamps, furniture and props (js/house.js; without the plan its woodwork and doorways too)
+  // the floor's kit (the one buildArch used, so the shell and the furniture agree), and whether it furnishes the band decor (KIT_BAND_MIN)
+  const kit = typeof Kit === 'undefined' ? null : plan ? level.archKit : Kit.get(F.style), kitBand = kitFurnishesBand(kit, plan);
+  // the house around the maze: lamps, rugs, and (the fallback, when the kit doesn't furnish the walls) furniture and props
+  // (js/house.js; without the plan its woodwork and doorways too)
   const pzFaces = puzzleFaces(), onPuzzleFace = f => pzFaces.has(f.x + ',' + f.y + ',' + f.nx + ',' + f.nz);   // (walls with a labyrinth box)
   const keep = new Set([...closets.map(c => Math.floor(c.x / T) + ',' + Math.floor(c.y / T)), exit.tx + ',' + exit.ty]);
   level.house = House.build(THREE, { style: F.style, L, H: WALL_H, GW, GH, isWall, faces, keep, wallMat, hash, toTex, glowTex, doll: dollTemplate || null,
+    furnished: kitBand, dolls: plan ? plan.dolls : null, clear: clearOfSolids,
     exitFace: plan ? null : faces.find(isExitFace), arch: !!plan, doorKeys: plan ? plan.doorKeys : null, ceilXZ: plan && typeof ceilAtXZ === 'function' ? ceilAtXZ : null,
     ceilKeep: plan ? new Set(plan.modules.filter(m => m.face < 0 && m.kind !== 'ceilingrose').map(m => m.x + ',' + m.y)) : null,
     decorFace: plan ? f => f.busy.includes('decor') || f.busy.includes('puzzle') : f => onPuzzleFace(f) || hash(f.x * 7 + f.nx, f.y * 7 + f.nz, 91) < F.frames + 0.045,
@@ -66,12 +70,13 @@ function buildLevel() {
   G.add(level.house.group);
   if (level.house.beam) { level.house.beam.position.copy(flash.position); camera.add(level.house.beam); }
   wallDecor(G, F, faces, level.house.doorTiles, f => onPuzzleFace(f) || isExitFace(f), plan);   // (no picture on the exit door's wall)
-  const wt = wardrobeMaterials();
-  for (const c of closets) G.add(makeWardrobe(c, wt));
+  // the wardrobes: the kit's (Kit.wardrobe, the same hinges and c.doors as makeWardrobe), else the painted ones
+  let wt = null;
+  for (const c of closets) G.add((kit && Kit.wardrobe(c, F.style, { kit, placeholders: false })) || makeWardrobe(c, wt || (wt = wardrobeMaterials())));
   if (!kitExit(level, level.archKit)) makeExit(G);
-  // the furniture you bump into (SOLIDS, js/layout.js): grey boxes of its exact size, so nothing solid is ever invisible (H5), until
-  // the Blender kit's models are wired in here (js/kit.js furnishes with them when given the kit)
-  if (typeof Kit !== 'undefined') Kit.furnish(level, { style: F.style, floorIdx }, { kit: null, evict: false });
+  // the furniture you bump into (SOLIDS, js/layout.js), every box exactly on its footprint (H5), and the band decor along the walls,
+  // from the kit (js/kit.js; see KIT_BAND_MIN for what is real and what stands in)
+  if (typeof Kit !== 'undefined') { Kit.furnish(level, plan || { style: F.style, floorIdx }, furnishOpts(F, kit, kitBand)); level.house.kitCount = level.kit.kitCount; }
   upgradeSurfaces(F, floor.material, G, walls, faces, ceil);   // (the surfaces baked in Blender, when they've loaded: tools/blender/kit/surfaces2.py)
   buildPuzzles3D(G);                                     // the labyrinth boxes on the walls (js/puzzles.js)
   notes.forEach(n => { const o = makeNote(n); n.obj = o; G.add(o); });
@@ -101,7 +106,7 @@ function buildArch(F, plan, G) {
     const next = FLOORS[floorIdx + 1];
     if (next) Kit.want(next.style);                        // (fetched while you play this one)
     const lv = level;
-    if (!kit) Kit.want(F.style).then(k => { if (k && level === lv && !lv.archKit) lateKit(lv, k); });
+    if (!kit) Kit.want(F.style).then(k => { if (k && level === lv && !lv.archKit) lateKit(lv, k); });   // (the shell, then the furniture)
   }
   return materials;
 }
@@ -119,8 +124,92 @@ function lateKit(lv, kit) {
       if (old.open) lv.door.setOpen(true, 10);
     }
     lv.compiled = false;
+    // then the furniture: the kit's pieces in place of the stand-ins, the kit's wardrobes in place of the painted ones (open as far
+    // as they were), the band decor if the kit has it (house.js drops its props then: level.house.upgrade); compiled first too
+    if (lv.kit) Kit.upgradeAsync(lv, lv.plan, { kit, band: kitFurnishesBand(kit, lv.plan), exitDoor: false })
+      .then(R => { if (R && level === lv) { if (lv.house) lv.house.kitCount = R.kitCount; lv.compiled = false; } });
   };
   if (renderer.compileAsync) renderer.compileAsync(A.group, camera, scene).then(swap, swap); else swap();
+}
+
+/* ---------- the furniture from the kit (js/kit.js) and what stands in for the art it doesn't have yet ----------
+   The rule (WP4.1), decided by the manifest (models/kit/manifest.json: a node with placeholder: true is a grey stand-in, not art):
+   - Boxes you bump into (SOLIDS: the gameplay truth, js/layout.js) go PER ITEM: the kit's model where it has real art for that
+     node; otherwise (the manifest still marks it a stand-in, or the kit hasn't loaded) a procedural stand-in of the box's exact
+     footprint and height: a dust sheet thrown over it, or a bare post, column or chimney breast for the ones that hold the roof. Never
+     a grey box in play, and still nothing solid is invisible (H5). Each piece turns real as soon as its art is in the manifest.
+   - The band decor along the walls (no collision) goes PER FLOOR: the kit furnishes it when it has real art for at least
+     KIT_BAND_MIN of the plan's pieces (the few without are left out); then house.js places no furniture or props of its own (only
+     its lamps, rugs, puddles and pipes). Below that, the kit places none and house.js's old props are the fallback, as without a
+     kit: half a wall of real pieces beside half a wall of procedural ones would look worse than either.
+   - Lamps stay house.js's for now (fixtures: false: its lights and pool, until the lighting package); windows are Arch's.
+   Today: the nursery, gallery and basement are furnished from the kit; the attic and workshop have stand-ins for their boxes and
+   house.js's props (their art is still grey in the manifest). */
+const KIT_BAND_MIN = 0.8;
+function kitFurnishesBand(kit, plan) { return !!(kit && plan && typeof Kit !== 'undefined' && Kit.covers(kit, plan, { placeholders: false }) >= KIT_BAND_MIN); }
+function furnishOpts(F, kit, band) {
+  return { kit, placeholders: false, windows: false, fixtures: false, band, evict: false, standIn: (s, it, tier) => standInLook(F.style, s, tier) };
+}
+// (house.js's props keep out of the boxes you bump into: a prop of radius rm at (xm, zm) m)
+function clearOfSolids(xm, zm, rm) {
+  for (const s of SOLIDS) if (xm + rm > s.x0 * S && xm - rm < s.x1 * S && zm + rm > s.y0 * S && zm - rm < s.y1 * S) return false;
+  return true;
+}
+// a stand-in's look: {geo, mat}, a unit box's footprint ([-0.5, 0.5] across, 0..1 up) that Kit.furnish scales to the box; made once and
+// kept (marked shared: no floor frees them), per style and tier
+const STAND_IN = new Map();
+function standInLook(style, s, tier) {
+  const kind = /post|column|stanchion|pier|chimney/.test(s.id || '') ? (/steel|stanchion/.test(s.id) ? 'steel' : /pier|chimney/.test(s.id) ? 'brick' : /column/.test(s.id) ? 'plaster' : 'beam')
+    : 'sheet', lo = tier === 'lo', key = style + '|' + kind + '|' + (lo ? 'lo' : 'md');
+  if (STAND_IN.has(key)) return STAND_IN.get(key);
+  const mark = o => { o.userData.shared = true; o.userData.kit = true; return o; };
+  const geoKey = kind === 'sheet' ? 'sheet' : 'box';
+  if (!STAND_IN.has(geoKey)) STAND_IN.set(geoKey, mark(kind === 'sheet' ? sheetGeometry() : new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0)));
+  const tex = c => { const t = toTex(c, true); t.userData.shared = true; return t; };
+  const o = kind === 'sheet' ? { map: tex(sheetCanvas(style === 'workshop' ? '#766c5c' : '#a29a8a')), roughness: 0.95 }
+    : kind === 'brick' ? { map: tex(brickCanvas()), roughness: 0.9 } : kind === 'steel' ? { color: 0x34302c, roughness: 0.55, metalness: 0.6 }
+    : kind === 'plaster' ? { color: 0x8a8278, roughness: 0.9 } : { map: tex(postCanvas()), roughness: 0.8 };
+  const mat = mark(lo ? new THREE.MeshLambertMaterial({ map: o.map || null, color: o.color !== undefined ? o.color : 0xffffff })
+    : new THREE.MeshStandardMaterial(Object.assign({ metalness: 0 }, o)));
+  mat.name = 'StandIn_' + kind;
+  if (typeof MatLib !== 'undefined' && MatLib.withLightField) MatLib.withLightField(mat);
+  const look = { geo: STAND_IN.get(geoKey), mat }; STAND_IN.set(key, look); return look;
+}
+// a sheet thrown over something: straight sides that round in toward a smaller top (the unit box's footprint, so the box stays exact)
+function sheetGeometry() {
+  const rings = [[0, 0.5], [0.08, 0.5], [0.82, 0.485], [0.94, 0.45], [1, 0.38]], P = [], U = [];
+  const corner = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  for (let r = 0; r < rings.length - 1; r++) for (let k = 0; k < 4; k++) {
+    const [y0, h0] = rings[r], [y1, h1] = rings[r + 1], a = corner[k], b = corner[(k + 1) % 4];
+    const q = [[a[0] * h0, y0, a[1] * h0], [b[0] * h0, y0, b[1] * h0], [b[0] * h1, y1, b[1] * h1], [a[0] * h1, y1, a[1] * h1]];
+    const uv = [[k, y0], [k + 1, y0], [k + 1, y1], [k, y1]];
+    for (const i of [0, 2, 1, 0, 3, 2]) { P.push(...q[i]); U.push(uv[i][0] * 0.5, uv[i][1]); }
+  }
+  const t = rings[rings.length - 1], h = t[1];                                 // (the top)
+  for (const [x, z] of [[-h, -h], [h, h], [h, -h], [-h, -h], [-h, h], [h, h]]) { P.push(x, 1, z); U.push(x + 0.5, z + 0.5); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+  g.computeVertexNormals(); g.computeBoundingBox(); g.computeBoundingSphere();
+  return g;
+}
+function sheetCanvas(base) {
+  const c = mkCanvas(128, 128), g = c.getContext('2d'); g.fillStyle = base; g.fillRect(0, 0, 128, 128);
+  for (let k = 0; k < 16; k++) { const x = Math.random() * 128, gr = g.createLinearGradient(x - 7, 0, x + 7, 0);          // (folds)
+    gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.5, 'rgba(0,0,0,.16)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - 7, 0, 14, 128); }
+  for (let k = 0; k < 2200; k++) { g.fillStyle = 'rgba(0,0,0,' + Math.random() * 0.06 + ')'; g.fillRect(Math.random() * 128, Math.random() * 128, 1 + Math.random() * 2, 1 + Math.random() * 2); }
+  const dg = g.createLinearGradient(0, 128, 0, 0); dg.addColorStop(0, 'rgba(90,80,60,.3)'); dg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = dg; g.fillRect(0, 0, 128, 128);   // (dust on top: v = 1 is up)
+  return c;
+}
+function brickCanvas() {
+  const c = mkCanvas(128, 128), g = c.getContext('2d'); g.fillStyle = '#2a201a'; g.fillRect(0, 0, 128, 128);
+  for (let y = 0, r = 0; y < 128; y += 8, r++) for (let x = -(r % 2) * 8; x < 128; x += 16) {
+    g.fillStyle = 'rgb(' + (92 + Math.random() * 30 | 0) + ',' + (48 + Math.random() * 16 | 0) + ',' + (36 + Math.random() * 10 | 0) + ')'; g.fillRect(x + 1, y + 1, 14, 6); }
+  return c;
+}
+function postCanvas() {
+  const c = mkCanvas(64, 128), g = c.getContext('2d'); g.fillStyle = '#3a2a1c'; g.fillRect(0, 0, 64, 128);
+  g.strokeStyle = 'rgba(0,0,0,.3)'; for (let x = 2; x < 64; x += 4 + Math.random() * 5) { g.beginPath(); g.moveTo(x, 0); g.bezierCurveTo(x + 3, 40, x - 3, 90, x + 1, 128); g.stroke(); }
+  return c;
 }
 // the kit's exit (Kit.exit: its porch, the leaf that swings out, the boards that drop, the lamp) on the plan's exit face -> level.door
 function kitExit(lv, kit) {

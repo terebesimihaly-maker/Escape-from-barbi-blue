@@ -196,6 +196,7 @@ function render3D(t) {
     if (m.active) acts.push({ x: m.x * S, z: m.y * S });
     Arch.updateDoors(lastDt, acts);
   }
+  if (level.kit && level.kit.update) level.kit.update(lastDt);     // (the kit's rocking chairs, mobiles, pendulums: still with calm effects)
   if (level.house) { level.house.calm = calm(); level.house.dark = scares.dim < 0.5; }
   if (level.house) level.house.update(lastDt, t, camera, p, flash);
   draw(scene, camera);
