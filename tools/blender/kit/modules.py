@@ -441,7 +441,7 @@ def build_exit(style, M):
     root.add(quad_bm([(-po, py0, 0.0), (po, py0, 0.0), (po, py1, 0.0), (-po, py1, 0.0)], (0, 0, 1)), M['porch_floor'], plain(None), wrap=False)
     for sx in (-1, 1):
         root.add(quad_bm([(sx * po, fy, 0), (sx * po, py1, 0), (sx * po, py1, head), (sx * po, fy, head)], (-sx, 0, 0)), M['porch_wall'], attrs_of(lambda c: tuple(c), random.random()), wrap=False)
-    root.add(quad_bm([(-po, fy, head), (po, fy, head), (po, py1, head), (-po, py1, head)], (0, 0, -1)), M['porch_wall'], plain(None), wrap=False)
+    root.add(quad_bm([(-po, fy, head), (po, fy, head), (po, py1, head), (-po, py1, head)], (0, 0, -1)), M['board'], wood_attrs((0, 1, 0), (0, 0, -1)), wrap=False)   # (the boarded soffit)
     Wn.sky(root, M['sky'], -po, po, 0.0, head, py1 + 0.002)
     root.add(block((-0.32, py0 + 0.03, 0.0), (0.32, py0 + 0.45, 0.018), 0.01, 2), M['coir'], plain(None), wrap=False)      # (a doormat outside)
     for k in range(18):                                        # (dead leaves blown into the porch's corners)
@@ -472,14 +472,14 @@ def build_exit(style, M):
         if kind == 'panel':                                     # (a knocker on the muntin of the solid door)
             L.add(plate(rounded(0.06, 0.09, 0.02, 4, lw / 2, 1.62), oy - T / 2, 0.006), M['brass'], metal_attrs(), wrap=False)
             tube(L, M['brass'], [Vector((lw / 2 - 0.035, oy - T / 2 - 0.016, 1.59)), Vector((lw / 2 - 0.035, oy - T / 2 - 0.016, 1.5)), Vector((lw / 2 + 0.035, oy - T / 2 - 0.016, 1.5)), Vector((lw / 2 + 0.035, oy - T / 2 - 0.016, 1.59))], 0.008, 8)
-        knuckles(L, M['iron'], -0.002, 0.0, (0.25, 1.15, 2.05))
+        knuckles(L, M['iron'], 0.0076, 0.0, (0.25, 1.15, 2.05))
     elif kind in ('boards', 'boards_rough'):
         rough = kind == 'boards_rough'; n = 7 if not rough else 6
         bw = boards_leaf(L, M, lw, lh, T, n, 0.0 if not rough else 0.004, [(0.22, 0.16), (1.15, 0.16), (2.08, 0.16)], [(0.3, 1.07), (1.23, 2.0)] if not rough else [], rough, o=(0.0, oy, 0.0))
-        for zc in (0.22, 1.15, 2.08): L.add(plate(strap_outline(-0.004, 0.62, zc, 0.045, 0.03, 'round' if not rough else 'spear'), oy - T / 2, 0.0045, bevel=0.0007), M['iron'], metal_attrs(), wrap=False)
+        for zc in (0.22, 1.15, 2.08): L.add(plate(strap_outline(0.0, 0.62, zc, 0.045, 0.03, 'round' if not rough else 'spear'), oy - T / 2, 0.0045, bevel=0.0007), M['iron'], metal_attrs(), wrap=False)
         nails(L, M['iron'], [(i * bw + bw * f, zc + dz) for i in range(n) for zc in (0.22, 1.15, 2.08) for f, dz in ((0.3, 0.04), (0.7, -0.04))], oy - T / 2)
         tube(L, M['iron'], [Vector((lw - 0.1, oy - T / 2 - 0.004 - 0.02 * math.sin(math.pi * k / 8), 0.95 + 0.25 * k / 8)) for k in range(9)], 0.007)
-        knuckles(L, M['iron'], -0.002, 0.0, (0.22, 1.15, 2.08))
+        knuckles(L, M['iron'], 0.0076, 0.0, (0.22, 1.15, 2.08))
     else:                                                       # (a steel door: flush, a push bar, a wired vision panel)
         F = Face((0, oy - T / 2, 0), (1, 0, 0), (0, 0, 1), (0, -1, 0)); vp = (lw / 2 - 0.11, lw / 2 + 0.11, 1.35, 1.95)
         mems = {}
@@ -494,7 +494,7 @@ def build_exit(style, M):
             L.add(block((xb - 0.03, oy - T / 2 - 0.06, 0.96), (xb + 0.03, oy - T / 2, 1.06), 0.006, 2), M['steel'], metal_attrs(), wrap=False)
         tube(L, M['steel'], [Vector((0.12, oy - T / 2 - 0.05, 1.01)), Vector((lw - 0.12, oy - T / 2 - 0.05, 1.01))], 0.016, 12)          # (the push bar)
         L.add(plate(rounded(lw - 0.06, 0.3, 0.004, 2, lw / 2, 0.17), oy - T / 2, 0.0015), M['steel'], metal_attrs(), wrap=False)
-        knuckles(L, M['steel'], -0.002, 0.0, (0.25, 1.15, 2.05))
+        knuckles(L, M['steel'], 0.0076, 0.0, (0.25, 1.15, 2.05))
     # the boards and the chain across the doorway (they drop when the power comes on)
     B = G['boards']; rnd = random.Random(hash(style) & 0xffff)
     for k, (zc, ang) in enumerate(((0.62, 0.05), (1.28, -0.07), (1.95, 0.04))):
@@ -1180,6 +1180,12 @@ def build_ceilhole(style, M):
         for k in range(14):                                     # (plaster dangling on hair and lath)
             x = cx + rnd.uniform(-hw * 0.38, hw * 0.38); y = cy + rnd.uniform(-hh * 0.38, hh * 0.38); s_ = rnd.uniform(0.012, 0.03)
             G.add(rock((x, y, -rnd.uniform(0.02, 0.16)), (s_, s_ * 0.8, s_ * 0.45), k * 2.1, 1, 1.0), M['coat'], plain(None), smooth=True, wrap=False)
+    # the void above the hole closed all round: dark sides from the ceiling's back up past the boards, and a lid over them (looking up
+    # steeply through the hole never sees out past the floorboards' edges or between them)
+    zt = 0.295; bx0, bx1, by0, by1 = px0 - 0.004, px1 + 0.004, py0 - 0.004, py1 + 0.004
+    for (p0, p1, n) in (((bx0, by0), (bx1, by0), (0, 1, 0)), ((bx1, by0), (bx1, by1), (-1, 0, 0)), ((bx1, by1), (bx0, by1), (0, -1, 0)), ((bx0, by1), (bx0, by0), (1, 0, 0))):
+        G.add(quad_bm([(p0[0], p0[1], 0.0), (p1[0], p1[1], 0.0), (p1[0], p1[1], zt), (p0[0], p0[1], zt)], n), M['cavity'], plain(None), wrap=False)
+    G.add(quad_bm([(bx0, by0, zt), (bx1, by0, zt), (bx1, by1, zt), (bx0, by1, zt)], (0, 0, -1)), M['cavity'], plain(None), wrap=False)
     return G
 
 def build_skylight(style, M):
@@ -1261,7 +1267,7 @@ def materials(group, style):
                                edges=('box', 0.0, 1.15, 0.0, 2.3)) if E['paint'] else Dr.bare_boards(k + '_leaf', 'deal', [], 1.6, tone=0.62))
         M['wood'] = M['leafm']; M['sill'] = kitlib.wood(k + '_sill', 'oak', 'bare', age=1.6)
         M['porch_floor'] = {'flags': stone_flags, 'quarry': lambda n: quarry(n, '#7a2e22', '#d9d0bc'), 'concrete': lambda n: stone_flags(n, '#86827a'), 'boards': lambda n: Dr.bare_boards(n, 'deal', [], 1.8, tone=0.7)}[E['floor']](k + '_porchf')
-        M['porch_wall'] = brick_body(k + '_porchw') if style != 'attic' else Dr.bare_boards(k + '_porchw', 'deal', [], 1.8, tone=0.6)
+        M['porch_wall'] = brick_coursed(k + '_porchw') if style != 'attic' else Dr.bare_boards(k + '_porchw', 'deal', [], 1.8, tone=0.6)   # (coursed: a flat face of brick)
         M['coir'] = coir(k + '_coir'); M['leaves'] = leaves_mat(k + '_leaves')
         M['board'] = Dr.bare_boards(k + '_board', 'deal', [], 1.7); M['chain'] = kitlib.metal(k + '_chain', 'iron', rust=0.9, age=1.5)
     elif group == 'fireplace':
@@ -1299,7 +1305,7 @@ def materials(group, style):
     return M
 
 # ================================================================ build, bake, register
-def bake_parts(name, parts, M, uv1=True, px=PX, double=False, alpha=None, spread=False):
+def bake_parts(name, parts, M, uv1=True, px=PX, double=False, alpha=None, spread=False, shrink=None):
     """bake several nodes' baked parts into one texture set (they share the atlas): parts = [(node name, Geo, extra reserved-only)]
        -> {node name: object}"""
     objs = {}; reserved = [M['glass'], M['wall'], M['sky'], M['emit']]; res = {}
@@ -1326,7 +1332,14 @@ def bake_parts(name, parts, M, uv1=True, px=PX, double=False, alpha=None, spread
                 c = o.data.vertices[lp_.vertex_index].co; uvd[li].uv = (0.5 + c.x / (2 * R), 0.5 + c.y / (2 * R))
         mg = 0.008 if alpha else 0.003                       # (a cut-out's clear border must not take its neighbour's texels in the bake margin)
         if rest: kitlib.unwrap(rest, margin=mg, smart=True, angle=60)
-        kitlib.unwrap(baked, margin=mg, smart=False)
+        if shrink:                                           # (less of the atlas for what is seen least: {node: ([materials], factor)})
+            kitlib.unwrap(baked, margin=mg, smart=False)
+            for o in baked:
+                if o.name in shrink:
+                    mats, k = shrink[o.name]; idx = {i for i, m_ in enumerate(o.data.materials) if m_ in mats}
+                    kitlib.uv_scale(o, lambda p_: p_.material_index in idx, k)
+            kitlib.unwrap(baked, margin=mg, smart=False, average=False)
+        else: kitlib.unwrap(baked, margin=mg, smart=False)
         if spread:                                           # (alternatives of one piece, all at the origin: apart while baking, or each
             for i, o in enumerate(baked): o.location.x += 4.0 * i  # would catch the others' shadows)
         files = kitlib.bake_set(baked, name, px, 64)
@@ -1357,6 +1370,22 @@ def bake_parts(name, parts, M, uv1=True, px=PX, double=False, alpha=None, spread
         o.name = nm; o.data.name = nm; o['kit'] = 'arch'; out[nm] = o
     return out, files
 
+def split_child(ob, matname, name):
+    """the faces of ob in material matname taken out into their own object name (same frame) -> it, or None"""
+    idx = [i for i, m_ in enumerate(ob.data.materials) if m_ and m_.name == matname]
+    if not idx: return None
+    bm = bmesh.new(); bm.from_mesh(ob.data); rb = bm.copy()
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.material_index in idx], context='FACES')
+    bmesh.ops.delete(rb, geom=[f for f in rb.faces if f.material_index not in idx], context='FACES')
+    for b in (bm, rb): bmesh.ops.delete(b, geom=[v for v in b.verts if not v.link_faces], context='VERTS')
+    me2 = ob.data.copy(); rb.to_mesh(me2); rb.free(); bm.to_mesh(ob.data); bm.free()
+    keep = [m_ for i, m_ in enumerate(ob.data.materials) if i not in idx]; mi = [keep.index(ob.data.materials[p_.material_index]) for p_ in ob.data.polygons]
+    ob.data.materials.clear()
+    for m_ in keep: ob.data.materials.append(m_)
+    ob.data.polygons.foreach_set('material_index', mi)
+    me2.materials.clear(); me2.materials.append(bpy.data.materials[matname]); me2.polygons.foreach_set('material_index', [0] * len(me2.polygons))
+    c = kitlib.link(bpy.data.objects.new(name, me2)); c.data.name = name; c.matrix_world = ob.matrix_world.copy(); return c
+
 def register(asset, roots, t0, info):
     for r in roots: r.location = (0, 0, 0)
     json.dump(info, open(os.path.join(TMP, asset + '.json'), 'w'), indent=1)
@@ -1366,8 +1395,11 @@ def register(asset, roots, t0, info):
 def do_exit(style):
     t0 = time.time(); kitlib.reset(); M = materials('exit', style); G = build_exit(style, M); nm = 'Exit_' + style
     p = PIECES[nm]; lw = p['leaf'][0]
-    objs, f1 = bake_parts(nm, [(nm, G['root']), (f'Exit_leaf_{style}', G['leaf']), (f'Exit_boards_{style}', G['boards']), (f'Exit_lamp_{style}', G['lamp'])], M)
+    objs, f1 = bake_parts(nm, [(nm, G['root']), (f'Exit_leaf_{style}', G['leaf']), (f'Exit_boards_{style}', G['boards']), (f'Exit_lamp_{style}', G['lamp'])], M,
+                          shrink={nm: ([M['porch_floor'], M['porch_wall'], M['board'], M['coir'], M['leaves']], 0.45)})
     root = objs[nm]
+    lf = objs[f'Exit_leaf_{style}']; gl = split_child(lf, 'Glass', f'Exit_leaf_{style}_glass')   # (the glazing its own node: the game's glass role)
+    if gl: gl.parent = lf; gl.matrix_parent_inverse.identity(); gl.location = (0, 0, 0)
     for k in ('leaf', 'boards', 'lamp'):
         o = objs[f'Exit_{k}_{style}']; o.parent = root; o.matrix_parent_inverse.identity()
     objs[f'Exit_leaf_{style}'].location = (-lw / 2, 0, 0)

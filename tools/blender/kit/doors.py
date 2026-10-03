@@ -344,7 +344,7 @@ def build_leaf(style, M):
                 finger_plate(G, M['steel'], kx, 1.22, 1.52, 0.09, s, yf, 0.0014)
         for h in holes:
             b = BEAD[-1][0] - 0.004; wired_glass(G, M['glass'], M['wire'], h[0] + b, h[1] - b, h[2] + b, h[3] - b)
-        knuckles(G, M['brass'] if style == 'tile' else M['wood'], -0.002, 0.0, (0.25, 1.3, 2.3))   # (painted over with the door)
+        knuckles(G, M['brass'] if style == 'tile' else M['wood'], 0.0076, 0.0, (0.25, 1.3, 2.3))   # (painted over with the door; nothing behind the hinge line x = 0)
         return G
     rough = style == 'attic'; n, gap = (7, 0.0) if style == 'concrete' else (5, 0.004)
     ledges = [(0.2, 0.15), (1.2, 0.15), (2.3, 0.15)]
@@ -352,15 +352,15 @@ def build_leaf(style, M):
     yf = -T / 2
     nails(G, M['iron'], [(i * (bw + gap) + bw * f, zc + dz) for i in range(n) for (zc, _) in ledges for f, dz in ((0.3, 0.035), (0.7, -0.035))], yf)
     if style == 'concrete':
-        for (zc, _) in ledges: G.add(plate(strap_outline(-0.004, 0.52, zc, 0.04, 0.03), yf, 0.004, bevel=0.0007), M['iron'], metal_attrs(), wrap=False)
+        for (zc, _) in ledges: G.add(plate(strap_outline(0.0, 0.52, zc, 0.04, 0.03), yf, 0.004, bevel=0.0007), M['iron'], metal_attrs(), wrap=False)
         for zc in (0.94, 1.18):                             # (the Suffolk latch: two cusped plates, the bow grip between them)
             G.add(plate([(0.905, zc - 0.012), (0.935, zc - 0.012), (0.94, zc), (0.935, zc + 0.012), (0.905, zc + 0.012), (0.9, zc)], yf, 0.003), M['iron'], metal_attrs(), wrap=False)
         tube(G, M['iron'], [Vector((0.92, yf - 0.003 - 0.0085 * math.sin(math.pi * k / 8), 0.95 + 0.22 * k / 8)) for k in range(9)], 0.0055)
     else:
-        for (zc, _) in ledges: G.add(plate(strap_outline(-0.004, 0.68, zc, 0.045, 0.028, 'spear'), yf, 0.0045, bevel=0.0007), M['iron'], metal_attrs(), wrap=False)
+        for (zc, _) in ledges: G.add(plate(strap_outline(0.0, 0.68, zc, 0.045, 0.028, 'spear'), yf, 0.0045, bevel=0.0007), M['iron'], metal_attrs(), wrap=False)
         G.add(lathe_bm([(0.0, 0.022), (1.0, 0.022)], (0.9, yf, 1.0), (0.9, yf - 0.003, 1.0), 12, (False, True)), M['iron'], metal_attrs(), wrap=False)   # (a flat iron ring pull)
         tube(G, M['iron'], [Vector((0.9 + 0.035 * math.sin(2 * math.pi * k / 16), yf - 0.0085, 1.0 - 0.035 * math.cos(2 * math.pi * k / 16))) for k in range(17)], 0.0045, 6)
-    knuckles(G, M['iron'], -0.002, 0.0, (0.2, 1.2, 2.3))
+    knuckles(G, M['iron'], 0.0076, 0.0, (0.2, 1.2, 2.3))
     return G
 
 # ================================================================ the frame

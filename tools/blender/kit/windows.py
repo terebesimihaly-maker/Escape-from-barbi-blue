@@ -239,12 +239,13 @@ def win_sash(M, G, open_, R, tall=False):
     pz = z1 + MARGIN + AW + 0.08
     if tall:
         pw = ow / 2 + AW + 0.2                                # (the pelmet: a mahogany box, a cornice, a shaped lower edge)
-        cur.add(block((-pw, -0.17, pz - 0.2), (pw, -0.15, pz + 0.04), 0.004, 1), M['shutter'], wood_attrs((1, 0, 0), (0, -1, 0)), wrap=False)
-        for sx in (-1, 1): cur.add(block((min(sx * pw, sx * (pw - 0.02)), -0.17, pz - 0.2), (max(sx * pw, sx * (pw - 0.02)), 0.0, pz + 0.04), 0.004, 1), M['shutter'], wood_attrs((0, 0, 1), (sx, 0, 0)), wrap=False)
+        PF = -0.152                                           # (the pelmet's face: its cornice stays inside the 0.20 m envelope)
+        cur.add(block((-pw, PF, pz - 0.2), (pw, PF + 0.02, pz + 0.04), 0.004, 1), M['shutter'], wood_attrs((1, 0, 0), (0, -1, 0)), wrap=False)
+        for sx in (-1, 1): cur.add(block((min(sx * pw, sx * (pw - 0.02)), PF, pz - 0.2), (max(sx * pw, sx * (pw - 0.02)), 0.0, pz + 0.04), 0.004, 1), M['shutter'], wood_attrs((0, 0, 1), (sx, 0, 0)), wrap=False)
         cor = [(0, 0), (0.0, 0.012), (0.008, 0.02), (0.014, 0.03), (0.022, 0.036), (0.03, 0.036), (0.03, 0.044)]
-        rows = [[Vector((-pw - h, -0.17 - h, pz + 0.04 + w)), Vector((pw + h, -0.17 - h, pz + 0.04 + w))] for w, h in cor]
+        rows = [[Vector((-pw - h, PF - h, pz + 0.04 + w)), Vector((pw + h, PF - h, pz + 0.04 + w))] for w, h in cor]
         cur.add(strip(rows, [Vector((0, -1, 0.6))] * (len(rows) - 1)), M['shutter'], wood_attrs((1, 0, 0), (0, -1, 0)), smooth=True, wrap=False)
-        cur.add(block((-pw - 0.03, -0.2, pz + 0.075), (pw + 0.03, 0.0, pz + 0.084), 0.002, 1), M['shutter'], wood_attrs((1, 0, 0), (0, 0, 1)), wrap=False)
+        cur.add(block((-pw - 0.03, PF - 0.03, pz + 0.075), (pw + 0.03, 0.0, pz + 0.084), 0.002, 1), M['shutter'], wood_attrs((1, 0, 0), (0, 0, 1)), wrap=False)
         for sx in (-1, 1):
             b = drape(cur, M['cloth'], sx * (ow / 2 + AW + 0.18), sx * (ow / 2 - 0.12), pz - 0.05, 0.012, -0.03, 6, (1.05, 0.14), 0.055, nx=22, nz=30, seed=3 + sx)
             tieback(cur, M['cord'], M['brass'], b)

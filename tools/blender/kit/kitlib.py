@@ -232,7 +232,7 @@ def rounded_rect(w, h, r, n=3, cx=0.0, cy=0.0, r_top=None):
     return out
 
 # ---------------------------------------------------------------- UVs
-def unwrap(objs, margin=0.004, uv1=False, smart=True, angle=66, fast=False):
+def unwrap(objs, margin=0.004, uv1=False, smart=True, angle=66, fast=False, average=True):
     """uv0: smart project (unless the object already has hand-made UVs and smart=False), every island scaled to the same
        texel density and packed (convex hulls; fast: bounding boxes, for grey boxes); uv1 (modules):
        lightmap pack, a unique 0..1 layout for the wall atlas"""
@@ -242,7 +242,8 @@ def unwrap(objs, margin=0.004, uv1=False, smart=True, angle=66, fast=False):
         o.data.uv_layers.active_index = 0; o.data.uv_layers[0].active_render = True
     select(objs); bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
     if smart: bpy.ops.uv.smart_project(angle_limit=math.radians(angle), island_margin=margin, scale_to_bounds=False)
-    bpy.ops.uv.select_all(action='SELECT'); bpy.ops.uv.average_islands_scale()
+    bpy.ops.uv.select_all(action='SELECT')
+    if average: bpy.ops.uv.average_islands_scale()
     bpy.ops.uv.pack_islands(rotate=not fast, margin=margin, shape_method='AABB' if fast else 'CONVEX')   # (CONCAVE takes minutes)
     bpy.ops.object.mode_set(mode='OBJECT')
     for o in objs:                                          # (kept off the atlas's border: glTF samplers repeat, so an island
