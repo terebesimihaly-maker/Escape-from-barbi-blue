@@ -143,8 +143,8 @@ function lateKit(lv, kit) {
      its lamps, rugs, puddles and pipes). Below that, the kit places none and house.js's old props are the fallback, as without a
      kit: half a wall of real pieces beside half a wall of procedural ones would look worse than either.
    - Lamps stay house.js's for now (fixtures: false: its lights and pool, until the lighting package); windows are Arch's.
-   Today: the nursery, gallery and basement are furnished from the kit; the attic and workshop have stand-ins for their boxes and
-   house.js's props (their art is still grey in the manifest). */
+   With the manifest as it is now, all five floors are furnished from the kit (only three common band pieces are still grey: they are
+   left out); the stand-ins show only while a floor's kit is still loading, or for pieces a later manifest marks grey again. */
 const KIT_BAND_MIN = 0.8;
 function kitFurnishesBand(kit, plan) { return !!(kit && plan && typeof Kit !== 'undefined' && Kit.covers(kit, plan, { placeholders: false }) >= KIT_BAND_MIN); }
 function furnishOpts(F, kit, band) {

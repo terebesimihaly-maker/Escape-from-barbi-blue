@@ -355,9 +355,9 @@ function build(THREE, env) {
     });
     const sm = sheets.mesh(std({ map: tex(clothCanvas('#b8b0a0'), true), roughness: 0.95 }), true); if (sm) props.add(sm);
     const tm = trunks.mesh(std({ map: tex(crateCanvas()), color: 0x8a6a4a, roughness: 0.7 }), true); if (tm) props.add(tm);
-    // cobwebs across the top corners
+    // cobwebs across the top corners (not when the kit furnishes the walls: its band decor has cobweb cards of its own)
     const web = std({ map: tex(webCanvas()), transparent: true, alphaTest: 0.1, side: THREE.DoubleSide, roughness: 1, depthWrite: false });
-    for (const f of faces) { if (hash(f.x * 5 + f.nx, f.y * 5 + f.nz, 196) > 0.14 || f.inset) continue;
+    if (!env.furnished) for (const f of faces) { if (hash(f.x * 5 + f.nx, f.y * 5 + f.nz, 196) > 0.14 || f.inset) continue;
       const w = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.7), web), end = hash(f.x, f.y, 197) < 0.5 ? 0 : 1;
       const ex = end ? f.x1 : f.x0, ez = end ? f.z1 : f.z0, tx = f.x1 - f.x0, tz = f.z1 - f.z0, tl = Math.hypot(tx, tz);
       const wx = ex - (end ? 1 : -1) * tx / tl * 0.25 + f.nx * 0.25, wz = ez - (end ? 1 : -1) * tz / tl * 0.25 + f.nz * 0.25;
