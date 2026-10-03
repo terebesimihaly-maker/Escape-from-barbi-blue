@@ -6,26 +6,26 @@
  "tiers": {
   "hi": {
    "wood": 30208768,
-   "tile": 10755068,
+   "tile": 18937564,
    "concrete": 11265116,
    "attic": 10358868,
    "workshop": 13133704,
-   "common": 1079144
+   "common": 1079148
   },
   "md": {
    "wood": 12034604,
-   "tile": 4650344,
+   "tile": 8290628,
    "concrete": 3800680,
-   "attic": 3664536,
-   "workshop": 4611144,
-   "common": 400152
+   "attic": 3664544,
+   "workshop": 4611152,
+   "common": 400148
   },
   "lo": {
    "wood": 6461872,
-   "tile": 2725048,
+   "tile": 4718888,
    "concrete": 1813412,
-   "attic": 1915060,
-   "workshop": 2490104,
+   "attic": 1915056,
+   "workshop": 2490096,
    "common": 188652
   }
  },
@@ -246,9 +246,10 @@
    "id": "china_cabinet",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_china_cabinet",
+    "Glass"
    ],
    "uv1": false,
    "children": [],
@@ -261,13 +262,13 @@
     [
      0.55,
      2.0,
-     0.42
+     0.422
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 2518,
+    "md": 2518,
+    "lo": 2134
    }
   },
   "Band_coal_bin": {
@@ -426,28 +427,28 @@
    "id": "console",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_console"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.5,
+     -0.495,
      0.0,
      0.0
     ],
     [
-     0.5,
+     0.495,
      0.85,
-     0.4
+     0.4024
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1088,
+    "md": 1088,
+    "lo": 866
    }
   },
   "Band_console_mirror": {
@@ -456,28 +457,28 @@
    "id": "console_mirror",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_console_mirror"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.4,
-     1.0,
+     -0.38,
+     1.02,
      0.0
     ],
     [
-     0.4,
-     1.95,
-     0.06
+     0.38,
+     1.965,
+     0.05
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 218,
+    "md": 218,
+    "lo": 202
    }
   },
   "Band_doll_cabinet": {
@@ -486,28 +487,29 @@
    "id": "doll_cabinet",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_doll_cabinet",
+    "Glass"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.6,
+     -0.605,
      0.0,
      0.0
     ],
     [
-     0.6,
-     2.0,
-     0.42
+     0.605,
+     1.98,
+     0.402
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 3732,
+    "md": 3732,
+    "lo": 3240
    }
   },
   "Band_doll_shelf": {
@@ -701,28 +703,28 @@
    "id": "gilt_mirror",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_gilt_mirror"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.35,
-     1.0,
+     -0.33,
+     1.005,
      0.0
     ],
     [
-     0.35,
-     2.0,
-     0.08
+     0.33,
+     1.97,
+     0.0489
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 2406,
+    "md": 2406,
+    "lo": 2097
    }
   },
   "Band_grandfather_clock": {
@@ -731,9 +733,10 @@
    "id": "grandfather_clock",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_grandfather_clock",
+    "Glass"
    ],
    "uv1": false,
    "children": [
@@ -752,9 +755,9 @@
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1582,
+    "md": 1582,
+    "lo": 1274
    }
   },
   "Band_hall_bench": {
@@ -763,28 +766,28 @@
    "id": "hall_bench",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_hall_bench"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.6,
+     -0.59,
      0.0,
      0.0
     ],
     [
-     0.6,
-     0.48,
-     0.42
+     0.59,
+     0.472,
+     0.4
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1648,
+    "md": 1648,
+    "lo": 1076
    }
   },
   "Band_head_shelf": {
@@ -1873,9 +1876,9 @@
    "id": "sideboard",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_sideboard"
    ],
    "uv1": false,
    "children": [],
@@ -1888,13 +1891,13 @@
     [
      0.8,
      0.95,
-     0.44
+     0.435
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1632,
+    "md": 1632,
+    "lo": 1028
    }
   },
   "Band_suitcase_pile": {
@@ -1993,28 +1996,28 @@
    "id": "umbrella_stand",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_umbrella_stand"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.175,
-     0.0,
-     0.0
+     -0.1339,
+     -0.0004,
+     0.0335
     ],
     [
-     0.175,
+     0.1339,
      0.95,
-     0.35
+     0.3061
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 636,
+    "md": 636,
+    "lo": 317
    }
   },
   "Band_utility_sink": {
@@ -2299,9 +2302,9 @@
    "id": "column_tile",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_column_tile_H350"
    ],
    "uv1": false,
    "children": [],
@@ -2318,9 +2321,9 @@
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1582,
+    "md": 1582,
+    "lo": 916
    },
    "slot": "pocket",
    "foot": [
@@ -2338,9 +2341,9 @@
    "id": "column_tile",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_column_tile_H400"
    ],
    "uv1": false,
    "children": [],
@@ -2357,9 +2360,9 @@
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1582,
+    "md": 1582,
+    "lo": 811
    },
    "slot": "pocket",
    "foot": [
@@ -2377,9 +2380,9 @@
    "id": "column_tile",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_column_tile_H450"
    ],
    "uv1": false,
    "children": [],
@@ -2396,9 +2399,9 @@
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1582,
+    "md": 1582,
+    "lo": 791
    },
    "slot": "pocket",
    "foot": [
@@ -3986,9 +3989,10 @@
    "id": "isl_dining",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_isl_tile_dining_grand_piano_parlour_reading",
+    "Glass"
    ],
    "uv1": false,
    "children": [
@@ -3996,20 +4000,20 @@
    ],
    "aabb": [
     [
-     -0.975,
-     0.0,
-     -0.725
+     -0.9794,
+     -0.0021,
+     -0.7294
     ],
     [
-     0.975,
-     1.1,
-     0.725
+     0.9794,
+     1.1006,
+     0.7294
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 12280,
+    "md": 12280,
+    "lo": 5520
    },
    "slot": "island",
    "foot": [
@@ -4145,28 +4149,28 @@
    "id": "isl_grand_piano",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_isl_tile_dining_grand_piano_parlour_reading"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.75,
+     -0.74,
      0.0,
-     -0.975
+     -0.9734
     ],
     [
-     0.75,
-     1.9,
+     0.74,
+     1.89,
      0.975
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 6073,
+    "md": 6073,
+    "lo": 5619
    },
    "slot": "island",
    "foot": [
@@ -4305,9 +4309,9 @@
    "id": "isl_parlour",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_isl_tile_dining_grand_piano_parlour_reading"
    ],
    "uv1": false,
    "children": [
@@ -4315,20 +4319,20 @@
    ],
    "aabb": [
     [
-     -0.95,
+     -0.945,
      0.0,
-     -0.8
+     -0.802
     ],
     [
-     0.95,
+     0.945,
      1.1,
-     0.8
+     0.802
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 7952,
+    "md": 7952,
+    "lo": 5098
    },
    "slot": "island",
    "foot": [
@@ -4346,28 +4350,29 @@
    "id": "isl_reading",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_isl_tile_dining_grand_piano_parlour_reading",
+    "Glass"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.95,
-     0.0,
-     -0.65
+     -0.945,
+     -0.0043,
+     -0.645
     ],
     [
-     0.95,
-     1.2,
-     0.65
+     0.9506,
+     1.2006,
+     0.645
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 5546,
+    "md": 5546,
+    "lo": 4272
    },
    "slot": "island",
    "foot": [
@@ -5924,28 +5929,29 @@
    "id": "display_bench",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_display_bench",
+    "Glass"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.35,
+     -0.345,
      0.0,
-     -1.55
+     -1.545
     ],
     [
-     0.35,
-     1.25,
-     1.55
+     0.345,
+     1.244,
+     1.545
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 9160,
+    "md": 9160,
+    "lo": 7574
    },
    "slot": "bar",
    "foot": [
@@ -6238,9 +6244,10 @@
    "id": "plinth_bust",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_plinth_bust",
+    "Glass"
    ],
    "uv1": false,
    "children": [],
@@ -6257,9 +6264,9 @@
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1962,
+    "md": 1962,
+    "lo": 1760
    },
    "slot": "pocket",
    "foot": [
@@ -6864,28 +6871,29 @@
    "id": "vitrine_double",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_vitrine_double",
+    "Glass"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.495,
+     -0.4875,
      0.0,
-     -1.0
+     -0.9925
     ],
     [
-     0.495,
+     0.4875,
      1.95,
-     1.0
+     0.9925
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 4379,
+    "md": 4379,
+    "lo": 3773
    },
    "slot": "bar",
    "foot": [

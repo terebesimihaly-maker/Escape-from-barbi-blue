@@ -27,6 +27,7 @@ def seated_doll(G, M, seat, face, rnd, scale=1.0, bonnet=False, frock='frockA', 
     """a bisque-headed doll sitting on seat (the point under her hips), facing face: the head (a lathe with a chin and a turned-up
        nose), glass eyes, a wig, a shoulder plate; a stuffed cloth body; a frock with a full skirt over her knees; legs out, shoes"""
     s = scale; c = Vector(seat); N = lambda n: max(5, int(round(n * lod)))       # (lod < 1: fewer sides, for a doll seen small)
+    NH = lambda n: max(9, int(round(n * max(lod, 0.7))))                    # (but the head and wig stay round: the face is what's seen)
     f = Vector((face[0], face[1], 0)).normalized(); sd = Vector((-f.y, f.x, 0)); up = Vector((0, 0, 1))
     hip = c + up * 0.02 * s; chest = hip + up * 0.16 * s - f * 0.01 * s; neck = chest + up * 0.07 * s; head = neck + up * 0.085 * s + f * 0.006 * s
     # body and frock bodice
@@ -54,7 +55,7 @@ def seated_doll(G, M, seat, face, rnd, scale=1.0, bonnet=False, frock='frockA', 
         G.add(lathe_bm([(0.0, 0.0), (0.3, 0.012 * s), (1.0, 0.0)], hd - f * 0.005 * s, hd + f * 0.022 * s, N(8)), M['bisque'], ma(), smooth=True, wrap=False)
     # the shoulder plate and neck, the head
     G.add(lathe_bm([(0.0, 0.045 * s), (0.5, 0.03 * s), (1.0, 0.018 * s)], chest + up * 0.02 * s, neck, N(10)), M['bisque'], ma(), smooth=True, wrap=False)
-    bm = lathe_bm([(0.0, 0.0), (0.12, 0.03 * s), (0.35, 0.046 * s), (0.6, 0.05 * s), (0.85, 0.042 * s), (1.0, 0.0)], neck + up * 0.01 * s, head + up * 0.05 * s, N(14))
+    bm = lathe_bm([(0.0, 0.0), (0.12, 0.03 * s), (0.35, 0.046 * s), (0.6, 0.05 * s), (0.85, 0.042 * s), (1.0, 0.0)], neck + up * 0.01 * s, head + up * 0.05 * s, NH(14))
     for v in bm.verts:                                                      # (chubby cheeks forward, the chin, a little nose)
         rel = v.co - head; fw = rel.dot(f)
         if fw > 0: v.co += f * fw * 0.18 * math.exp(-(rel.z / (0.035 * s)) ** 2)
@@ -65,10 +66,10 @@ def seated_doll(G, M, seat, face, rnd, scale=1.0, bonnet=False, frock='frockA', 
         G.add(lathe_bm([(0.0, 0.0), (0.5, 0.008 * s), (1.0, 0.0)], e - f * 0.004 * s, e + f * 0.004 * s, N(10)), M['eye'], ma(), smooth=True, wrap=False)
     # the wig: ringlets round the back and sides; or a bonnet
     if bonnet:
-        G.add(lathe_bm([(0.0, 0.062 * s), (0.3, 0.064 * s), (0.7, 0.058 * s), (1.0, 0.0)], head - f * 0.02 * s - up * 0.01 * s, head - f * 0.03 * s + up * 0.075 * s, N(14), (False, True)), M['bonnet'], fa(rnd), smooth=True, wrap=False)
+        G.add(lathe_bm([(0.0, 0.062 * s), (0.3, 0.064 * s), (0.7, 0.058 * s), (1.0, 0.0)], head - f * 0.02 * s - up * 0.01 * s, head - f * 0.03 * s + up * 0.075 * s, NH(14), (False, True)), M['bonnet'], fa(rnd), smooth=True, wrap=False)
         tube(G, M['bonnet'], [head - f * 0.005 * s + sd * 0.06 * s * k + up * 0.02 * s * (1 - abs(k)) for k in np.linspace(-1, 1, 9)], 0.008 * s, 6, fa(rnd))
     else:
-        G.add(lathe_bm([(0.0, 0.054 * s), (0.35, 0.056 * s), (0.65, 0.05 * s), (0.85, 0.036 * s), (0.95, 0.02 * s), (1.0, 0.0)], head - f * 0.008 * s, head + up * 0.058 * s - f * 0.004 * s, N(14), (False, True)), M['hair'], fa(rnd, 20, 20), smooth=True, wrap=False)
+        G.add(lathe_bm([(0.0, 0.054 * s), (0.35, 0.056 * s), (0.65, 0.05 * s), (0.85, 0.036 * s), (0.95, 0.02 * s), (1.0, 0.0)], head - f * 0.008 * s, head + up * 0.058 * s - f * 0.004 * s, NH(14), (False, True)), M['hair'], fa(rnd, 20, 20), smooth=True, wrap=False)
     for k in range(N(13)):                                                   # (ringlets: curls hanging round the back and sides)
         a = math.pi * (0.2 + 1.6 * k / max(1, N(13) - 1)); rad = (sd * math.cos(a) - f * math.sin(a)); p0 = head + rad * 0.052 * s - up * 0.0 * s
         L = (0.06 + 0.035 * rnd.random()) * s; ph = rnd.uniform(0, 6.28); pts = []

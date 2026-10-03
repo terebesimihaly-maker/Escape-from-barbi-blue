@@ -170,23 +170,8 @@ def build_crib(v):
     print(f'  {node}: {kitlib.tris(body)} + mobile {kitlib.tris(mob)} triangles, box {F.footprint_check([body, mob], None, None)}, bake {files["times"]["total"]}s', flush=True)
     return body, files
 
-def build_simple(node, asset, builder, mats, rnd_seed, px=2048):
-    rnd = random.Random(rnd_seed); M = mats(); G = S.Geo(1, 1, False, False); builder(G, M, rnd)
-    body = F.build_obj(node, G); files = F.bake_objs(asset, [body], px)
-    body.name = node; body.data.name = node; body['kit'] = 'band' if node.startswith('Band_') else 'solid'
-    for nm, loc in getattr(G, 'sockets', []):                               # (empties: a fixture's place, where the game seats a doll)
-        e = kitlib.empty(nm, loc, body); e.matrix_parent_inverse.identity(); e.location = loc
-    print(f'  {node}: {kitlib.tris(body)} triangles, box {F.footprint_check([body], None, None)}, bake {files["times"]["total"]}s', flush=True)
-    return body, files
-
-def run(asset, nodes_builders, wall=False):
-    """build, bake, sheet and register one asset (one or more nodes)"""
-    t0 = time.time(); kitlib.reset(); roots = []; info = {}
-    for args in nodes_builders:
-        r, f = build_simple(*args); roots.append(r); info[r.name] = {'tris': kitlib.tris(r), 'bake': f['times']['total']}
-    if '--sheets' in sys.argv: print('sheet', F.sheet(asset, roots, STYLE, wall=wall))
-    json.dump(info, open(os.path.join(TMP, f'furn_wood_{asset}.json'), 'w'), indent=1)
-    kitlib.register(f'furn_wood_{asset}', roots); print(f'{asset}: {time.time() - t0:.0f}s', flush=True)
+def build_simple(node, asset, builder, mats, rnd_seed, px=2048): return F.build_simple(node, asset, builder, mats, rnd_seed, px)
+def run(asset, nodes_builders, wall=False): return F.run(STYLE, asset, nodes_builders, wall)
 
 def main():
     import furn_wood2 as W2
@@ -213,34 +198,7 @@ def main():
     isl = [k for k in ('isl_crib_rocker', 'isl_twin_cribs', 'isl_bed_screen', 'isl_tea_party', 'isl_dollhouse', 'isl_washstand') if want(k) or want('islands')]
     if isl: islands(W3, isl)
 
-def islands(W3, ids):
-    """the islands: their new parts baked together, the reused pieces joined in, the animated part on its pivot"""
-    t0 = time.time(); kitlib.reset()
-    specs, new_parts, M = W3.build_islands(lambda k: k in ids)
-    files = F.bake_objs('isl_wood', new_parts, 2048, spread=True) if new_parts else None
-    roots = []; info = {}
-    for name, statics, piv, piv_name, piv_loc, junk in specs:
-        statics = [o for o in statics if o.name in bpy.data.objects]
-        body = kitlib.join(statics, name) if len(statics) > 1 else statics[0]
-        body.name = name; body.data.name = name; body['kit'] = 'island'
-        if piv is not None: F.pivot_child(body, piv_name, piv, piv_loc)
-        for j in junk:
-            if j.name in bpy.data.objects: bpy.data.objects.remove(j)
-        roots.append(body); info[name] = {'tris': kitlib.tris(body) + sum(kitlib.tris(c) for c in body.children), 'mats': len(body.data.materials)}
-        print(f'  {name}: {info[name]}, box {F.footprint_check([body] + list(body.children), None, None)}', flush=True)
-    for o in list(bpy.data.objects):                                     # (whatever came along from the appended files and isn't used)
-        if o not in roots and o.parent not in roots and o.type in ('EMPTY',): bpy.data.objects.remove(o)
-    if '--sheets' in sys.argv: print('sheet', F.sheet('islands_wood', roots, STYLE))
-    json.dump({'info': info, 'bake': files['times']['total'] if files else 0}, open(os.path.join(TMP, 'furn_wood_islands.json'), 'w'), indent=1)
-    # (one registration per island: building some of them again never takes the others out of the kit)
-    blend = os.path.join(TMP, 'furn_wood_islands_' + '_'.join(sorted(r.name[4:] for r in roots)) + '.blend')
-    kitlib.register('furn_wood_islands_tmp', roots, blend=blend)
-    reg = os.path.join(TMP, 'assets', 'furn_wood_islands_tmp.json'); r_ = json.load(open(reg)); os.remove(reg)
-    old = os.path.join(TMP, 'assets', 'furn_wood_islands.json')
-    if os.path.exists(old): os.remove(old)
-    for n in r_['nodes']:
-        e = dict(r_); e['asset'] = 'furn_wood_' + n; e['nodes'] = [n]; json.dump(e, open(os.path.join(TMP, 'assets', f'furn_wood_{n}.json'), 'w'), indent=1)
-    print(f'islands: {time.time() - t0:.0f}s', flush=True)
+def islands(W3, ids): return F.islands(STYLE, W3.build_islands, ids)
 
 if __name__ == '__main__':
     main()
