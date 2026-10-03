@@ -1,0 +1,9 @@
+{
+ "version": 1,
+ "moon": {
+  "az": 0.0,
+  "el": 0.6109
+ },
+ "eye_m": 1.5,
+ "note": "equirect, three.js equirectUv; the moon is in the picture at (az, el) in dress.js terms: turn u by (plan.moon.az - az) / 2pi to put it where the shafts come from"
+}
