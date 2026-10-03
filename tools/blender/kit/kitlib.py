@@ -245,6 +245,9 @@ def unwrap(objs, margin=0.004, uv1=False, smart=True, angle=66, fast=False):
     bpy.ops.uv.select_all(action='SELECT'); bpy.ops.uv.average_islands_scale()
     bpy.ops.uv.pack_islands(rotate=not fast, margin=margin, shape_method='AABB' if fast else 'CONVEX')   # (CONCAVE takes minutes)
     bpy.ops.object.mode_set(mode='OBJECT')
+    for o in objs:                                          # (kept off the atlas's border: glTF samplers repeat, so an island
+        uv = o.data.uv_layers[0].data; a = np.empty(len(uv) * 2, np.float32)   # touching it would pick up the far side's texels)
+        uv.foreach_get('uv', a); uv.foreach_set('uv', margin + a * (1.0 - 2.0 * margin))
     if uv1:
         for o in objs:
             if len(o.data.uv_layers) < 2: o.data.uv_layers.new(name='UV1')
@@ -782,6 +785,7 @@ def baked_material(name, files, double=False, alpha=None):
         t.image.name = f'{name}_{key}'                     # (unique: every asset's files are called albedo.hi.webp...)
         t.image.colorspace_settings.name = 'sRGB' if srgb else 'Non-Color'; return t
     a = tex('albedo', True); nt.links.new(a.outputs['Color'], b.inputs['Base Color'])
+    a.image.alpha_mode = 'CHANNEL_PACKED'                   # (straight alpha as glTF means it: Cycles would divide the colour by a near-zero alpha)
     alpha = files.get('alpha') if alpha is None else alpha
     if alpha == 'blend':                                     # (a veil: lace, net; glTF BLEND)
         nt.links.new(a.outputs['Alpha'], b.inputs['Alpha'])

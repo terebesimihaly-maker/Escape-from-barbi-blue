@@ -17,6 +17,7 @@
 import sys, os, math, random, time, json
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import bpy, bmesh
+import numpy as np
 from mathutils import Vector, noise as mnoise
 import kitlib, defs
 import surfaces2 as S
@@ -143,17 +144,18 @@ def ceiling_mat(name, style, hole=None, soot=None):
         col = m.mix(m.math('MULTIPLY', m.remap(d, r, 0.0, smooth=True), m.remap(m.noise(op, 6, 3), 0.3, 0.7, 0.4, 0.8)), col, m.mix(1.0, col, (0.45, 0.42, 0.38), 'MULTIPLY'))
     return m.out(col, rough, nrm)
 
-def wall_tex_mat(name, style, lp_attr=True, back=None):
+def wall_tex_mat(name, style, lp_attr=True, back=None, edge_w=0.05, fade=0.35):
     """the style's own wall (its shipped texture, colour A) at the place the piece came from: the attribute 'lp' holds that flat
-       position (x across the face, z up) so a curl of paper keeps its pattern; back: the paper's back where the normal faces the wall"""
+       position (x across the face, z up) so a curl of paper keeps its pattern; back: the paper's back where the normal faces the wall;
+       edge_w: how far in from the torn edge (attribute ja) it is browned"""
     files = S.manifest_load()['styles'][style]['wall']['files']
     m = kitlib.Mat(name); lp = m.attr('lp', True); op = m.attr('opos', True); x, yy, z = sep(m, lp)
     x = m.math('ADD', m.math('MULTIPLY', x, 0.985), 0.012); z = m.math('ADD', m.math('MULTIPLY', z, 0.99), 0.009)   # (the paper shrank as it dried: the print no longer lines up)
     u = m.math('MULTIPLY', m.math('ADD', 0.5, m.math('DIVIDE', x, FW)), 0.5); v = m.math('DIVIDE', z, FH)
     col, rough, nrm = surf_tex(m, files, u, v)
-    col = m.mix(0.35, col, m.hsv(col, 0.5, 0.75, 1.12))                     # (faded off the wall)
+    col = m.mix(fade, col, m.hsv(col, 0.5, 0.75, 1.12))                     # (faded off the wall)
     edge = m.attr('ja')                                        # (how far from the torn edge)
-    col = m.mix(m.math('MULTIPLY', m.remap(edge, 0.05, 0.0, smooth=True), 0.6), col, m.mix(1.0, col, (0.62, 0.5, 0.36), 'MULTIPLY'))
+    col = m.mix(m.math('MULTIPLY', m.remap(edge, edge_w, 0.0, smooth=True), 0.6), col, m.mix(1.0, col, (0.62, 0.5, 0.36), 'MULTIPLY'))
     st = m.noise(op, 3.5, 4, 0.6); tide = m.math('MULTIPLY', m.remap(st, 0.52, 0.56), m.remap(st, 0.6, 0.56))
     col = m.mix(m.math('ADD', m.math('MULTIPLY', m.remap(st, 0.56, 0.7), 0.45), m.math('MULTIPLY', tide, 0.7)), col, m.mix(1.0, col, (0.72, 0.58, 0.4), 'MULTIPLY'))
     mo = m.math('MULTIPLY', m.remap(m.noise(op, 40, 3), 0.64, 0.7), m.remap(st, 0.5, 0.65)); col = m.mix(mo, col, (0.1, 0.1, 0.07))
@@ -314,26 +316,78 @@ def plaster_paint(name, col_='#e4ddcc', soot=0.0, age=1.3):
     if soot: col = m.mix(m.math('MULTIPLY', m.remap(m.noise(op, 2, 3), 0.3, 0.75), soot), col, m.mix(1.0, col, (0.4, 0.37, 0.33), 'MULTIPLY'))
     return finish(m, col, 0.92, m.math('SUBTRACT', m.math('MULTIPLY', flake, -0.0003), m.math('MULTIPLY', crk, 0.0002)))
 
-def limewash_coat(name):
-    """old limewash on brick, flake by flake: grey-white, mottled and grimed, rust-pink where the brick's iron and salts bled through
-       the thin coat, the mortar joints printed in it (running bond, as the wall behind), dirt packed into the lifted rims (ja: how
-       far from the flake's edge), crazed, dead matte"""
-    m = kitlib.Mat(name); op = m.attr('opos', True); ja = m.attr('ja'); x, y, z = sep(m, op)
-    col = m.mix(m.remap(m.noise(op, 7, 4, 0.6), 0.3, 0.7), lin('#cbc5b6'), lin('#a8a090'))
-    col = m.mix(m.remap(m.noise(op, 1.4, 4, 0.6), 0.3, 0.8, 0.1, 0.75), col, m.mix(1.0, col, (0.66, 0.62, 0.55), 'MULTIPLY'))   # (a century of cellar grime)
-    col = m.mix(m.remap(m.noise(op, 12, 4, 0.6), 0.45, 0.75, 0.0, 0.35), col, m.mix(1.0, col, (0.75, 0.72, 0.66), 'MULTIPLY'))
-    col = m.mix(m.math('MULTIPLY', m.remap(m.noise(op, 3.0, 3, 0.55), 0.52, 0.72), 0.5), col, lin('#b38c76'))                # (bled through)
-    col = m.mix(m.math('MULTIPLY', m.remap(z, 1.0, 0.55), 0.35), col, m.mix(1.0, col, (0.82, 0.82, 0.8), 'MULTIPLY'))       # (the damp greys it low down)
-    row = m.math('FLOOR', m.math('DIVIDE', z, 0.075)); bx = m.math('ADD', x, m.math('MULTIPLY', m.math('MODULO', row, 2.0), 0.1125))
-    fz = m.math('FRACT', m.math('DIVIDE', z, 0.075)); fx = m.math('FRACT', m.math('DIVIDE', bx, 0.225))
-    jt = m.math('MAXIMUM', m.remap(m.math('ABSOLUTE', m.math('SUBTRACT', fz, 0.5)), 0.42, 0.48), m.remap(m.math('ABSOLUTE', m.math('SUBTRACT', fx, 0.5)), 0.465, 0.495))
-    col = m.mix(m.math('MULTIPLY', jt, 0.45), col, m.mix(1.0, col, (0.7, 0.67, 0.62), 'MULTIPLY'))
-    rim = m.remap(ja, 0.006, 0.0, smooth=True)
-    col = m.mix(m.math('MULTIPLY', rim, 0.55), col, m.mix(1.0, col, (0.55, 0.5, 0.44), 'MULTIPLY'))
-    crz = m.math('MULTIPLY', m.remap(m.voronoi(op, 90, 'Distance', 'DISTANCE_TO_EDGE'), 0.02, 0.0), 0.5)
-    col = m.mix(crz, col, m.mix(1.0, col, (0.6, 0.58, 0.54), 'MULTIPLY'))
-    h = m.math('ADD', m.math('MULTIPLY', jt, -0.0006), m.math('ADD', m.math('MULTIPLY', m.noise(op, 220, 3), 0.0003), m.math('MULTIPLY', crz, -0.0001)))
+def coat_mask_node(m, mask):
+    """the coat's mask (see coat_mask) sampled at the card's flat position lp: (coat, rim, residue or deep, height) sockets"""
+    path, (x0, x1, z0, z1) = mask; x, _, z = sep(m, m.attr('lp', True))
+    u = m.math('DIVIDE', m.math('SUBTRACT', x, x0), x1 - x0); v = m.math('DIVIDE', m.math('SUBTRACT', z, z0), z1 - z0)
+    t = m.n('ShaderNodeTexImage', interpolation='Cubic', extension='EXTEND'); t.image = bpy.data.images.load(path, check_existing=False)
+    t.image.colorspace_settings.name = 'Non-Color'; t.image.alpha_mode = 'CHANNEL_PACKED'; m.l(comb(m, u, v, 0.0), t.inputs['Vector'])
+    r, g, b = sep(m, t.outputs['Color']); return r, g, b, t.outputs['Alpha']
+
+def alpha_out(m, a):
+    """the cut-out / veil the bake puts in the albedo's alpha (kitlib.bake_set reads the node called ALPHA)"""
+    a = m.math('DIVIDE', m.math('SUBTRACT', a, 0.03), 0.97)   # (nothing faint left where it should be clear)
+    n = m.n('ShaderNodeMath', operation='MAXIMUM', use_clamp=True); n.name = 'ALPHA'; m.l(a, n.inputs[0]); n.inputs[1].default_value = 0.0; return n
+
+def limewash_coat(name, mask=None):
+    """old limewash on the cellar's brick, a few millimetres of many coats: grey-white, mottled and grimed, rust-pink where the brick's
+       iron and salts bled through, the bed joints printed in it (they line up with the wall's courses; the perpends barely), fine
+       crazing, dead matte. Its broken edges: a thin line of fresh white lime, then the dirt packed against them.
+       mask: the card's (coat, rim, residue, height) from coat_mask, where the coat has gone a ghost of lime stays in the brick's
+       pores and joints (a pale veil) and darker under the lifted flakes; without: a lifted flake (ja: how far from its edge)"""
+    m = kitlib.Mat(name); op = m.attr('opos', True); x, y, z = sep(m, op)
+    if mask: coat, rim, res, hgt = coat_mask_node(m, mask)
+    else: coat = 1.0; rim = m.remap(m.attr('ja'), 0.005, 0.0, smooth=True); res = 0.0; hgt = 1.0
+    col = m.mix(m.remap(m.noise(op, 7, 4, 0.6), 0.3, 0.7), lin('#d8d3c6'), lin('#c0b9aa'))
+    col = m.mix(m.remap(m.noise(op, 1.4, 4, 0.6), 0.35, 0.85, 0.0, 0.55), col, m.mix(1.0, col, (0.8, 0.77, 0.71), 'MULTIPLY'))   # (a century of cellar grime)
+    col = m.mix(m.remap(m.noise(op, 12, 4, 0.6), 0.5, 0.75, 0.0, 0.3), col, m.mix(1.0, col, (0.84, 0.82, 0.77), 'MULTIPLY'))
+    col = m.mix(m.math('MULTIPLY', m.remap(m.noise(op, 3.0, 3, 0.55), 0.55, 0.75), 0.3), col, lin('#c9ab98'))                # (bled through)
+    col = m.mix(m.math('MULTIPLY', m.remap(z, 1.0, 0.5), 0.25), col, m.mix(1.0, col, (0.88, 0.88, 0.86), 'MULTIPLY'))       # (the damp greys it low down)
+    run = m.math('MULTIPLY', m.remap(m.noise(m.map(op, (22, 22, 1.2)), 1.0, 4, 0.6), 0.5, 0.72), m.remap(m.noise(op, 2.5, 2), 0.35, 0.65))
+    col = m.mix(m.math('MULTIPLY', run, 0.45), col, m.mix(1.0, col, (0.78, 0.74, 0.66), 'MULTIPLY'))                        # (streaks run down it)
+    fz = m.math('FRACT', m.math('DIVIDE', z, 0.075)); jz = m.remap(m.math('ABSOLUTE', m.math('SUBTRACT', fz, 0.5)), 0.43, 0.49)   # (bed joints at z = k 0.075)
+    row = m.math('FLOOR', m.math('DIVIDE', z, 0.075)); fx = m.math('FRACT', m.math('DIVIDE', m.math('ADD', x, m.math('MULTIPLY', m.math('MODULO', row, 2.0), 0.05625)), 0.1125))
+    jx = m.math('MULTIPLY', m.remap(m.math('ABSOLUTE', m.math('SUBTRACT', fx, 0.5)), 0.44, 0.49), 0.35)
+    jt = m.math('MAXIMUM', jz, jx); jt = m.math('MULTIPLY', jt, m.remap(m.noise(op, 9, 3), 0.3, 0.6, 0.5, 1.0))
+    col = m.mix(m.math('MULTIPLY', jt, 0.4), col, m.mix(1.0, col, (0.72, 0.69, 0.64), 'MULTIPLY'))
+    crz = m.math('MULTIPLY', m.remap(m.voronoi(m.map(op, (1, 1, 1)), 140, 'Distance', 'DISTANCE_TO_EDGE'), 0.025, 0.0), m.remap(m.noise(op, 5, 3), 0.4, 0.65, 0.0, 0.4))
+    col = m.mix(crz, col, m.mix(1.0, col, (0.62, 0.6, 0.56), 'MULTIPLY'))                                                  # (hairline crazing)
+    dirt = m.math('MULTIPLY', m.remap(rim, 0.15, 0.8), m.remap(rim, 1.0, 0.85))                                             # (dirt against the edge ..)
+    col = m.mix(m.math('MULTIPLY', dirt, 0.55), col, m.mix(1.0, col, (0.52, 0.48, 0.42), 'MULTIPLY'))
+    fresh = m.math('MULTIPLY', m.remap(rim, 0.86, 0.97), m.remap(m.noise(op, 60, 3), 0.35, 0.55, 0.3, 1.0))                 # (.. the break itself white)
+    col = m.mix(fresh, col, lin('#e4dfd3'))
+    if mask:                                                    # (the ghost where it came away: a pale veil of lime in the pores, joints)
+        gh = m.mix(m.remap(m.noise(op, 40, 3), 0.35, 0.65), lin('#cdc5b8'), lin('#b4a597'))
+        col = m.mix(coat, gh, col)
+        alpha_out(m, m.math('MAXIMUM', coat, m.math('MULTIPLY', res, 0.85)))
+    h = m.math('ADD', m.math('MULTIPLY', hgt, 0.0013), m.math('ADD', m.math('MULTIPLY', jt, -0.0005), m.math('ADD', m.math('MULTIPLY', m.noise(op, 220, 3), 0.00025), m.math('MULTIPLY', crz, -0.0001))))
     return finish(m, col, 0.95, h)
+
+def paint_underlayers(name, mask):
+    """what shows where the workshop's distemper has flaked (card mask from coat_mask: coat = the top coat still on, where the card is
+       clear): an older ochre-cream distemper, and through that in places the bare lime plaster, sandy, pinkish brown; a dark line of
+       dirt and shadow round every broken edge of the coats above"""
+    m = kitlib.Mat(name); op = m.attr('opos', True)
+    coat, rim, deep, hgt = coat_mask_node(m, mask)
+    old = m.mix(m.remap(m.noise(op, 6, 4, 0.6), 0.3, 0.7), lin('#c8bea0'), lin('#aea489'))                               # (an older cream distemper)
+    old = m.mix(m.remap(m.noise(op, 1.5, 3), 0.35, 0.75, 0.0, 0.5), old, m.mix(1.0, old, (0.74, 0.7, 0.62), 'MULTIPLY'))
+    old = m.mix(m.math('MULTIPLY', m.remap(m.noise(op, 3.5, 3, 0.6), 0.55, 0.7), 0.6), old, lin('#a9ad96'))               # (and a green one, in patches)
+    brush = m.remap(m.noise(m.map(op, (2.5, 2.5, 60)), 1.0, 3, 0.6), 0.3, 0.7, -0.06, 0.06)                              # (brushed on, sideways)
+    old = m.mix(m.remap(brush, -0.06, 0.06), m.hsv(old, 0.5, 1.0, 0.93), m.hsv(old, 0.5, 1.0, 1.06))
+    pit = m.remap(m.noise(op, 500, 2), 0.66, 0.74); old = m.mix(m.math('MULTIPLY', pit, 0.5), old, (0.25, 0.23, 0.2))       # (pin holes, grit)
+    pl = m.mix(m.remap(m.noise(op, 30, 4, 0.7), 0.3, 0.7), lin('#b8a58a'), lin('#9c8a72'))
+    pl = m.mix(m.remap(m.noise(op, 400, 2), 0.6, 0.75), pl, lin('#d6cdb9'))                                                # (sand grains)
+    col = m.mix(deep, old, pl)
+    step = m.math('MULTIPLY', m.remap(deep, 0.15, 0.5), m.remap(deep, 0.85, 0.5))                                        # (the old coat's own broken edge)
+    col = m.mix(m.math('MULTIPLY', step, 0.5), col, m.mix(1.0, col, (0.55, 0.5, 0.42), 'MULTIPLY'))
+    ring = m.math('MULTIPLY', m.remap(hgt, 0.04, 0.45), m.math('SUBTRACT', 1.0, coat))                                     # (outside the top coat's edge: its shadow, dirt)
+    col = m.mix(m.math('MULTIPLY', ring, 0.7), col, m.mix(1.0, col, (0.42, 0.39, 0.34), 'MULTIPLY'))
+    edge = m.math('MULTIPLY', m.remap(rim, 0.55, 0.95), coat)                                                            # (on the top coat: its grimy broken edge)
+    col = m.mix(edge, col, lin('#6a6556'))
+    alpha_out(m, m.math('MAXIMUM', m.math('SUBTRACT', 1.0, coat), m.math('MULTIPLY', edge, 0.55)))
+    h = m.math('ADD', m.math('ADD', m.math('MULTIPLY', m.math('SUBTRACT', 1.0, deep), 0.0005), m.math('MULTIPLY', m.noise(op, 260, 3), 0.0003)),
+              m.math('ADD', m.math('MULTIPLY', brush, 0.002), m.math('MULTIPLY', pit, -0.0003)))
+    return finish(m, col, 0.93, h)
 
 def bare_plaster(name):
     """plaster where wallpaper came away: lime grey-white, brown paste in streaks along the old strip, scraps of paper still stuck"""
@@ -724,7 +778,7 @@ def build_peel(node, style, variant, M):
        its edges torn; or flakes of paint; or split boards"""
     p = PIECES[node]; G = S.Geo(1, 1, False, False); rnd = random.Random(hash(node) & 0xffff)
     z0, z1 = p['z0'], p['z0'] + p['H']
-    if style in ('concrete', 'workshop'): return paint_flakes(G, M, rnd, z0, z1, variant)
+    if style in ('concrete', 'workshop'): return coat_flakes(G, M, style, variant, rnd)
     if style == 'attic': return split_boards(G, M, rnd, z0, z1)
     w = rnd.uniform(0.4, 0.56) if variant in 'AC' else rnd.uniform(0.28, 0.42); top = rnd.uniform(1.5, 1.58); L = rnd.uniform(0.4, 0.55)
     x0 = rnd.uniform(-0.5, 0.5 - w); curl = rnd.uniform(0.018, 0.026); twist = rnd.uniform(-0.6, 0.6); lean0 = rnd.uniform(0.035, 0.05)
@@ -761,86 +815,162 @@ def build_peel(node, style, variant, M):
     G.add(bm, M['bare'], attrs_of(lambda c: tuple(c), 0.5, ja=0.05, lp=lambda c: (Vector(c).x, 0.0, Vector(c).z)), wrap=False)
     return G
 
-def clip_half(poly, p, q):
-    """the part of polygon poly nearer p than q (a Voronoi cell's cut)"""
-    mx, mz = (p[0] + q[0]) / 2, (p[1] + q[1]) / 2; nx, nz = q[0] - p[0], q[1] - p[1]; out = []
-    side = lambda a: (a[0] - mx) * nx + (a[1] - mz) * nz
-    for i in range(len(poly)):
-        a, b = poly[i], poly[(i + 1) % len(poly)]; sa, sb = side(a), side(b)
-        if sa <= 0: out.append(a)
-        if (sa < 0) != (sb < 0) and abs(sa - sb) > 1e-12:
-            t = sa / (sa - sb); out.append((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
+# ---------------------------------------------------------------- flaking coats
+# A coat crazed into flakes (limewash on the cellar's brick, distemper on the workshop's plaster) is drawn, not modelled: a crazing
+# network (warped Voronoi cells, numpy) decides cell by cell what is still stuck, what has fallen and what has lifted. What is stuck
+# and what came away is one flat card 2 mm off the wall, textured from that mask (glTF BLEND: the coat opaque, a ghost of lime or the
+# old coats under it showing); only the lifted flakes are geometry, cut from the same cells, so they fit the gaps they came from.
+COATS = {   # the card (x0, x1, z0, z1); per variant: the patch's middle, half sizes, the crazing's spacing
+    'concrete': {'rect': (-0.58, 0.58, 0.42, 1.58), 'n': 22, 'v': {
+        'A': ((-0.04, 1.0), (0.44, 0.4), 0.038), 'B': ((0.1, 0.96), (0.3, 0.3), 0.034),
+        'C': ((-0.12, 1.04), (0.24, 0.48), 0.036), 'D': ((0.08, 0.86), (0.42, 0.28), 0.032)}},
+    'workshop': {'rect': (-0.58, 0.58, 1.0, 1.58), 'n': 24, 'v': {     # (above the boarding's rail at 0.93)
+        'A': ((-0.04, 1.3), (0.42, 0.22), 0.03), 'B': ((0.12, 1.32), (0.28, 0.2), 0.028),
+        'C': ((-0.14, 1.28), (0.22, 0.25), 0.032), 'D': ((0.06, 1.3), (0.36, 0.2), 0.026)}},
+}
+MASK_PX = 1024
+
+def _vnoise(x, z, f, seed):
+    T = np.random.default_rng(seed).random((256, 256), dtype=np.float32) * 2 - 1
+    gx, gz = x * f, z * f; i0 = np.floor(gx).astype(np.int64); j0 = np.floor(gz).astype(np.int64)
+    fx, fz = gx - i0, gz - j0; sx = fx * fx * (3 - 2 * fx); sz = fz * fz * (3 - 2 * fz)
+    i1, j1 = (i0 + 1) & 255, (j0 + 1) & 255; i0 &= 255; j0 &= 255
+    a = T[i0, j0] + (T[i1, j0] - T[i0, j0]) * sx; b = T[i0, j1] + (T[i1, j1] - T[i0, j1]) * sx
+    return a + (b - a) * sz
+
+def fbm2(x, z, f, octaves=3, seed=0, rough=0.5):
+    """value-noise fBm (about -0.6 .. 0.6) at points (x, z) in metres, f cycles per metre"""
+    s, a, t = 0.0, 1.0, 0.0
+    for k in range(octaves): s = s + a * _vnoise(x, z, f * 2.03 ** k, seed + 17 * k); t += a; a *= rough
+    return s / t
+
+def _blur(a, r):
+    for ax in (0, 1):
+        for _ in range(3):
+            c = np.cumsum(np.pad(a, [(r + 1, r) if k == ax else (0, 0) for k in range(2)], mode='edge'), axis=ax)
+            a = (np.take(c, range(2 * r + 1, c.shape[ax]), axis=ax) - np.take(c, range(0, c.shape[ax] - 2 * r - 1), axis=ax)) / (2 * r + 1)
+    return a
+
+def coat_mask(style, variant, path):
+    """the crazed coat of a Band_peel (style concrete: limewash still on in a patch, falling away toward its ragged edge; workshop:
+       distemper flaked off in a patch, the old coats under it). Writes the card's mask (R coat, G nearness to a broken edge, B lime
+       ghost / the plaster under the old coat, A the coat blurred: its height) to path and returns the lifted flakes:
+       [{'pts': outline [(x, z)], 'c': middle, 'R': mean radius, 'dir': toward the gap it lifts from, 'hang': hangs from its top,
+         'k': 0 .. 1 how near the patch's edge}]"""
+    C = COATS[style]; x0, x1, z0, z1 = C['rect']; (cx, cz), (rx, rz), sp = C['v'][variant]
+    sd = ord(variant) * 7 + (0 if style == 'concrete' else 300); rng = np.random.default_rng(sd)
+    W = MASK_PX; Hp = max(64, round(MASK_PX * (z1 - z0) / (x1 - x0))); px, pz = (x1 - x0) / W, (z1 - z0) / Hp
+    X, Z = np.meshgrid(x0 + (np.arange(W) + 0.5) * px, z0 + (np.arange(Hp) + 0.5) * pz)        # (row 0 at the bottom, as Blender's pixels)
+    def env(x, z):                                              # (> 0 inside the patch)
+        e = 1 - ((x - cx) / rx) ** 2 - ((z - cz) / rz) ** 2 + 0.9 * fbm2(x, z, 3.0, 3, sd) + 0.35 * fbm2(x, z, 11, 3, sd + 5)
+        bd = np.minimum(np.minimum(x - x0, x1 - x), np.minimum(z - z0, z1 - z))
+        return e - 3.0 * np.clip((0.06 - bd) / 0.06, 0, 1)    # (never up to the card's edge)
+    # the crazing: jittered seeds, the pixels' positions warped so the cracks wander
+    NX, NZ = int((x1 - x0) / sp) + 5, int((z1 - z0) / sp) + 5; gx0, gz0 = x0 - 2 * sp, z0 - 2 * sp
+    SX = gx0 + (np.arange(NX)[:, None] + 0.5 + rng.uniform(-0.45, 0.45, (NX, NZ))) * sp
+    SZ = gz0 + (np.arange(NZ)[None, :] + 0.5 + rng.uniform(-0.45, 0.45, (NX, NZ))) * sp
+    WX = X + 0.55 * sp * fbm2(X, Z, 1.3 / sp, 3, sd + 40); WZ = Z + 0.55 * sp * fbm2(X, Z, 1.3 / sp, 3, sd + 41)
+    gi = np.floor((WX - gx0) / sp).astype(np.int64); gj = np.floor((WZ - gz0) / sp).astype(np.int64)
+    d1 = np.full(X.shape, 1e9); d2 = d1.copy(); i1 = np.zeros(X.shape, np.int64); i2 = i1.copy()
+    for di in (-1, 0, 1):
+        for dj in (-1, 0, 1):
+            ii = np.clip(gi + di, 0, NX - 1); jj = np.clip(gj + dj, 0, NZ - 1); cid = ii * NZ + jj
+            d = (WX - SX[ii, jj]) ** 2 + (WZ - SZ[ii, jj]) ** 2
+            closer = d < d1; second = ~closer & (d < d2) & (cid != i1)
+            d2 = np.where(closer, d1, np.where(second, d, d2)); i2 = np.where(closer, i1, np.where(second, cid, i2))
+            d1 = np.where(closer, d, d1); i1 = np.where(closer, cid, i1)
+    sx, sz = SX.ravel(), SZ.ravel()
+    ed = (d2 - d1) / (2 * (np.hypot(sx[i2] - sx[i1], sz[i2] - sz[i1]) + 1e-9))   # (how far to the crack with the next cell)
+    # each cell: still on, fallen, or lifted (still on but peeling off a gap)
+    E = env(sx, sz); r = rng.random(sx.size); clus = fbm2(sx, sz, 4.5, 2, sd + 60)
+    if style == 'concrete': keep = (E > -0.02) & (r < np.clip(0.18 + 1.5 * E + 1.4 * clus, 0, 0.97))
+    else: keep = ~((E > 0.0) & (r < np.clip(0.12 + 1.2 * E + 1.4 * clus, 0, 0.95)))
+    Ep = env(X, Z); hi = fbm2(X, Z, 150, 2, sd + 80)
+    gone2 = ~keep[i2]
+    border = np.bincount(i1[keep[i1] & gone2 & (ed < 0.002)].ravel(), minlength=sx.size)
+    area = np.bincount(i1.ravel(), minlength=sx.size) * px * pz
+    cand = [c for c in np.argsort(rng.random(sx.size)) if keep[c] and border[c] > 8 and 0.25 * sp * sp < area[c] < 2.2 * sp * sp]
+    lift = np.zeros(sx.size, bool)
+    for c in cand[:C['n']]: lift[c] = True
+    K = keep[i1] & ~lift[i1]
+    w = 0.00035 + 0.0006 * np.maximum(0, hi) + np.where(gone2 & ~lift[i2], 0.001 + 0.004 * np.maximum(0, hi + 0.15), 0.0) \
+        + 0.0012 * np.clip(1 - Ep / 0.4, 0, 1)                  # (hairline where it holds, bitten back at a gap, open toward the edge)
+    coat = K * np.clip((ed - w) / px + 0.5, 0, 1)
+    rim = np.clip(1 - (ed - w) / 0.005, 0, 1) * K * gone2       # (near a broken edge, not a hairline crack)
+    if style == 'concrete':                                     # (the lime ghost: in the pores and bed joints where it fell, under lifted flakes)
+        near = np.clip(_blur(coat, 7) * 2.5, 0, 1)             # (within a centimetre of the coat: a thin wash left)
+        clump = np.clip((fbm2(X, Z, 22, 3, sd + 92) + 0.1) * 3, 0, 1)
+        speck = np.clip((fbm2(X, Z, 320, 2, sd + 90) - 0.05) * 6, 0, 1) * clump
+        jz = np.abs(((Z + 0.0375) % 0.075) - 0.0375); joint = np.clip(1 - jz / 0.005, 0, 1) * np.clip(fbm2(X, Z, 14, 3, sd + 91) * 4 + 0.3, 0, 1)
+        was = np.clip((Ep + 0.12) / 0.25, 0, 1)                 # (where the coat once was)
+        third = np.where(lift[i1], 0.3, 0.32 * speck * was + 0.2 * near * clump) + 0.5 * joint * was
+        third = np.clip(third, 0, 1) * (1 - coat)
+        third = np.maximum(third, (1 - coat) * K * 0.35)         # (an open crack)
+    else:                                                       # (the old coat broken through to the plaster in the deepest places)
+        dc = fbm2(sx, sz, 7.0, 2, sd + 70)                       # (in patches of a few cells together, no crack between two of them)
+        deep = (~keep) & (np.clip((E - 0.3) * 1.2 + 2.2 * dc, 0, 1) > 0.35)
+        ed2 = np.where(deep[i2], 1.0, ed)
+        third = deep[i1] * np.clip((ed2 - 0.002 - 0.004 * np.maximum(0, hi)) / px + 0.5, 0, 1) * (1 - K)
+        spk = fbm2(X, Z, 170, 2, sd + 95) + 0.2 * fbm2(X, Z, 6, 2, sd + 96)    # (crumbs of the top coat still stuck in a gap)
+        crumbs = np.clip((spk - 0.4) / 0.06, 0, 1) * (1 - third) * ~K
+        coat = np.maximum(coat, K * np.clip(1 - (Ep + 0.1) / 0.3, 0, 1))   # (the crazing fades out into the whole coat round the patch)
+    hgt = np.clip(_blur(coat, 2), 0, 1)
+    if style != 'concrete': coat = np.maximum(coat, crumbs)    # (too small to throw the edge's shadow ring)
+    rgba = np.stack([coat, rim, third, hgt], -1).astype(np.float32)
+    im = bpy.data.images.new(os.path.basename(path), W, Hp, alpha=True, float_buffer=True); im.alpha_mode = 'CHANNEL_PACKED'
+    im.pixels.foreach_set(rgba.ravel()); kitlib.save_exr(im, path); bpy.data.images.remove(im)
+    # the lifted flakes' outlines: rays out from each cell's middle to its crack (a little in from it)
+    out = []
+    for c in np.nonzero(lift)[0]:
+        rows, cols = np.nonzero(i1 == c)
+        if len(rows) < 30: continue
+        mc, mr = cols.mean(), rows.mean(); n = 14 if len(rows) > 900 else 11; pts = []
+        for k in range(n):
+            a = 2 * math.pi * (k + 0.3 * rng.random()) / n; dx, dz = math.cos(a), math.sin(a) * px / pz; s = 0.0
+            while True:
+                s += 0.5; q, p_ = int(round(mc + dx * s)), int(round(mr + dz * s))
+                if not (0 <= q < W and 0 <= p_ < Hp) or i1[p_, q] != c or ed[p_, q] < 0.0005: break
+            s = max(1.0, s - 0.5); pts.append((x0 + (mc + dx * s + 0.5) * px, z0 + (mr + dz * s + 0.5) * pz))
+        bx = (gone2 & (i1 == c) & (ed < 0.003)); br, bc = np.nonzero(bx)
+        mx, mz = x0 + (mc + 0.5) * px, z0 + (mr + 0.5) * pz
+        dirv = (x0 + (bc.mean() + 0.5) * px - mx, z0 + (br.mean() + 0.5) * pz - mz) if len(br) else (mx - cx, mz - cz)
+        L = math.hypot(*dirv) or 1.0; dirv = (dirv[0] / L, dirv[1] / L)
+        R = sum(math.hypot(p[0] - mx, p[1] - mz) for p in pts) / n
+        out.append({'pts': pts, 'c': (mx, mz), 'R': R, 'dir': dirv, 'hang': dirv[1] < -0.75 and rng.random() < 0.5,
+                    'k': float(np.clip(1 - E[c] / 0.6, 0, 1))})
     return out
 
-FLAKES = {      # the patch of old coat: its middle (x, z), half sizes, the flakes' spacing, how many have fallen, how many hang loose
-    'A': ((-0.05, 1.0), (0.42, 0.36), 0.075, 0.28, 0.08),
-    'B': ((0.08, 0.95), (0.3, 0.3), 0.062, 0.34, 0.1),
-    'C': ((-0.12, 1.02), (0.22, 0.48), 0.07, 0.3, 0.06),
-    'D': ((0.1, 0.9), (0.34, 0.26), 0.058, 0.42, 0.14),
-}
-
-def paint_flakes(G, M, rnd, z0, z1, variant='A'):
-    """a patch of old limewash (or paint) still on the wall, crazed into irregular flakes (Voronoi cells, split a hair apart, their
-       edges ragged), most stuck at their middle and cupped up at their edges (some one way more than the other), a few hanging loose
-       from their top, many already fallen, more of them toward the patch's ragged edge, where the wall shows through"""
-    (cx, cz), (rx, rz), sp, fall, loose = FLAKES[variant]; sd = rnd.uniform(0, 50)
-    x0, x1, zb, zt = -0.56, 0.56, z0 + 0.04, z1 - 0.04
-    mask = lambda x, z: 1.0 - ((x - cx) / rx) ** 2 - ((z - cz) / rz) ** 2 + 0.55 * mnoise.noise(Vector((x * 3.5 + sd, z * 3.5, 0.0))) + 0.2 * mnoise.noise(Vector((x * 11, z * 11 + sd, 1.0)))
-    seeds = []
-    nz_ = int((zt - zb) / sp) + 1; nx_ = int((x1 - x0) / sp) + 1
-    for j in range(nz_):
-        for i in range(nx_):
-            x = x0 + (i + 0.5 + rnd.uniform(-0.42, 0.42)) * sp * (1.0 if j % 2 else 1.0) + (sp * 0.5 if j % 2 else 0.0)
-            z = zb + (j + 0.5 + rnd.uniform(-0.42, 0.42)) * sp * 0.82          # (a little squashed: limewash crazes along the courses)
-            if x0 < x < x1 and zb < z < zt: seeds.append((x, z))
-    lut = {}
-    def put(bm_pts, ja_vals):
-        for co, j_ in zip(bm_pts, ja_vals): lut[tuple(round(c, 5) for c in co)] = j_
-    for k, sd_ in enumerate(seeds):
-        m_ = mask(*sd_)
-        if m_ < 0.0: continue
-        clus = mnoise.noise(Vector((sd_[0] * 6 + sd, sd_[1] * 6, 3.0)))         # (they fall in clusters, and more toward the edge)
-        if rnd.random() < fall * 0.55 + 0.5 * max(0.0, 0.35 - m_) + (0.45 if clus > 0.28 else 0.0): continue
-        ed = max(0.0, min(1.0, 1.0 - m_ / 0.7))                                 # (0 deep in the patch .. 1 at its edge: where it lifts)
-        cell = [(sd_[0] - sp * 1.5, sd_[1] - sp * 1.5), (sd_[0] + sp * 1.5, sd_[1] - sp * 1.5), (sd_[0] + sp * 1.5, sd_[1] + sp * 1.5), (sd_[0] - sp * 1.5, sd_[1] + sp * 1.5)]
-        for q in seeds:
-            if q is sd_ or abs(q[0] - sd_[0]) > sp * 2.2 or abs(q[1] - sd_[1]) > sp * 2.2: continue
-            cell = clip_half(cell, sd_, q)
-            if len(cell) < 3: break
-        if len(cell) < 3: continue
-        n = len(cell); ccx = sum(c[0] for c in cell) / n; ccz = sum(c[1] for c in cell) / n
-        R = sum(math.hypot(c[0] - ccx, c[1] - ccz) for c in cell) / n
-        edge = []                                                               # (shrunk apart, ragged: a jittered point mid-edge on long edges)
-        for i in range(n):
-            a, b = cell[i], cell[(i + 1) % n]
-            for t in ((0.0, 0.5) if math.hypot(b[0] - a[0], b[1] - a[1]) > 0.05 else (0.0,)):
-                px, pz = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
-                dx, dz = px - ccx, pz - ccz; L = math.hypot(dx, dz) or 1.0
-                g = 0.0005 + 0.003 * ed + rnd.uniform(0.0, 0.0008) + (rnd.uniform(-0.0025, 0.0025) if t else 0.0)   # (hairline where it holds, gaping where it lifts)
-                edge.append((px - dx / L * g, pz - dz / L * g))
-        curl = (0.0006 + 0.011 * ed ** 1.5) * rnd.uniform(0.6, 1.4)
-        cdir = math.atan2(ccz - cz, ccx - cx) + rnd.uniform(-0.8, 0.8)       # (curling up on the side away from the patch's middle)
-        hang = rnd.random() < loose * (0.25 + 1.5 * ed); tilt = math.radians(rnd.uniform(12, 32)) if hang else 0.0
-        ztop = max(c[1] for c in edge)
-        def lift(px, pz, f):                                                    # (y out from the wall for a point f of the way out)
-            a = math.atan2(pz - ccz, px - ccx); y = -0.0012 - curl * f * f * (1.0 + 0.8 * math.cos(a - cdir))
-            if hang: y -= (ztop - pz) * math.tan(tilt)
-            return max(-0.074, y)
-        bm = bmesh.new(); c0 = bm.verts.new((ccx, lift(ccx, ccz, 0.0), ccz)); m = len(edge)
-        rim = [bm.verts.new((ex, lift(ex, ez, 1.0), ez)) for ex, ez in edge]
-        if curl > 0.003 or hang:                                                # (a ring between, so the cup bends)
-            mid = [bm.verts.new(((ccx + (ex - ccx) * 0.55), lift(ccx + (ex - ccx) * 0.55, ccz + (ez - ccz) * 0.55, 0.55), ccz + (ez - ccz) * 0.55)) for ex, ez in edge]
-            fs = [bm.faces.new((c0, mid[i], mid[(i + 1) % m])) for i in range(m)] + [bm.faces.new((mid[i], rim[i], rim[(i + 1) % m], mid[(i + 1) % m])) for i in range(m)]
-            put([c0.co] + [v.co for v in mid] + [v.co for v in rim], [R] + [0.45 * R] * m + [0.0] * m)
-        else:
-            fs = [bm.faces.new((c0, rim[i], rim[(i + 1) % m])) for i in range(m)]
-            put([c0.co] + [v.co for v in rim], [R] + [0.0] * m)
+def coat_flakes(G, M, style, variant, rnd):
+    """the card (the stuck coat and what fell, from its mask) and the lifted flakes: stuck along the side away from their gap, lifting
+       toward it, cupped (lime: stiff, a few degrees; distemper: curling), a few hanging from their top edge"""
+    x0, x1, z0, z1 = COATS[style]['rect']; flakes = M['flakes_' + variant]
+    bm = bmesh.new(); f = bm.faces.new([bm.verts.new(p) for p in ((x0, -0.002, z0), (x1, -0.002, z0), (x1, -0.002, z1), (x0, -0.002, z1))]); f.normal_update()
+    if f.normal.y > 0: f.normal_flip()
+    G.add(bm, M['card_' + variant], attrs_of(lambda c: tuple(c), 0.5, ja=1.0, lp=lambda c: (c[0], 0.0, c[2])), wrap=False)
+    lime = style == 'concrete'
+    for fl in flakes:
+        (mx, mz), R, (ux, uz), pts = fl['c'], fl['R'], fl['dir'], fl['pts']
+        tilt = math.radians(rnd.uniform(6, 16) if lime else rnd.uniform(14, 34)) * (0.6 + 0.6 * fl['k'])
+        cup = (0.12 if lime else 0.35) * R * rnd.uniform(0.6, 1.3)
+        ztop = max(p[1] for p in pts)
+        def y_at(px_, pz_, f):
+            if fl['hang']: return -0.0032 - (ztop - pz_) * math.tan(tilt * 1.4) - cup * 0.3 * f * f
+            s = ((px_ - mx) * ux + (pz_ - mz) * uz) / R               # (-1 the stuck side .. 1 the side over the gap)
+            t = max(0.0, (s + 0.35) / 1.35)
+            return max(-0.074, -0.0032 - R * math.tan(tilt) * t ** (1.6 if lime else 2.2) - cup * f * f * (0.4 + 0.6 * t))
+        bm = bmesh.new(); n = len(pts); c0 = bm.verts.new((mx, y_at(mx, mz, 0.0), mz))
+        mid = [bm.verts.new((mx + (p[0] - mx) * 0.55, y_at(mx + (p[0] - mx) * 0.55, mz + (p[1] - mz) * 0.55, 0.55), mz + (p[1] - mz) * 0.55)) for p in pts]
+        rim = [bm.verts.new((p[0], y_at(p[0], p[1], 1.0), p[1])) for p in pts]
+        fs = [bm.faces.new((c0, mid[i], mid[(i + 1) % n])) for i in range(n)] + [bm.faces.new((mid[i], rim[i], rim[(i + 1) % n], mid[(i + 1) % n])) for i in range(n)]
         for f in fs:
             f.normal_update()
             if f.normal.y > 0: f.normal_flip()
-        G.add(bm, M['front'], attrs_of(lambda c: tuple(c), rnd.random(), ja=lambda c: lut.get(tuple(round(x_, 5) for x_ in c), 0.0),
-                                       lp=lambda c: (Vector(c).x, 0.0, Vector(c).z)), smooth=True, wrap=False)
+        ja = {}
+        for v, d in [(c0, R)] + [(v, 0.45 * R) for v in mid] + [(v, 0.0) for v in rim]: ja[v.co.to_tuple(5)] = d
+        G.add(bm, M['front'], attrs_of(lambda c: tuple(c), rnd.random(), ja=lambda c, ja=ja: ja.get(tuple(round(q, 5) for q in c), 0.0),
+                                       zone=1.0, lp=lambda c: (c[0], 0.0, c[2])), smooth=True, wrap=False)
     return G
+
 
 def split_boards(G, M, rnd, z0, z1):
     """two or three boards split along the grain, the split pieces warped out from the wall"""
@@ -1151,8 +1281,13 @@ def materials(group, style):
     elif group == 'peel':
         if style in ('wood', 'tile'): M['front'] = wall_tex_mat(k + '_front', style); M['back'] = paper_back(k + '_back'); M['bare'] = bare_plaster(k + '_bare')
         elif style == 'attic': M['front'] = Dr.bare_boards(k + '_front', 'deal', [], 1.8, tone=0.6); M['back'] = M['front']   # (as dark as the attic's wall boards)
-        elif style == 'concrete': M['front'] = limewash_coat(k + '_front'); M['back'] = M['front']                       # (limewash flakes)
-        else: M['front'] = wall_tex_mat(k + '_front', style); M['back'] = plaster_coats(k + '_back', '#c9c2b2', '#9b9282')
+        else:                                                   # (a crazed coat: its mask per variant, the card's material from it, the flakes')
+            rect = COATS[style]['rect']; md = os.path.join(TMP, 'tex', f'peel_{style}_mask'); os.makedirs(md, exist_ok=True)
+            for v in 'ABCD':
+                path = os.path.join(md, f'mask_{v}.exr'); M['flakes_' + v] = coat_mask(style, v, path)
+                M['card_' + v] = (limewash_coat if style == 'concrete' else paint_underlayers)(f'{k}_card{v}', (path, rect))
+            M['front'] = limewash_coat(k + '_front') if style == 'concrete' else wall_tex_mat(k + '_front', style, edge_w=0.006, fade=0.15)
+            M['back'] = M['front']
     elif group == 'niche':
         M['stone'] = plaster_paint(k + '_stone', '#d8ccb2'); M['marble'] = marble(k + '_marble'); M['porcelain'] = porcelain_fig(k + '_porcelain')
     elif group == 'ceiling':
@@ -1164,7 +1299,7 @@ def materials(group, style):
     return M
 
 # ================================================================ build, bake, register
-def bake_parts(name, parts, M, uv1=True, px=PX, double=False):
+def bake_parts(name, parts, M, uv1=True, px=PX, double=False, alpha=None, spread=False):
     """bake several nodes' baked parts into one texture set (they share the atlas): parts = [(node name, Geo, extra reserved-only)]
        -> {node name: object}"""
     objs = {}; reserved = [M['glass'], M['wall'], M['sky'], M['emit']]; res = {}
@@ -1189,10 +1324,15 @@ def bake_parts(name, parts, M, uv1=True, px=PX, double=False):
             uvd = o.data.uv_layers[0].data; R = max(max(abs(v.co.x), abs(v.co.y)) for v in o.data.vertices) or 1.0
             for li, lp_ in enumerate(o.data.loops):
                 c = o.data.vertices[lp_.vertex_index].co; uvd[li].uv = (0.5 + c.x / (2 * R), 0.5 + c.y / (2 * R))
-        if rest: kitlib.unwrap(rest, margin=0.003, smart=True, angle=60)
-        kitlib.unwrap(baked, margin=0.003, smart=False)
+        mg = 0.008 if alpha else 0.003                       # (a cut-out's clear border must not take its neighbour's texels in the bake margin)
+        if rest: kitlib.unwrap(rest, margin=mg, smart=True, angle=60)
+        kitlib.unwrap(baked, margin=mg, smart=False)
+        if spread:                                           # (alternatives of one piece, all at the origin: apart while baking, or each
+            for i, o in enumerate(baked): o.location.x += 4.0 * i  # would catch the others' shadows)
         files = kitlib.bake_set(baked, name, px, 64)
-        mat = kitlib.baked_material('Kit_' + name, files, double=double)
+        if spread:
+            for i, o in enumerate(baked): o.location.x -= 4.0 * i
+        mat = kitlib.baked_material('Kit_' + name, files, double=double, alpha=alpha)
         for o in baked:
             o.data.materials.clear(); o.data.materials.append(mat); o.data.polygons.foreach_set('material_index', [0] * len(o.data.polygons))
     out = {}
@@ -1234,10 +1374,10 @@ def do_exit(style):
     if '--sheets' in sys.argv: sheet('exit', style, [root])
     register(f'exit_{style}', [root], t0, {'bake': f1['times']['total'] if f1 else 0})
 
-def do_simple(group, style, nodes_builders, uv1=True, double=False, sockets=()):
+def do_simple(group, style, nodes_builders, uv1=True, double=False, sockets=(), alpha=None):
     t0 = time.time(); kitlib.reset(); M = materials(group, style)
     parts = [(nm, b(M)) for nm, b in nodes_builders]
-    objs, f1 = bake_parts(f'{group}_{style}', parts, M, uv1=uv1, double=double)
+    objs, f1 = bake_parts(f'{group}_{style}', parts, M, uv1=uv1, double=double, alpha=alpha, spread=len(parts) > 1)
     roots = list(objs.values())
     for nm, loc in sockets:
         e = kitlib.empty(nm, loc, objs[nm.rsplit('_fix', 1)[0]]); e.matrix_parent_inverse.identity(); e.location = loc
@@ -1257,7 +1397,8 @@ def main():
             do_simple('wallhole', st, [(n, lambda M, n=n, st=st: build_wallhole(n, st, n.split('_')[-2], M)) for n in names])
         if want('peel'):
             names = [n for n in PIECES if PIECES[n]['kind'] == 'peel' and PIECES[n]['style'] == st]
-            do_simple('peel', st, [(n, lambda M, n=n, st=st: build_peel(n, st, n.split('_')[-2], M)) for n in names], uv1=False, double=True)
+            do_simple('peel', st, [(n, lambda M, n=n, st=st: build_peel(n, st, n.split('_')[-2], M)) for n in names], uv1=False, double=True,
+                      alpha='blend' if st in COATS else None)
         if want('niche') and f'Mod_niche_{st}' in PIECES:
             do_simple('niche', st, [(f'Mod_niche_{st}', lambda M, st=st: build_niche(st, M))])
         if want('ceiling'):
@@ -1272,7 +1413,7 @@ def main():
 def do_simple_ceiling(st, nb):
     t0 = time.time(); kitlib.reset(); M = materials('ceiling', st); M['ceiling'] = ceiling_mat(f'ceiling_{st}_ceil', st, hole=(0.0, 0.0, 0.55))
     parts = [(nm, b(M)) for nm, b in nb]
-    objs, f1 = bake_parts(f'ceiling_{st}', parts, M, uv1=True)
+    objs, f1 = bake_parts(f'ceiling_{st}', parts, M, uv1=True, spread=True)
     roots = list(objs.values())
     if '--sheets' in sys.argv: sheet('ceiling', st, roots)
     register(f'ceiling_{st}', roots, t0, {'bake': f1['times']['total'] if f1 else 0})
@@ -1332,6 +1473,14 @@ def sheet(group, style, roots):
             keep(S.lamp('sh_f2', 'AREA', 50, (-0.8, -2.6, 2.4), (math.radians(60), 0, math.radians(-20)), 2.0, (0.8, 0.85, 1.0)))
             S.cam_at((0.3, -3.2, 1.5), (0.0, 0.0, 1.3), 32); shots.append(S.render(os.path.join(d, f'{r.name}.png'), 1000, 1000, 128))
             S.cam_at((1.0, -1.4, 1.25), (0.0, 0.0, 1.0), 40); shots.append(S.render(os.path.join(d, f'{r.name}_angle.png'), 1000, 1000, 128))
+            if group == 'peel' and style in COATS:              # (close, raking; and the cellar's other wall look, limewashed)
+                zc = 1.3 if style == 'workshop' else 1.0
+                S.cam_at((0.55, -0.45, zc + 0.1), (0.0, 0.0, zc), 40); shots.append(S.render(os.path.join(d, f'{r.name}_close.png'), 1000, 1000, 128))
+                if style == 'concrete' and man.get('wall'):
+                    wB = S.ship_mat('sh_wallB', man['wall'], 1)
+                    for o in tmp:
+                        if o.name.startswith('sh_w'): o.data.materials[0] = wB
+                    S.cam_at((0.3, -3.2, 1.5), (0.0, 0.0, 1.3), 32); shots.append(S.render(os.path.join(d, f'{r.name}_B.png'), 1000, 1000, 128))
         for o, i, m_ in swaps: o.data.materials[i] = m_; o.visible_shadow = True
         for o in tmp:
             if o.name in bpy.data.objects: bpy.data.objects.remove(o)

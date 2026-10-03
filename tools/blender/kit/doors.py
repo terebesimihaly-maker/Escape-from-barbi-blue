@@ -564,22 +564,23 @@ def arris_dist(m, x, y, z, edges):
     ln = lambda a, b: m.math('SQRT', m.math('ADD', m.math('MULTIPLY', a, a), m.math('MULTIPLY', b, b)))
     return m.math('MINIMUM', ln(dx, dy), ln(dz, dy))
 
-def paint(name, coats, base='pine', hands=(), kick=0.32, chips=1.0, gloss=0.34, age=1.0, craze=1.0, joints=True, rust=0.0, edges=None):
+def paint(name, coats, base='pine', hands=(), kick=0.32, chips=1.0, gloss=0.34, age=1.0, craze=1.0, joints=True, rust=0.0, edges=None, top_fn=None, space=None):
     """old paint, coat over coat, on wood (or steel): brush ridges along each piece, the grain showing through as relief, yellowed
        and crazed in patches, cracked across the joints where rails meet stiles, a shrinkage line round each panel; chipped where
        knocked (edges first, the kick zone, the handled places) through the older coats to the primer and the wood (or rusting
        steel); greasy finger marks and smears where hands go, kick scuffs low down, grime in the mouldings, dust on the ledges.
-       coats: newest first ['#top', '#older', '#primer']"""
+       coats: newest first ['#top', '#older', '#primer']; top_fn(m) -> the top coat's colour as a socket (a stencil on it);
+       space: the attribute that holds the design position (hands, kicks, edges) when it isn't the object's ('lp' on a mirrored leaf)"""
     m = kitlib.Mat(name); g = m.attr('gpos', True); op = m.attr('opos', True); pr = m.attr('prand')
     ja = m.attr('ja'); jb = m.attr('jb'); zone = m.attr('zone'); pz = m.attr('pz')
     cav = m.math('ADD', m.cavity(), 0.0); edge = m.math('ADD', m.edge(), 0.0)
-    x, y, z, hm, low = hands_and_kicks(m, op, hands, kick)
+    x, y, z, hm, low = hands_and_kicks(m, m.attr(space, True) if space else op, hands, kick)
     if base == 'steel':
         wcol = m.mix(m.remap(m.noise(g, 9, 5, 0.6), 0.45, 0.6), m.mix(m.remap(m.noise(g, 30, 4), 0.3, 0.7), lin('#5e6062'), lin('#77797a')), m.mix(m.noise(g, 80, 6), lin('#4a2412'), lin('#8a4a1e')))
         ring = m.val(0.0)
     else:
         wcol, ring, fib = wood_base(m, g, pr, base); wcol = m.mix(0.45, wcol, m.hsv(wcol, 0.5, 0.6, 0.62))   # (old wood under paint: darkened)
-    top = lin(coats[0]); under = lin(coats[1]) if len(coats) > 1 else top; primer = lin(coats[2]) if len(coats) > 2 else under
+    top = top_fn(m) if top_fn else lin(coats[0]); under = lin(coats[1]) if len(coats) > 1 else lin(coats[0]); primer = lin(coats[2]) if len(coats) > 2 else under
     brush = m.noise(m.map(g, (650, 650, 4.5)), 1.0, 3, 0.6); brush2 = m.noise(m.map(g, (120, 120, 1.2)), 1.0, 3, 0.5)
     yel = m.math('ADD', m.remap(m.noise(op, 2.2, 4, 0.55), 0.3, 0.75, 0.0, 0.65 * age), m.remap(z, 0.4, 2.6, 0.0, 0.3 * age))
     col = m.mix(yel, top, m.mix(1.0, top, (0.88, 0.79, 0.58), 'MULTIPLY'))
@@ -627,13 +628,13 @@ def paint(name, coats, base='pine', hands=(), kick=0.32, chips=1.0, gloss=0.34, 
     col, rough = grime_dust(m, col, rough, op, cav, age)
     return finish(m, col, rough, h)
 
-def mahogany(name, hands=(), kick=0.3, age=1.0):
+def mahogany(name, hands=(), kick=0.3, age=1.0, space=None):
     """mahogany under an old French polish: the ribbon stripe of quartered wood (bands along the grain that change with the light),
        deep red-brown, the shellac ambered, dull and crazed in patches, worn through to paler wood on the arrises and where hands go
        (greasy round them), a milky bloom low down where it was damp, dust in the mouldings"""
     m = kitlib.Mat(name); g = m.attr('gpos', True); op = m.attr('opos', True); pr = m.attr('prand')
     cav = m.math('ADD', m.cavity(), 0.0); edge = m.math('ADD', m.edge(), 0.0)
-    x, y, z, hm, low = hands_and_kicks(m, op, hands, kick)
+    x, y, z, hm, low = hands_and_kicks(m, m.attr(space, True) if space else op, hands, kick)
     wcol, ring, fib = wood_base(m, g, pr, 'mahogany'); gx, gy, gz = sep(m, g)
     rib = m.math('SINE', m.math('ADD', m.math('MULTIPLY', gx, 85.0), m.math('MULTIPLY', m.noise(m.map(g, (3, 3, 0.5)), 1.0, 3), 7.0)))   # (soft ribbon bands, 2..5 cm)
     wcol = m.mix(m.remap(rib, -0.8, 0.9, 0.0, 0.2), wcol, m.hsv(wcol, 0.5, 1.04, 0.8))
