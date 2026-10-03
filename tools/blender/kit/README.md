@@ -49,3 +49,14 @@ Before each push: `git pull --rebase origin claude/elegant-babbage-h8btki`, then
 3. WP2.3 wardrobes (5 styles, exact hinge contract), WP2.4 light fixtures + emission profiles.
 4. WP2.6 decals atlas, WP2.7 sky panorama, env maps, glass, window cookies, AO profiles.
 5. WP2.5 furniture and island sets per style (3 islands + 6 solids per style first, then the rest).
+   Per style three scripts: `furn_<style>.py` (materials, solids, columns, `main`), `furn_<style>2.py` (wall pieces: `BANDS`,
+   `band_mats`), `furn_<style>3.py` (`build_islands`), run as `py -3.11 tools/blender/kit/furn_<style>.py [--preview] [--force]
+   [--only <asset>,bands,islands] [--sheets]`. Shared helpers in `furnlib.py`: `run` / `build_simple` (one node, baked, sockets
+   and pivots), `islands` (several islands per texture set, one registration each — keep it to two or three islands an atlas),
+   `rod` (bent bars), `Moved` (a Geo proxy that moves parts while their attributes keep their own frame), `cloth_drape`
+   (Blender's cloth solver, headless: the attic's dust sheets, over `furn_attic.hulls` colliders). The doll parts (heads with
+   painted faces, glass eyes, limbs) are in `furn_workshop.py`. Clutter has no kitdefs nodes yet.
+6. WP2.8 lookdev reference: `py -3.11 tools/blender/kit/lookdev.py [--only wood] [--preview]` renders a reference room per
+   style from the shipped surfaces, the packed hi kit (`pack.py all hi` first) and the style's lamps (point lights through
+   their profiles at 4π·k0 W: Cycles then gives E = k0 at 1 m, the game's convention) → `models/kit/lookdev/*.png` and
+   `models/kit/lookdev/lookdev.json` (rooms, cameras, exposure, mean linear luminance) for `?lookdev=1` and WP6.

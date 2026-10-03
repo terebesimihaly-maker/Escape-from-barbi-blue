@@ -1,0 +1,991 @@
+{
+ "version": 1,
+ "rooms": {
+  "wood": {
+   "style": "wood",
+   "size": [
+    4.5,
+    3.0,
+    6.75
+   ],
+   "origin": "three.js axes, metres: the room spans x 0..4.5, y 0..3.0, z -6.75..0 (Blender y = -z)",
+   "surfaces": {
+    "floor": "floor A/B checker per 2.25 m tile",
+    "walls": "wall A/B alternating per tile",
+    "ceiling": "ceil"
+   },
+   "window": {
+    "wall": "east (x = 4.5)",
+    "z_range": [
+     0.9,
+     2.3
+    ],
+    "span": [
+     -3.875,
+     -2.875
+    ],
+    "glass": "none (an opening)"
+   },
+   "nodes": [
+    {
+     "node": "Solid_crib_v0",
+     "pos": [
+      1.0,
+      0.0,
+      -5.4
+     ],
+     "yaw": 0.0
+    },
+    {
+     "node": "Solid_iron_bed",
+     "pos": [
+      3.3,
+      0.0,
+      -5.2
+     ],
+     "yaw": 0.0
+    },
+    {
+     "node": "Solid_rocking_chair",
+     "pos": [
+      1.2,
+      0.0,
+      -2.2
+     ],
+     "yaw": -0.6
+    },
+    {
+     "node": "Solid_toy_chest_v0",
+     "pos": [
+      3.9,
+      0.0,
+      -1.0
+     ],
+     "yaw": 1.5708
+    },
+    {
+     "node": "Band_dresser",
+     "pos": [
+      2.4,
+      0.0,
+      -6.75
+     ],
+     "yaw": 0.0
+    },
+    {
+     "node": "Isl_tea_party",
+     "pos": [
+      2.5,
+      0.0,
+      -2.9
+     ],
+     "yaw": 0.0
+    }
+   ],
+   "fixtures": [
+    {
+     "type": "pendant_shade",
+     "node": "Fix_pendant_shade",
+     "pos": [
+      2.25,
+      3.0,
+      -3.4
+     ],
+     "yaw": 0.0,
+     "light_centre": [
+      2.25,
+      2.795,
+      -3.4
+     ],
+     "k0": 2.2,
+     "cycles_power_w": 27.646,
+     "colour_linear": [
+      1.0,
+      0.72,
+      0.42
+     ]
+    },
+    {
+     "type": "sconce_shade",
+     "node": "Fix_sconce_shade",
+     "pos": [
+      0.0,
+      0.0,
+      -4.3
+     ],
+     "yaw": -1.5708,
+     "light_centre": [
+      -0.13,
+      2.05,
+      -4.3
+     ],
+     "k0": 1.5,
+     "cycles_power_w": 18.8496,
+     "colour_linear": [
+      1.0,
+      0.72,
+      0.42
+     ]
+    },
+    {
+     "type": "night_light",
+     "node": "Fix_night_light",
+     "pos": [
+      2.7,
+      0.939,
+      -6.54
+     ],
+     "yaw": 0.0,
+     "light_centre": [
+      2.7,
+      1.074,
+      -6.54
+     ],
+     "k0": 0.35,
+     "cycles_power_w": 4.3982,
+     "colour_linear": [
+      1.0,
+      0.72,
+      0.42
+     ]
+    }
+   ],
+   "views": [
+    {
+     "id": "entry",
+     "pos": [
+      0.45,
+      1.6,
+      -0.4
+     ],
+     "target": [
+      3.0,
+      1.1,
+      -5.0
+     ],
+     "vfov_deg": 58.716,
+     "size": [
+      960,
+      540
+     ],
+     "png": "models/kit/lookdev/wood_entry.png",
+     "view_transform": "AgX (Base Contrast)",
+     "exposure": 2.0,
+     "mean_luminance_linear": 0.037115
+    },
+    {
+     "id": "window",
+     "pos": [
+      4.05,
+      1.6,
+      -6.35
+     ],
+     "target": [
+      1.5,
+      0.9,
+      -1.9
+     ],
+     "vfov_deg": 58.716,
+     "size": [
+      960,
+      540
+     ],
+     "png": "models/kit/lookdev/wood_window.png",
+     "view_transform": "AgX (Base Contrast)",
+     "exposure": 2.0,
+     "mean_luminance_linear": 0.032184
+    }
+   ]
+  },
+  "tile": {
+   "style": "tile",
+   "size": [
+    4.5,
+    3.0,
+    6.75
+   ],
+   "origin": "three.js axes, metres: the room spans x 0..4.5, y 0..3.0, z -6.75..0 (Blender y = -z)",
+   "surfaces": {
+    "floor": "floor A/B checker per 2.25 m tile",
+    "walls": "wall A/B alternating per tile",
+    "ceiling": "ceil"
+   },
+   "window": {
+    "wall": "east (x = 4.5)",
+    "z_range": [
+     0.9,
+     2.3
+    ],
+    "span": [
+     -3.875,
+     -2.875
+    ],
+    "glass": "none (an opening)"
+   },
+   "nodes": [
+    {
+     "node": "Isl_parlour",
+     "pos": [
+      2.2,
+      0.0,
+      -4.4
+     ],
+     "yaw": 0.0
+    },
+    {
+     "node": "Band_console",
+     "pos": [
+      3.3,
+      0.0,
+      -6.75
+     ],
+     "yaw": 0.0
+    },
+    {
+     "node": "Band_console_mirror",
+     "pos": [
+      3.3,
+      0.0,
+      -6.75
+     ],
+     "yaw": 0.0
+    },
+    {
+     "node": "Band_grandfather_clock",
+     "pos": [
+      0.0,
+      0.0,
+      -2.2
+     ],
+     "yaw": -1.5708
+    },
+    {
+     "node": "Solid_plinth_bust",
+     "pos": [
+      3.9,
+      0.0,
+      -0.9
+     ],
+     "yaw": 0.0
+    },
+    {
+     "node": "Band_sideboard",
+     "pos": [
+      1.4,
+      0.0,
+      -6.75
+     ],
+     "yaw": 0.0
+    }
+   ],
+   "fixtures": [
+    {
+     "type": "chandelier",
+     "node": "Fix_chandelier",
+     "pos": [
+      2.25,
+      3.0,
+      -3.2
+     ],
+     "yaw": 0.0,
+     "light_centre": [
+      2.25,
+      2.67,
+      -3.2
+     ],
+     "k0": 3.4,
+     "cycles_power_w": 42.7257,
+     "colour_linear": [
+      1.0,
+      0.72,
+      0.42
+     ]
+    },
+    {
+     "type": "sconce_candles",
+     "node": "Fix_sconce_candles",
+     "pos": [
+      0.0,
+      0.0,
+      -4.6
+     ],
+     "yaw": -1.5708,
+     "light_centre": [
+      -0.13,
+      2.0955,
+      -4.6
+     ],
+     "k0": 0.7,
+     "cycles_power_w": 8.7965,
+     "colour_linear": [
+      1.0,
+      0.72,
+      0.42
+     ]
+    },
+    {
+     "type": "standard_lamp",
+     "node": "Fix_standard_lamp",
+     "pos": [
+      2.88,
+      0.0,
+      -3.88
+     ],
+     "yaw": 0.0,
+     "light_centre": [
+      2.88,
+      1.41,
+      -3.88
+     ],
+     "k0": 1.8,
+     "cycles_power_w": 22.6195,
+     "colour_linear": [
+      1.0,
+      0.72,
+      0.42
+     ]
+    },
+    {
+     "type": "candelabrum",
+     "node": "Fix_candelabrum",
+     "pos": [
+      1.4,
+      0.87,
+      -6.53
+     ],
+     "yaw": 0.0,
+     "light_centre": [
+      1.4,
+      1.271,
+      -6.53
+     ],
+     "k0": 0.9,
+     "cycles_power_w": 11.3097,
+     "colour_linear": [
+      1.0,
+      0.72,
+      0.42
+     ]
+    }
+   ],
+   "views": [
+    {
+     "id": "entry",
+     "pos": [
+      0.45,
+      1.6,
+      -0.4
+     ],
+     "target": [
+      3.0,
+      1.1,
+      -5.0
+     ],
+     "vfov_deg": 58.716,
+     "size": [
+      960,
+      540
+     ],
+     "png": "models/kit/lookdev/tile_entry.png",
+     "view_transform": "AgX (Base Contrast)",
+     "exposure": 2.0,
+     "mean_luminance_linear": 0.060059
+    },
+    {
+     "id": "window",
+     "pos": [
+      4.05,
+      1.6,
+      -6.35
+     ],
+     "target": [
+      1.5,
+      0.9,
+      -1.9
+     ],
+     "vfov_deg": 58.716,
+     "size": [
+      960,
+      540
+     ],
+     "png": "models/kit/lookdev/tile_window.png",
+     "view_transform": "AgX (Base Contrast)",
+     "exposure": 2.0,
+     "mean_luminance_linear": 0.042984
+    }
+   ]
+  },
+  "concrete": {
+   "style": "concrete",
+   "size": [
+    4.5,
+    3.0,
+    6.75
+   ],
+   "origin": "three.js axes, metres: the room spans x 0..4.5, y 0..3.0, z -6.75..0 (Blender y = -z)",
+   "surfaces": {
+    "floor": "floor A/B checker per 2.25 m tile",
+    "walls": "wall A/B alternating per tile",
+    "ceiling": "ceil"
+   },
+   "window": {
+    "wall": "east (x = 4.5)",
+    "z_range": [
+     0.9,
+     2.3
+    ],
+    "span": [
+     -3.875,
+     -2.875
+    ],
+    "glass": "none (an opening)"
+   },
+   "nodes": [
+    {
+     "node": "Solid_boiler_wall",
+     "pos": [
+      1.6,
+      0.0,
+      -6.75
+     ],
+     "yaw": 0.0
+    },
+    {
+     "node": "Solid_shelf_rack",
+     "pos": [
+      0.75,
+      0.0,
+      -3.9
+     ],
+     "yaw": 0.0
+    },
+    {
+     "node": "Solid_chest_freezer",
+     "pos": [
+      3.7,
+      0.0,
+      -1.0
+     ],
+     "yaw": 1.5708
+    },
+    {
+     "node": "Col_brick_pier_H300",
+     "pos": [
+      3.5,
+      0.0,
+      -5.3
+     ],
+     "yaw": 0.0
+    },
+    {
+     "node": "Band_fuse_box",
+     "pos": [
+      3.6,
+      0.0,
+      -6.75
+     ],
+     "yaw": 0.0
+    }
+   ],
+   "fixtures": [
+    {
+     "type": "bare_bulb",
+     "node": "Fix_bare_bulb",
+     "pos": [
+      2.4,
+      3.0,
+      -3.4
+     ],
+     "yaw": 0.0,
+     "light_centre": [
+      2.4,
+      2.895,
+      -3.4
+     ],
+     "k0": 2.6,
+     "cycles_power_w": 32.6726,
+     "colour_linear": [
+      1.0,
+      0.72,
+      0.42
+     ]
+    },
+    {
+     "type": "bulkhead",
+     "node": "Fix_bulkhead",
+     "pos": [
+      3.0,
+      0.0,
+      -6.75
+     ],
+     "yaw": 0.0,
+     "light_centre": [
+      3.0,
+      2.1,
+      -6.69
+     ],
+     "k0": 1.8,
+     "cycles_power_w": 22.6195,
+     "colour_linear": [
+      1.0,
+      0.72,
+      0.42
+     ]
+    },
+    {
+     "type": "boiler_glow",
+     "node": "Fix_boiler_glow",
+     "pos": [
+      1.6,
+      0.5,
+      -5.94
+     ],
+     "yaw": 0.0,
+     "light_centre": [
+      1.6,
+      0.56,
+      -5.93
+     ],
+     "k0": 1.0,
+     "cycles_power_w": 12.5664,
+     "colour_linear": [
+      1.0,
+      0.72,
+      0.42
+     ]
+    }
+   ],
+   "views": [
+    {
+     "id": "entry",
+     "pos": [
+      0.45,
+      1.6,
+      -0.4
+     ],
+     "target": [
+      3.0,
+      1.1,
+      -5.0
+     ],
+     "vfov_deg": 58.716,
+     "size": [
+      960,
+      540
+     ],
+     "png": "models/kit/lookdev/concrete_entry.png",
+     "view_transform": "AgX (Base Contrast)",
+     "exposure": 2.0,
+     "mean_luminance_linear": 0.025884
+    },
+    {
+     "id": "window",
+     "pos": [
+      4.05,
+      1.6,
+      -6.35
+     ],
+     "target": [
+      1.5,
+      0.9,
+      -1.9
+     ],
+     "vfov_deg": 58.716,
+     "size": [
+      960,
+      540
+     ],
+     "png": "models/kit/lookdev/concrete_window.png",
+     "view_transform": "AgX (Base Contrast)",
+     "exposure": 2.0,
+     "mean_luminance_linear": 0.03425
+    }
+   ]
+  },
+  "attic": {
+   "style": "attic",
+   "size": [
+    4.5,
+    3.0,
+    6.75
+   ],
+   "origin": "three.js axes, metres: the room spans x 0..4.5, y 0..3.0, z -6.75..0 (Blender y = -z)",
+   "surfaces": {
+    "floor": "floor A/B checker per 2.25 m tile",
+    "walls": "wall A/B alternating per tile",
+    "ceiling": "ceil"
+   },
+   "window": {
+    "wall": "east (x = 4.5)",
+    "z_range": [
+     0.9,
+     2.3
+    ],
+    "span": [
+     -3.875,
+     -2.875
+    ],
+    "glass": "none (an opening)"
+   },
+   "nodes": [
+    {
+     "node": "Isl_trunk_pile",
+     "pos": [
+      2.3,
+      0.0,
+      -4.6
+     ],
+     "yaw": 0.0
+    },
+    {
+     "node": "Solid_sheet_chair_v0",
+     "pos": [
+      1.0,
+      0.0,
+      -2.0
+     ],
+     "yaw": 0.4
+    },
+    {
+     "node": "Solid_sheet_tall_v0",
+     "pos": [
+      1.0,
+      0.0,
+      -6.3
+     ],
+     "yaw": 0.0
+    },
+    {
+     "node": "Band_box_stack",
+     "pos": [
+      0.0,
+      0.0,
+      -5.2
+     ],
+     "yaw": -1.5708
+    },
+    {
+     "node": "Band_mannequin",
+     "pos": [
+      0.0,
+      0.0,
+      -3.1
+     ],
+     "yaw": -1.5708
+    },
+    {
+     "node": "Solid_steamer_trunk_v1",
+     "pos": [
+      3.4,
+      0.0,
+      -1.1
+     ],
+     "yaw": 0.2
+    }
+   ],
+   "fixtures": [
+    {
+     "type": "bulb_batten",
+     "node": "Fix_bulb_batten",
+     "pos": [
+      2.25,
+      3.0,
+      -3.0
+     ],
+     "yaw": 0.0,
+     "light_centre": [
+      2.25,
+      2.882,
+      -3.0
+     ],
+     "k0": 2.2,
+     "cycles_power_w": 27.646,
+     "colour_linear": [
+      1.0,
+      0.72,
+      0.42
+     ]
+    },
+    {
+     "type": "hurricane_lantern",
+     "node": "Fix_hurricane_lantern",
+     "pos": [
+      1.75,
+      0.628,
+      -4.2
+     ],
+     "yaw": 0.0,
+     "light_centre": [
+      1.75,
+      0.756,
+      -4.2
+     ],
+     "k0": 0.75,
+     "cycles_power_w": 9.4248,
+     "colour_linear": [
+      1.0,
+      0.72,
+      0.42
+     ]
+    }
+   ],
+   "views": [
+    {
+     "id": "entry",
+     "pos": [
+      0.45,
+      1.6,
+      -0.4
+     ],
+     "target": [
+      3.0,
+      1.1,
+      -5.0
+     ],
+     "vfov_deg": 58.716,
+     "size": [
+      960,
+      540
+     ],
+     "png": "models/kit/lookdev/attic_entry.png",
+     "view_transform": "AgX (Base Contrast)",
+     "exposure": 2.0,
+     "mean_luminance_linear": 0.018208
+    },
+    {
+     "id": "window",
+     "pos": [
+      4.05,
+      1.6,
+      -6.35
+     ],
+     "target": [
+      1.5,
+      0.9,
+      -1.9
+     ],
+     "vfov_deg": 58.716,
+     "size": [
+      960,
+      540
+     ],
+     "png": "models/kit/lookdev/attic_window.png",
+     "view_transform": "AgX (Base Contrast)",
+     "exposure": 2.0,
+     "mean_luminance_linear": 0.017134
+    }
+   ]
+  },
+  "workshop": {
+   "style": "workshop",
+   "size": [
+    4.5,
+    3.0,
+    6.75
+   ],
+   "origin": "three.js axes, metres: the room spans x 0..4.5, y 0..3.0, z -6.75..0 (Blender y = -z)",
+   "surfaces": {
+    "floor": "floor A/B checker per 2.25 m tile",
+    "walls": "wall A/B alternating per tile",
+    "ceiling": "ceil"
+   },
+   "window": {
+    "wall": "east (x = 4.5)",
+    "z_range": [
+     0.9,
+     2.3
+    ],
+    "span": [
+     -3.875,
+     -2.875
+    ],
+    "glass": "none (an opening)"
+   },
+   "nodes": [
+    {
+     "node": "Solid_workbench",
+     "pos": [
+      2.4,
+      0.0,
+      -3.6
+     ],
+     "yaw": 0.0
+    },
+    {
+     "node": "Solid_kiln",
+     "pos": [
+      0.75,
+      0.0,
+      -5.95
+     ],
+     "yaw": 0.0
+    },
+    {
+     "node": "Band_head_shelf",
+     "pos": [
+      2.9,
+      0.0,
+      -6.75
+     ],
+     "yaw": 0.0
+    },
+    {
+     "node": "Band_eye_shelf",
+     "pos": [
+      0.0,
+      0.0,
+      -2.2
+     ],
+     "yaw": -1.5708
+    },
+    {
+     "node": "Solid_sewing_table",
+     "pos": [
+      3.8,
+      0.0,
+      -1.0
+     ],
+     "yaw": 1.5708
+    }
+   ],
+   "fixtures": [
+    {
+     "type": "green_shade",
+     "node": "Fix_green_shade",
+     "pos": [
+      2.4,
+      3.0,
+      -3.6
+     ],
+     "yaw": 0.0,
+     "light_centre": [
+      2.4,
+      2.855,
+      -3.6
+     ],
+     "k0": 2.6,
+     "cycles_power_w": 32.6726,
+     "colour_linear": [
+      1.0,
+      0.72,
+      0.42
+     ]
+    },
+    {
+     "type": "anglepoise",
+     "node": "Fix_anglepoise",
+     "pos": [
+      2.64,
+      0.92,
+      -3.15
+     ],
+     "yaw": 0.0,
+     "light_centre": [
+      2.64,
+      1.3425,
+      -2.9451
+     ],
+     "k0": 1.4,
+     "cycles_power_w": 17.5929,
+     "colour_linear": [
+      1.0,
+      0.72,
+      0.42
+     ]
+    },
+    {
+     "type": "kiln_glow",
+     "node": "Fix_kiln_glow",
+     "pos": [
+      0.75,
+      0.424,
+      -5.57
+     ],
+     "yaw": 0.0,
+     "light_centre": [
+      0.75,
+      0.574,
+      -5.59
+     ],
+     "k0": 1.2,
+     "cycles_power_w": 15.0796,
+     "colour_linear": [
+      1.0,
+      0.72,
+      0.42
+     ]
+    }
+   ],
+   "views": [
+    {
+     "id": "entry",
+     "pos": [
+      0.45,
+      1.6,
+      -0.4
+     ],
+     "target": [
+      3.0,
+      1.1,
+      -5.0
+     ],
+     "vfov_deg": 58.716,
+     "size": [
+      960,
+      540
+     ],
+     "png": "models/kit/lookdev/workshop_entry.png",
+     "view_transform": "AgX (Base Contrast)",
+     "exposure": 2.0,
+     "mean_luminance_linear": 0.042779
+    },
+    {
+     "id": "window",
+     "pos": [
+      4.05,
+      1.6,
+      -6.35
+     ],
+     "target": [
+      1.5,
+      0.9,
+      -1.9
+     ],
+     "vfov_deg": 58.716,
+     "size": [
+      960,
+      540
+     ],
+     "png": "models/kit/lookdev/workshop_window.png",
+     "view_transform": "AgX (Base Contrast)",
+     "exposure": 2.0,
+     "mean_luminance_linear": 0.03427
+    }
+   ]
+  }
+ },
+ "note": "WP2.8 reference rooms for ?lookdev=1 and the WP6 k calibration (+-25% mean luminance). Lamps: point lights through textures/light/profiles.json at k0 (Cycles power 4 pi k0 W, Blender convention), fixture bodies cast no shadow; Emit parts glow for the camera only. Moon: a sun lamp, direction (three.js axes) and strength in W/m2. Render: Cycles, AgX Base Contrast, the stated exposure; mean_luminance_linear is the scene-linear Rec.709 luminance of the render before the view transform.",
+ "moon": {
+  "dir": [
+   -0.7409,
+   -0.6007,
+   -0.3004
+  ],
+  "strength_w_m2": 0.35,
+  "colour_linear": [
+   0.58,
+   0.68,
+   1.0
+  ]
+ },
+ "world_colour_linear": [
+  0.0015,
+  0.002,
+  0.004
+ ],
+ "lamp_colour_linear": [
+  1.0,
+  0.72,
+  0.42
+ ]
+}
