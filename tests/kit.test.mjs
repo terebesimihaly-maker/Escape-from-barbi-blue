@@ -284,7 +284,8 @@ for (const style of STYLES) {
       const bo = new THREE.Box3(); d.leaf.traverse(o => { if (o.isMesh) bo.union(o.geometry.boundingBox.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld))); });
       d.pivot.rotation.y = 0; return [bx.min.x, bx.max.x, bo.getCenter(new THREE.Vector3()).z]; });
     const out = { doors, swingT: c.swingT, pos: g.position.toArray(), rot: g.rotation.y, refPos: ref.position.toArray(), refRot: ref.rotation.y, span,
-      none: Kit.wardrobe(Object.assign({}, c), style, { kit: null }), strict: Kit.wardrobe(Object.assign({}, c), style, { tier: 'lo', placeholders: false }) === null };
+      none: Kit.wardrobe(Object.assign({}, c), style, { kit: null }), strict: (Kit.wardrobe(Object.assign({}, c), style, { tier: 'lo', placeholders: false }) === null) ===
+        ['Ward_body_', 'Ward_leafL_', 'Ward_leafR_'].some(n => Kit.get(style, 'lo').isPlaceholder(n + style)) };   // (null only while the manifest still calls them grey stand-ins)
     for (const t of [wt.sideMat, wt.innerMat, wt.leafR, wt.leafL]) { if (t.map) t.map.dispose(); t.dispose(); } wt.geo.dispose(); wt.crown.dispose(); wt.leafGeo.dispose();
     // the exit door: level.door's fields, the boards drop (0.4 s), then the leaf swings out to 1.75 rad (1.6 s)
     const e = Kit.exit(style, { tier: 'lo', placeholders: true, plan: Dress.plan(Dress.envFromGame()) });
@@ -307,7 +308,7 @@ for (const style of STYLES) {
   check(W.pos.every((v, k) => Math.abs(v - W.refPos[k]) < 1e-9) && Math.abs(W.rot - W.refRot) < 1e-9, `${style}: the wardrobe stands where makeWardrobe puts it`, [W.pos, W.refPos]);
   check(W.span.every(([a, c], k) => k === 0 ? Math.abs(a + 0.575) < 0.01 && Math.abs(c) < 0.01 : Math.abs(a) < 0.01 && Math.abs(c - 0.575) < 0.01) && W.span.every(s => s[2] > 0.305),
     `${style}: each leaf reaches from its hinge to the middle and swings outward`, W.span);
-  check(W.none === null && W.strict, `${style}: wardrobe() is null without a kit (and for grey stand-ins with placeholders: false)`);
+  check(W.none === null && W.strict, `${style}: wardrobe() is null without a kit (and, with placeholders: false, exactly while its nodes are grey stand-ins)`);
   if (!W.exit) { check(false, `${style}: Kit.exit builds from the kit`); continue; }
   const E = W.exit;
   check(E.fields, `${style}: exit door has level.door's fields {door, lamp, lockedMat, openMat, open, setOpen}`);
