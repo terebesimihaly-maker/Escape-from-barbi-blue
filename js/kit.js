@@ -44,7 +44,12 @@
              (LightBaker's, so windows' wall parts sample their face's lightmap cell; default: LightBaker.packAtlas of plan.faces),
              bakeTier, placeholders (use the manifest's grey stand-in nodes too; default Kit.placeholderArt = true), anim, shadows,
              calm, evict (default true), keep (more styles eviction keeps), windows (false: leave plan.windows to Arch.modules,
-             which can place them too; one of the two)
+             which can place them too; one of the two), band (false: no band decor, house.js's props stand in), fixtures (false: no
+             lamps, house.js's light the floor), standIn(solid, item, tier) -> {geo, mat} | null (the look of a box that gets no kit
+             node, instead of grey: geo a unit box standing on the floor like the grey one's, so the footprint stays exact;
+             R.solids[i].standIn, stats.standIns)
+     Kit.covers(kit, plan, opts?) -> 0..1             the share of plan.band the kit has real art for (the manifest's grey stand-ins
+                                                     count as missing unless opts.placeholders; 0 without a kit, 1 with no band)
      Kit.upgradeInPlace(level, plan?, opts?)         when a kit arrives after its floor was built with placeholders: swaps only what the
                                                      kit owns (level.kit, the wardrobes, the exit door, level.house.upgrade if any).
                                                      Never rebuilds: scares.doll, level.paintings and the boards stay. Returns the new R.
@@ -408,6 +413,23 @@ function nodeFor(it, v, ceilMax) {
   if (it.nodes) return it.nodes[v | 0] || it.nodes[0];
   return it.node;
 }
+// which node a band piece of the plan gets in this kit: its own, else one of its looks (by a hash of where it is)
+function bandNode(kit, b) {
+  const def = KIT.band[b.id] || KIT.arch.pieces[b.id] || {};
+  let name = b.node;
+  if (!kit.nodes[name] && def.nodes) name = def.nodes[(hash(b.face, Math.round(b.u * 1000), 61) * def.nodes.length) | 0];   // (one of its looks)
+  return { name, def };
+}
+// how much of the plan's band decor the kit has real art for (0..1; 1 with no band pieces, 0 without a kit): the manifest's grey
+// stand-ins count as missing unless opts.placeholders (default Kit.placeholderArt)
+function covers(kit, plan, opts) {
+  const o = opts || {}, usePH = o.placeholders !== undefined ? !!o.placeholders : api.placeholderArt, band = (plan && plan.band) || [];
+  if (!kit) return 0;
+  if (!band.length) return 1;
+  let n = 0;
+  for (const b of band) { const { name } = bandNode(kit, b); if (name && kit.nodes[name] && (usePH || !kit.isPlaceholder(name))) n++; }
+  return n / band.length;
+}
 const nextStyle = fi => typeof FLOORS !== 'undefined' && FLOORS[(fi | 0) + 1] ? FLOORS[(fi | 0) + 1].style : null;
 const liveLevel = () => typeof level !== 'undefined' ? level : undefined;    // (level.js's current floor)
 const isCalm = o => typeof o.calm === 'function' ? !!o.calm() : o.calm !== undefined ? !!o.calm : typeof calm === 'function' ? calm() : false;
@@ -484,10 +506,12 @@ function furnish(level, plan, opts) {
     R.kitCount++;
     return item;
   };
-  const placeholder = (i, x0, z0, x1, z1, h) => {
+  // a box of the solid's exact size: grey, or the caller's stand-in look (opts.standIn: a unit geometry like the grey box's and a material)
+  const placeholder = (i, x0, z0, x1, z1, h, look) => {
     const m = new THREE.Matrix4().compose(V((x0 + x1) / 2, 0, (z0 + z1) / 2), new THREE.Quaternion(), V(x1 - x0, h, z1 - z0));
-    const item = addItem('placeholder', null, 'floor', m, S.unit, { solid: i, placeholder: true }), ck = chunkOf((x0 + x1) / 2, (z0 + z1) / 2);
-    let b = ph.get(ck); if (!b) ph.set(ck, b = []); b.push({ m, solid: i, item });
+    const item = addItem('placeholder', null, 'floor', m, S.unit, { solid: i, placeholder: true, standIn: !!look }), ck = chunkOf((x0 + x1) / 2, (z0 + z1) / 2);
+    const key = look ? look.geo.uuid + '|' + look.mat.uuid + '|' + ck : ck;
+    let b = ph.get(key); if (!b) ph.set(key, b = { look, list: [] }); b.list.push({ m, solid: i, item });
     return item;
   };
 
@@ -496,7 +520,7 @@ function furnish(level, plan, opts) {
     const it = itemOf(s), x0 = s.x0 * UM, z0 = s.y0 * UM, x1 = s.x1 * UM, z1 = s.y1 * UM, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, rot = s.rot | 0, th = rot * PI / 2;
     const ceilMax = Math.max(ceil(cx, cz), ceil(x0 + 1e-3, z0 + 1e-3), ceil(x1 - 1e-3, z0 + 1e-3), ceil(x0 + 1e-3, z1 - 1e-3), ceil(x1 - 1e-3, z1 - 1e-3));
     const name = nodeFor(it, s.v, ceilMax), slot = s.kind || (it && it.slot);
-    const rec = { i, id: s.id, kind: slot, node: null, placeholder: true, box: { x0, z0, x1, z1, h: s.h }, aabb: null, matrix: null, fix: null };
+    const rec = { i, id: s.id, kind: slot, node: null, placeholder: true, standIn: false, box: { x0, z0, x1, z1, h: s.h }, aabb: null, matrix: null, fix: null };
     if (ok(name)) {
       let ox = cx, oz = cz;
       if (slot === 'wall') { ox -= Math.round(Math.sin(th)) * (x1 - x0) / 2; oz -= Math.round(Math.cos(th)) * (z1 - z0) / 2; }   // (its back on the wall)
@@ -504,16 +528,17 @@ function furnish(level, plan, opts) {
       if (k >= 0) { const P = primsOf(kit, name, !anim);
         Object.assign(rec, { node: name, placeholder: false, matrix: m, aabb: R.items[k].aabb, fix: P.fix ? new THREE.Matrix4().multiplyMatrices(m, P.fix) : null }); }
     }
-    if (rec.placeholder) { const h = it && it.hcm ? Math.max(ceilMax, 0.5) : s.h || (it && it.h) || 1, k = placeholder(i, x0, z0, x1, z1, h); rec.aabb = R.items[k].aabb; }
+    if (rec.placeholder) {
+      const h = it && it.hcm ? Math.max(ceilMax, 0.5) : s.h || (it && it.h) || 1, look = o.standIn ? o.standIn(s, it, tier) : null;
+      const k = placeholder(i, x0, z0, x1, z1, h, look && look.geo && look.mat ? look : null); rec.aabb = R.items[k].aabb; rec.standIn = !!R.items[k].standIn;
+    }
     R.solids.push(rec);
   });
 
   if (kit) {
     /* furniture and props against the walls (no collision) */
-    (plan.band || []).forEach((b, k) => {
-      const def = KIT.band[b.id] || KIT.arch.pieces[b.id] || {};
-      let name = b.node;
-      if (!kit.nodes[name] && def.nodes) name = def.nodes[(hash(b.face, Math.round(b.u * 1000), 61) * def.nodes.length) | 0];   // (one of its looks)
+    if (o.band !== false) (plan.band || []).forEach((b, k) => {
+      const { name, def } = bandNode(kit, b);
       if (!ok(name)) return;
       const ry = b.ry + (b.mount === 'corner' && b.end ? -PI / 2 : 0);       // (a corner piece at the face's far end turns into that corner)
       put('band', name, b.mount === 'corner' ? 'corner' : 'wall', place(b.x, (b.z0 || 0) - (def.z0 || 0), b.z, ry), { band: k, face: b.face, anim: def.anim });
@@ -526,7 +551,7 @@ function furnish(level, plan, opts) {
       put('window', w.node, 'face', place(pos[0], pos[1] || 0, pos[2], w.ry !== undefined ? w.ry : f ? Math.atan2(f.nx, f.nz) : 0), { window: k, face: w.face });
     });
     /* lamps: the body like any piece; its emissive part instanced with the lamp's colour and flicker group; its glow; a cord */
-    (plan.fixtures || []).forEach((fx, k) => {
+    if (o.fixtures !== false) (plan.fixtures || []).forEach((fx, k) => {
       if (!ok(fx.node)) return;
       const P = primsOf(kit, fx.node, !anim), sp = fx.solid !== undefined && fx.solid >= 0 ? R.solids[fx.solid] : null;
       let m;
@@ -558,11 +583,11 @@ function furnish(level, plan, opts) {
     im.userData.kit = { kind: b.kind, node: b.name, mount: b.mount, aabb: boxArr(b.box), solid: b.list.map(e => e.solid), item: b.list.map(e => e.item) };
     G.add(im); R.owned.push(im);
   }
-  for (const list of ph.values()) {
-    const im = new THREE.InstancedMesh(S.box, S.grey[tierMat], list.length);
+  for (const { look, list } of ph.values()) {
+    const im = new THREE.InstancedMesh(look ? look.geo : S.box, look ? look.mat : S.grey[tierMat], list.length);
     list.forEach((e, j) => im.setMatrixAt(j, e.m)); im.instanceMatrix.needsUpdate = true;
-    im.computeBoundingBox(); im.computeBoundingSphere(); im.castShadow = shadows; im.receiveShadow = true; im.name = 'KitPlaceholder';
-    im.userData.kit = { kind: 'placeholder', node: null, mount: 'floor', aabb: boxArr(S.unit), solid: list.map(e => e.solid), item: list.map(e => e.item) };
+    im.computeBoundingBox(); im.computeBoundingSphere(); im.castShadow = shadows; im.receiveShadow = true; im.name = look ? 'KitStandIn' : 'KitPlaceholder';
+    im.userData.kit = { kind: 'placeholder', standIn: !!look, node: null, mount: 'floor', aabb: boxArr(S.unit), solid: list.map(e => e.solid), item: list.map(e => e.item) };
     G.add(im); R.owned.push(im);
   }
   for (const b of merges.values()) {
@@ -606,7 +631,7 @@ function furnish(level, plan, opts) {
   R.update(0, 0);
   const cnt = k => R.owned.filter(x => x.userData.kit.kind === k).length;
   R.stats = { instanced: R.owned.filter(x => x.isInstancedMesh).length, instances: R.owned.reduce((a, x) => a + (x.isInstancedMesh ? x.count : 0), 0),
-    merged: merges.size, emissive: emits.size, glows: glows.length, cords: [...cords.values()].reduce((a, l) => a + l.length, 0), anims: R.anims.length, placeholders: R.solids.filter(s => s.placeholder).length,
+    merged: merges.size, emissive: emits.size, glows: glows.length, cords: [...cords.values()].reduce((a, l) => a + l.length, 0), anims: R.anims.length, placeholders: R.solids.filter(s => s.placeholder).length, standIns: R.solids.filter(s => s.standIn).length,
     draws: R.owned.length + R.anims.reduce((a, x) => { let n = 0; x.obj.traverse(q => { if (q.isMesh) n++; }); return a + n; }, 0),
     byKind: { solid: cnt('solid'), island: cnt('island'), band: cnt('band'), window: cnt('window'), fixture: cnt('fixture'), placeholder: cnt('placeholder') }, ms: +(now() - t0).toFixed(1) };
   if (level && level.group) level.group.add(G);
@@ -861,7 +886,7 @@ function upgradeAsync(lv, plan, opts) {
   return r.compileAsync(tmp, cam, sc).then(finish, e => { console.warn('Kit: compileAsync', e && e.message); return finish(); });
 }
 
-const api = { want, preload, ready, kitReady: ready, get, progress, release, evict, keep, tierFor, furnish, wardrobe, exit: exitDoor, upgradeInPlace, upgradeAsync, disposeLevel: disposeLevelKit,
+const api = { want, preload, ready, kitReady: ready, get, progress, release, evict, keep, tierFor, furnish, covers, wardrobe, exit: exitDoor, upgradeInPlace, upgradeAsync, disposeLevel: disposeLevelKit,
   placeholderBox, setReserved, reserved, prims: primsOf, nodeFor, manifest: () => manifest, placeholderArt: true,
   files: () => [...files.values()].map(f => ({ name: f.name, tier: f.tier, state: f.state, loaded: f.loaded, total: f.total })) };
 window.Kit = api;
