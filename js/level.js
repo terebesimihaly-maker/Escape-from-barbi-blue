@@ -26,6 +26,8 @@ function disposeLevel() {
   if (level.door && !level.door.kit) { mat(level.door.openMat); mat(level.door.lockedMat); }   // (the kit's door frees its own: js/kit.js)
   // the architecture's own geometry and instance buffers (js/arch.js); the kit's pieces in it stay (H21)
   if (level.arch) level.arch.dispose();
+  // (and its materials: some sit only on the kit's pieces, which the traversal above leaves alone)
+  if (level.archOpts) for (const m of Object.values(level.archOpts.materials)) mat(m);
   level = null;
 }
 function buildLevel() {
@@ -125,6 +127,26 @@ function kitExit(lv, kit) {
   if (!kit || !lv.plan || typeof Kit === 'undefined') return false;
   const ex = Kit.exit(lv.plan.style, { plan: lv.plan, kit, wallMat: lv.archOpts.materials.wall, wallCells: lv.archOpts.cells, bakeTier: lv.archOpts.tier, level: lv });
   if (!ex) return false;
+  // (its leaf's glazing comes as an opaque mirror-like copy: the floor's glass instead, like the windows', so the flashlight doesn't
+  // flare white off it; the copy is still freed by the door's dispose)
+  ex.group.traverse(q => { if (q.isMesh && !Array.isArray(q.material) && /^Glass/.test(q.material.name || '')) q.material = lv.archOpts.materials.glass; });
+  // (its porch's wall parts come with the kit's own uv: mapped here onto the face's wallpaper like Arch.modules does its modules'
+  // wall parts: u across the face, the look's half of the picture by the face's variant, v = y / 3, a recess's sides unwrapped)
+  const md = lv.plan.modules.find(q => q.kind === 'exit'), f = md && lv.plan.faces[md.face], wallMat = lv.archOpts.materials.wall, own = [];
+  if (f) ex.group.traverse(q => {
+    if (!q.isMesh || q.material !== wallMat || !q.geometry.attributes.uv) return;
+    const g = q.geometry.clone(), P = g.attributes.position, N = g.attributes.normal, uv = g.attributes.uv, v = new THREE.Vector3(), n = new THREE.Vector3();
+    const M = q.matrix, nm = new THREE.Matrix3().getNormalMatrix(M);
+    const mirror = u => { const r = ((u % 2) + 2) % 2; return r > 1 ? 2 - r : r; };
+    for (let i = 0; i < P.count; i++) {
+      v.fromBufferAttribute(P, i).applyMatrix4(M); if (N) n.fromBufferAttribute(N, i).applyMatrix3(nm).normalize(); else n.set(0, 0, 1);
+      let u = 0.5 + v.x / TILE_M, w = v.y / WALL_H;
+      if (Math.abs(n.x) > 0.7) u = 0.5 + (v.x - Math.sign(n.x) * v.z) / TILE_M; else if (Math.abs(n.y) > 0.7) w = (v.y + Math.sign(n.y) * v.z) / WALL_H;
+      uv.setXY(i, 0.5 * mirror(u) + (f.variant ? 0.5 : 0), w);
+    }
+    uv.needsUpdate = true; q.geometry = g; own.push(g);
+  });
+  if (own.length) { const d0 = ex.door.dispose; ex.door.dispose = function () { d0.call(this); own.forEach(g => g.dispose()); }; }
   lv.group.add(ex.group); lv.door = ex.door; exitLight.position.copy(ex.door.lightPos);
   return true;
 }
