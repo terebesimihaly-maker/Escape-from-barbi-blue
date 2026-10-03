@@ -173,7 +173,9 @@ def build_crib(v):
 def build_simple(node, asset, builder, mats, rnd_seed, px=2048):
     rnd = random.Random(rnd_seed); M = mats(); G = S.Geo(1, 1, False, False); builder(G, M, rnd)
     body = F.build_obj(node, G); files = F.bake_objs(asset, [body], px)
-    body.name = node; body.data.name = node; body['kit'] = 'solid'
+    body.name = node; body.data.name = node; body['kit'] = 'band' if node.startswith('Band_') else 'solid'
+    for nm, loc in getattr(G, 'sockets', []):                               # (empties: a fixture's place, where the game seats a doll)
+        e = kitlib.empty(nm, loc, body); e.matrix_parent_inverse.identity(); e.location = loc
     print(f'  {node}: {kitlib.tris(body)} triangles, box {F.footprint_check([body], None, None)}, bake {files["times"]["total"]}s', flush=True)
     return body, files
 
@@ -204,6 +206,10 @@ def main():
     if want('pram'): run('pram', [('Solid_pram', 'pram', W2.pram, W2.pram_materials, 19)])
     import furn_wood3 as W3
     if want('nursery_table'): run('nursery_table', [('Solid_nursery_table', 'nursery_table', W3.nursery_table, W3.table_materials, 29)])
+    import furn_wood5 as W5
+    for node, nm, fn, px in W5.BANDS:
+        if want(nm) or want('bands') or want(node):
+            run(f'band_{nm}', [(node, f'band_{nm}', fn, (lambda nm=nm: W5.band_materials(nm)), hash(nm) & 0xfff, px)], wall=True)
     isl = [k for k in ('isl_crib_rocker', 'isl_twin_cribs', 'isl_bed_screen', 'isl_tea_party', 'isl_dollhouse', 'isl_washstand') if want(k) or want('islands')]
     if isl: islands(W3, isl)
 

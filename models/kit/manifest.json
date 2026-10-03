@@ -5,7 +5,7 @@
  "axes": "three.js: y up, front +z; aabb [min, max] in metres in the node frame",
  "tiers": {
   "hi": {
-   "wood": 24523224,
+   "wood": 30208768,
    "tile": 10755068,
    "concrete": 11265116,
    "attic": 10358868,
@@ -13,7 +13,7 @@
    "common": 1079144
   },
   "md": {
-   "wood": 10187420,
+   "wood": 12034604,
    "tile": 4650344,
    "concrete": 3800680,
    "attic": 3664536,
@@ -21,7 +21,7 @@
    "common": 400152
   },
   "lo": {
-   "wood": 5549680,
+   "wood": 6461872,
    "tile": 2725048,
    "concrete": 1813412,
    "attic": 1915060,
@@ -126,9 +126,9 @@
    "id": "bookshelf_low",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_bookshelf_low"
    ],
    "uv1": false,
    "children": [],
@@ -139,15 +139,15 @@
      0.0
     ],
     [
-     0.45,
-     1.1,
+     0.4529,
+     1.097,
      0.32
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 2824,
+    "md": 2824,
+    "lo": 2824
    }
   },
   "Band_box_stack": {
@@ -216,28 +216,28 @@
    "id": "changing_table",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_changing_table"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.45,
+     -0.44,
      0.0,
      0.0
     ],
     [
-     0.45,
+     0.44,
      0.95,
-     0.44
+     0.43
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 2166,
+    "md": 2166,
+    "lo": 1754
    }
   },
   "Band_china_cabinet": {
@@ -306,28 +306,28 @@
    "id": "coat_hooks",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_coat_hooks"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
      -0.45,
-     0.75,
+     0.8,
      0.0
     ],
     [
      0.45,
-     1.75,
-     0.3
+     1.76,
+     0.2456
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1536,
+    "md": 1536,
+    "lo": 1221
    }
   },
   "Band_cobweb_card": {
@@ -516,28 +516,31 @@
    "id": "doll_shelf",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_doll_shelf"
    ],
    "uv1": false,
-   "children": [],
+   "children": [
+    "Band_doll_shelf_SOCKET_0",
+    "Band_doll_shelf_SOCKET_1"
+   ],
    "aabb": [
     [
-     -0.6,
+     -0.585,
      1.27,
-     0.0
+     -0.0
     ],
     [
-     0.6,
+     0.585,
      1.47,
-     0.22
+     0.195
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 228,
+    "md": 228,
+    "lo": 228
    }
   },
   "Band_dresser": {
@@ -546,9 +549,9 @@
    "id": "dresser",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_dresser"
    ],
    "uv1": false,
    "children": [
@@ -556,20 +559,20 @@
    ],
    "aabb": [
     [
-     -0.5,
+     -0.492,
      0.0,
      0.0
     ],
     [
-     0.5,
-     0.95,
-     0.44
+     0.492,
+     0.968,
+     0.432
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1722,
+    "md": 1722,
+    "lo": 1293
    }
   },
   "Band_eye_shelf": {
@@ -820,28 +823,28 @@
    "id": "kids_frames",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_kids_frames_v0"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.225,
-     1.25,
+     -0.185,
+     1.253,
      0.0
     ],
     [
-     0.225,
-     1.8,
-     0.05
+     0.185,
+     1.737,
+     0.024
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 92,
+    "md": 92,
+    "lo": 92
    }
   },
   "Band_kids_frames_v1": {
@@ -850,28 +853,28 @@
    "id": "kids_frames",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_kids_frames_v1"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.225,
-     1.25,
+     -0.2,
+     1.253,
      0.0
     ],
     [
-     0.225,
-     1.8,
-     0.05
+     0.2,
+     1.777,
+     0.024
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 92,
+    "md": 92,
+    "lo": 92
    }
   },
   "Band_kids_frames_v2": {
@@ -880,28 +883,28 @@
    "id": "kids_frames",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_kids_frames_v2"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.225,
-     1.25,
+     -0.215,
+     1.253,
      0.0
     ],
     [
-     0.225,
-     1.8,
-     0.05
+     0.215,
+     1.737,
+     0.024
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 92,
+    "md": 92,
+    "lo": 92
    }
   },
   "Band_leaning_mirror": {
@@ -1030,28 +1033,28 @@
    "id": "night_stand",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_night_stand"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.225,
+     -0.221,
      0.0,
      0.0
     ],
     [
-     0.225,
-     0.6,
-     0.4
+     0.221,
+     0.615,
+     0.402
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 642,
+    "md": 642,
+    "lo": 578
    }
   },
   "Band_paint_shelf": {
@@ -1750,9 +1753,9 @@
    "id": "puppet_theatre",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_puppet_theatre"
    ],
    "uv1": false,
    "children": [],
@@ -1765,13 +1768,13 @@
     [
      0.6,
      1.6,
-     0.4
+     0.4179
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 792,
+    "md": 792,
+    "lo": 535
    }
   },
   "Band_radiator": {
@@ -1780,28 +1783,28 @@
    "id": "radiator",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_radiator"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.4,
+     -0.392,
      0.0,
      0.0
     ],
     [
-     0.4,
-     0.65,
-     0.12
+     0.4157,
+     0.645,
+     0.11
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 3682,
+    "md": 3682,
+    "lo": 3682
    }
   },
   "Band_rolled_rug": {
@@ -1960,9 +1963,9 @@
    "id": "toy_shelf",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_toy_shelf"
    ],
    "uv1": false,
    "children": [],
@@ -1979,9 +1982,9 @@
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 3904,
+    "md": 3904,
+    "lo": 3354
    }
   },
   "Band_umbrella_stand": {
@@ -2050,28 +2053,28 @@
    "id": "wall_clock",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_wall_clock"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.175,
+     -0.1702,
      1.75,
      0.0
     ],
     [
-     0.175,
-     2.25,
-     0.12
+     0.1702,
+     2.252,
+     0.082
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 394,
+    "md": 394,
+    "lo": 350
    }
   },
   "Band_washstand": {
@@ -2080,28 +2083,28 @@
    "id": "washstand",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_washstand"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.425,
+     -0.42,
      0.0,
      0.0
     ],
     [
-     0.425,
+     0.42,
      0.8,
-     0.44
+     0.43
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1140,
+    "md": 1140,
+    "lo": 1022
    }
   },
   "Band_water_heater": {
