@@ -179,6 +179,57 @@ for (let i = 0; i < 5; i++) for (const tier of TIERS) {
   check(same, 'the pieces stand in the same places on lo and md (H7: the tier changes only the detail)');
 }
 
+/* ---------- the game's own floors (level.js buildLevel, WP4.1): real art where the manifest has it, stand-ins (never grey) elsewhere ---------- */
+// (a style's furniture is "real" when the manifest marks none of its Solid_/Isl_/Col_ nodes as a grey stand-in)
+const realStyle = s => !Object.keys(MAN.nodes).some(n => MAN.nodes[n].file === s && /^(Solid|Isl|Col)_/.test(n) && MAN.nodes[n].placeholder);
+const realWard = s => ['Ward_body_', 'Ward_leafL_', 'Ward_leafR_'].every(n => MAN.nodes[n + s] && !MAN.nodes[n + s].placeholder);
+for (let i = 0; i < 5; i++) {
+  const style = STYLES[i], tag = `game F${i + 1} ${style}`;
+  const G = await p.evaluate(async i => {
+    await Kit.want(FLOORS[i].style, 'lo');
+    bb.startFloor(i);
+    await new Promise(res => { const w = () => (bb.level && bb.level.grid === bb.grid ? res() : requestAnimationFrame(w)); w(); });
+    const R = level.kit, plan = level.plan, kit = Kit.get(FLOORS[i].style, 'lo');
+    const ab = __kt.aabbs(R), U = 0.045;
+    // every box: drawn by a visible, opaque batch of the furnish group, covering its footprint and height (H5)
+    const vis = new Array(SOLIDS.length).fill(false);
+    R.group.traverse(o => { const k = o.userData.kit; if (!o.isInstancedMesh || !k || !Array.isArray(k.solid)) return;
+      let shown = true; for (let q = o; q; q = q.parent) if (!q.visible) shown = false;
+      const m = o.material; if (shown && m.visible !== false && !(m.transparent && m.opacity < 0.5)) k.solid.forEach(s => { if (s >= 0) vis[s] = true; }); });
+    const invisible = SOLIDS.map((s, k) => vis[k] && ab[k].hits ? null : s.id).filter(Boolean);
+    const offBox = SOLIDS.map((s, k) => { const a = ab[k]; if (!a.hits) return null;
+      const ok = Math.abs(a.min[0] - s.x0 * U) <= 0.05 && Math.abs(a.max[0] - s.x1 * U) <= 0.05 && Math.abs(a.min[2] - s.y0 * U) <= 0.05 && Math.abs(a.max[2] - s.y1 * U) <= 0.05;
+      return ok ? null : s.id; }).filter(Boolean);
+    let grey = 0; level.group.traverse(o => { if (o.isMesh && [].concat(o.material).some(m => m && m.name === 'KitPlaceholder')) grey += o.isInstancedMesh ? o.count : 1; });
+    const props = level.house.group.getObjectByName('HouseProps');
+    return { kit: !!kit, levelKit: !!R && R.kit === kit, n: SOLIDS.length, ph: R.solids.filter(s => s.placeholder).length, standIn: R.solids.filter(s => s.placeholder && s.standIn).length,
+      phNodes: R.solids.filter(s => s.placeholder).map(s => s.id), invisible, offBox, grey, covers: Kit.covers(kit, plan, { placeholders: false }),
+      band: R.items.filter(x => x.kind === 'band').length, planBand: plan.band.length, fixtures: R.items.filter(x => x.kind === 'fixture').length, windows: R.items.filter(x => x.kind === 'window').length,
+      furnished: level.house.furnished, props: props ? props.children.length : -1, dolls: level.house.dolls.length, planDolls: plan.dolls.length,
+      dollsAt: level.house.dolls.every(d => plan.dolls.some(q => Math.abs(d.obj.position.x - q.x) < 1e-6 && Math.abs(d.obj.position.z - q.z) < 1e-6)),
+      wards: closets.map(c => ({ kitW: !!c.kitWardrobe, doors: c.doors ? c.doors.length : 0,
+        hinges: !!c.doors && c.doors.every(d => Math.abs(Math.abs(d.pivot.position.x) - 0.575) < 1e-9 && Math.abs(d.pivot.position.z - 0.305) < 1e-9),
+        inLevel: !!c.doors && (() => { let q = c.doors[0].pivot; while (q && q !== level.group) q = q.parent; return !!q; })() })),
+      houseCount: level.house.kitCount === R.kitCount };
+  }, i);
+  check(G.kit && G.levelKit, `${tag}: buildLevel furnishes from the loaded kit (level.kit)`, G);
+  check(G.invisible.length === 0, `${tag}: every one of the ${G.n} boxes you bump into has visible geometry (H5)`, G.invisible.slice(0, 5));
+  check(G.offBox.length === 0, `${tag}: and it stands on its box (0.05 m)`, G.offBox.slice(0, 5));
+  check(G.grey === 0, `${tag}: no grey placeholder box anywhere on the floor`, G.grey);
+  check(G.ph === G.standIn, `${tag}: every box without kit art gets a procedural stand-in (${G.standIn})`, G);
+  if (realStyle(style)) check(G.ph === 0, `${tag}: the manifest has real art for ${style}: zero placeholder boxes`, G.phNodes.slice(0, 5));
+  else check(G.ph > 0 || G.n === 0, `${tag}: ${style}'s furniture is still grey in the manifest: stand-ins for it (${G.ph} of ${G.n})`);
+  const kitBand = G.covers >= 0.8;
+  check(G.furnished === kitBand && (kitBand ? G.band > 0 && G.props === 0 : G.band === 0 && G.props > 0),
+    `${tag}: band decor from the kit and no house.js props, or neither (kit art for ${(G.covers * 100).toFixed(0)}% of it: ${kitBand ? 'kit' : 'house.js'})`, [G.furnished, G.band, G.planBand, G.props]);
+  if (realStyle(style)) check(kitBand, `${tag}: a floor with real furniture also gets the kit's band decor`, G.covers);
+  check(G.fixtures === 0 && G.windows === 0, `${tag}: no kit lamps (house.js lights the floor for now) and no kit windows (Arch places them)`, [G.fixtures, G.windows]);
+  check(G.dolls <= G.planDolls && G.dollsAt && (G.planDolls < 6 || G.dolls > 0), `${tag}: the scare dolls sit where the plan says (${G.dolls} of its ${G.planDolls} on Low)`, [G.dolls, G.planDolls]);
+  check(G.wards.length > 0 && G.wards.every(w => w.doors === 2 && w.hinges && w.inLevel && w.kitW === realWard(style)),
+    `${tag}: the wardrobes are ${realWard(style) ? "the kit's" : 'the painted ones'}, with makeWardrobe's hinges`, G.wards.slice(0, 2));
+  check(G.houseCount, `${tag}: level.house.kitCount is the kit's piece count`);
+}
+
 /* ---------- placeholders when no kit can be loaded, and upgrading in place when it arrives ---------- */
 {
   const q = await b.newContext({ viewport: { width: 480, height: 300 } }).then(async c2 => {
@@ -265,6 +316,39 @@ for (let i = 0; i < 5; i++) for (const tier of TIERS) {
   check(B2.winGone && (B.planWindows === 0 || B2.windows > 0), `upgrade with opts.walls: ${B2.windows} windows placed, their face quads collapsed (${B2.collapsed} parts)`, B2);
   check(B2.otherKept, 'upgrade with opts.walls: other faces keep their quads', B2);
   console.log(`  (upgrade: ${B.oldCount} -> ${B.kitCount} kit pieces)`);
+  // the game's own late-kit path (level.js lateKit): a floor built while its kit is still on its way gets stand-ins and house.js's
+  // props, then the shell and the furniture are swapped in place, compiled first, when the kit comes
+  let openGate; const gate = new Promise(r => { openGate = r; });
+  await q.route('**/models/kit/lo/tile.glb', async r => { await gate; r.continue(); });
+  const L0 = await q.evaluate(async () => {
+    bb.startFloor(1);
+    await new Promise(res => { const w = () => (bb.level && bb.level.grid === bb.grid ? res() : requestAnimationFrame(w)); w(); });
+    const R = level.kit, props = level.house.group.getObjectByName('HouseProps');
+    let grey = 0; level.group.traverse(o => { if (o.isMesh && [].concat(o.material).some(m => m && m.name === 'KitPlaceholder')) grey += o.isInstancedMesh ? o.count : 1; });
+    window.__late = { R, dolls: level.house.dolls.slice(), boards: level.group.children.filter(o => o.children.some(c => /^Board(Short|Long)/.test(c.name))), lv: level };
+    return { kit: !!R.kit, n: R.solids.length, standIn: R.solids.filter(s => s.standIn).length, grey, furnished: level.house.furnished, props: props ? props.children.length : -1,
+      painted: closets.every(c => !c.kitWardrobe && c.doors && c.doors.length === 2) };
+  });
+  check(!L0.kit && L0.n > 0 && L0.standIn === L0.n && L0.grey === 0, `late kit: the floor starts with a stand-in for each of its ${L0.n} boxes, none grey`, L0);
+  check(!L0.furnished && L0.props >= 0 && L0.painted, `late kit: meanwhile house.js furnishes the walls (${L0.props} props at Low) and the wardrobes are the painted ones`, L0);
+  openGate();
+  const L1 = await q.evaluate(async () => {
+    const t0 = performance.now();
+    while (performance.now() - t0 < 90000 && !(level.kit && level.kit.kit && level.archKit)) await new Promise(r => setTimeout(r, 200));
+    const u = window.__late, R = level.kit, props = level.house.group.getObjectByName('HouseProps');
+    const ab = __kt.aabbs(R), U = 0.045;
+    return { same: level === u.lv, kit: !!R.kit, archKit: !!level.archKit, oldGone: u.R.disposed && u.R.group.parent === null, ph: R.solids.filter(s => s.placeholder).length,
+      onBox: SOLIDS.every((s, k) => ab[k].hits && Math.abs(ab[k].min[0] - s.x0 * U) <= 0.05 && Math.abs(ab[k].max[0] - s.x1 * U) <= 0.05 && Math.abs(ab[k].min[2] - s.y0 * U) <= 0.05 && Math.abs(ab[k].max[2] - s.y1 * U) <= 0.05),
+      band: R.items.filter(x => x.kind === 'band').length, furnished: level.house.furnished, props: props ? props.parent === level.house.group : false,
+      dolls: level.house.dolls.length === u.dolls.length && u.dolls.every((d, k) => level.house.dolls[k] === d && d.obj.parent === level.house.group),
+      boards: u.boards.every(o => o.parent === level.group), kitWards: closets.every(c => c.kitWardrobe && c.doors.length === 2 && c.doors[0].pivot.parent.parent === level.group),
+      fixtures: level.house.fixtures.every(f => !f.prop) };
+  });
+  check(L1.same && L1.kit && L1.archKit && L1.oldGone, 'late kit: the same floor (no rebuild) now has the kit\'s shell and furniture; the stand-ins are gone', L1);
+  check(L1.ph === 0 && L1.onBox, 'late kit: every box is the kit\'s model now, still on its box', L1);
+  check(L1.band > 0 && L1.furnished && !L1.props && L1.fixtures, 'late kit: the kit\'s band decor in, house.js\'s props (and their candles) out', L1);
+  check(L1.dolls && L1.boards, 'late kit: the scare dolls and the loose boards are the same objects (never a rebuild)', L1);
+  check(L1.kitWards, 'late kit: the wardrobes became the kit\'s', L1);
   await q.context().close();
 }
 
