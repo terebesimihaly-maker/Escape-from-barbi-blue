@@ -77,6 +77,7 @@ function buildLevel() {
   // the furniture you bump into (SOLIDS, js/layout.js), every box exactly on its footprint (H5), and the band decor along the walls,
   // from the kit (js/kit.js; see KIT_BAND_MIN for what is real and what stands in)
   if (typeof Kit !== 'undefined') { Kit.furnish(level, plan || { style: F.style, floorIdx }, furnishOpts(F, kit, kitBand)); level.house.kitCount = level.kit.kitCount; }
+  uploadKitTextures(G);                                  // (now, while the floor is being built, not the first time each piece comes into view)
   upgradeSurfaces(F, floor.material, G, walls, faces, ceil);   // (the surfaces baked in Blender, when they've loaded: tools/blender/kit/surfaces2.py)
   buildPuzzles3D(G);                                     // the labyrinth boxes on the walls (js/puzzles.js)
   notes.forEach(n => { const o = makeNote(n); n.obj = o; G.add(o); });
@@ -127,7 +128,7 @@ function lateKit(lv, kit) {
     // then the furniture: the kit's pieces in place of the stand-ins, the kit's wardrobes in place of the painted ones (open as far
     // as they were), the band decor if the kit has it (house.js drops its props then: level.house.upgrade); compiled first too
     if (lv.kit) Kit.upgradeAsync(lv, lv.plan, { kit, band: kitFurnishesBand(kit, lv.plan), exitDoor: false })
-      .then(R => { if (R && level === lv) { if (lv.house) lv.house.kitCount = R.kitCount; lv.compiled = false; } });
+      .then(R => { if (R && level === lv) { if (lv.house) lv.house.kitCount = R.kitCount; lv.compiled = false; uploadKitTextures(lv.group, true); } });
   };
   if (renderer.compileAsync) renderer.compileAsync(A.group, camera, scene).then(swap, swap); else swap();
 }
@@ -146,6 +147,19 @@ function lateKit(lv, kit) {
    With the manifest as it is now, all five floors are furnished from the kit (only three common band pieces are still grey: they are
    left out); the stand-ins show only while a floor's kit is still loading, or for pieces a later manifest marks grey again. */
 const KIT_BAND_MIN = 0.8;
+// The kit's pictures go to the graphics card when a floor is built (renderer.initTexture, E2 step 13), not the first frame each piece is
+// seen: with many of them that first frame is a hitch, worst on slow (software) renderers. Each texture once (the kit's are shared
+// between floors); spread: a few per frame when the kit came late, during play.
+const KIT_UPLOADED = new WeakSet();
+function uploadKitTextures(root, spread) {
+  if (!renderer || !renderer.initTexture) return;
+  const list = [];
+  root.traverse(o => { if (!o.userData.kit || !o.material) return;
+    for (const m of [].concat(o.material)) for (const k of TEX_KEYS) { const t = m && m[k]; if (t && t.isTexture && !KIT_UPLOADED.has(t)) { KIT_UPLOADED.add(t); list.push(t); } } });
+  const lv = level, step = () => { for (let n = 0; n < (spread ? 2 : list.length) && list.length; n++) renderer.initTexture(list.shift());
+    if (list.length && level === lv) requestAnimationFrame(step); };
+  step();
+}
 function kitFurnishesBand(kit, plan) { return !!(kit && plan && typeof Kit !== 'undefined' && Kit.covers(kit, plan, { placeholders: false }) >= KIT_BAND_MIN); }
 function furnishOpts(F, kit, band) {
   return { kit, placeholders: false, windows: false, fixtures: false, band, evict: false, standIn: (s, it, tier) => standInLook(F.style, s, tier) };
