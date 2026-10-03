@@ -95,9 +95,8 @@ function buildArch(F, plan, G) {
   level.arch = Arch.build(plan, kit, level.archOpts); level.archKit = kit;
   G.add(level.arch.group);
   if (typeof Kit !== 'undefined') {
-    // this floor's kit and the next floor's stay; in multiplayer every floor still ahead (E4, E5)
-    const next = FLOORS[floorIdx + 1], keep = [F.style, next && next.style].concat(MP.on ? FLOORS.slice(floorIdx).map(q => q.style) : []);
-    Kit.evict(keep.filter(Boolean));
+    // (no eviction here yet: Kit.furnish does it on floor entry once the furniture comes from the kit, WP2.3)
+    const next = FLOORS[floorIdx + 1];
     if (next) Kit.want(next.style);                        // (fetched while you play this one)
     const lv = level;
     if (!kit) Kit.want(F.style).then(k => { if (k && level === lv && !lv.archKit) lateKit(lv, k); });
