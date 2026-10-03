@@ -11,7 +11,12 @@
           wallMat, hash, toTex, glowTex, quality: 'low'|'medium'|'high', lowq (true on phones),
           arch (js/arch.js built the shell: no woodwork or doorways here; faces are the plan's, js/dress.js), doorKeys (the plan's
           doorway tiles 'x,y'), ceilXZ(xm, zm) (the ceiling's height there; else H everywhere), ceilKeep (Set of 'x,y' tiles whose
-          ceiling has a skylight, a hole or the loft ladder: nothing hangs there) } */
+          ceiling has a skylight, a hole or the loft ladder: nothing hangs there),
+          furnished (js/kit.js furnishes this floor's band decor from the Blender kit: no furniture, props or cobwebs here, only the lamps,
+          rugs, puddles and pipes; the house's fallback otherwise, E2 step 5), dolls (the plan's [{x, z, y, ry, face}]: the
+          scare dolls sit there, whoever furnishes; else on free wall sides as before), clear(xm, zm, rm) (false where a prop of that
+          radius would stand in a box you bump into, SOLIDS: the props keep out of them) }
+   h.upgrade(kit, R): the kit arrived late and Kit.upgradeInPlace furnished the band decor: the props here go (the dolls stay). */
 (function () {
 'use strict';
 
@@ -68,12 +73,17 @@ function build(THREE, env) {
   const { style, L, H, isWall, faces, hash } = env;
   const group = new THREE.Group(), fixtures = [], dolls = [], clocks = [];
   const lowq = env.lowq, dens = env.quality === 'low' ? 0.45 : lowq ? 0.75 : 1;
-  const std = (o) => new THREE.MeshStandardMaterial(Object.assign({ roughness: 0.75, metalness: 0 }, o));
+  const made = [];                                      // (every material made here: the ones nothing ended up using are freed below)
+  const std = (o) => { const m = new THREE.MeshStandardMaterial(Object.assign({ roughness: 0.75, metalness: 0 }, o)); made.push(m); return m; };
   const tex = (c, rep) => env.toTex(c, rep);
   const cellOf = f => f.x + ',' + f.y;
   // a wall side that already has something on it (a picture, the exit, a wardrobe, a door frame) gets no lamp or furniture
   // (and with the plan: a face a module or window replaces, or a servant corridor's wall standing 0.30 m proud: f.skip, f.inset)
   const busy = f => env.keep.has(cellOf(f)) || doorTiles.has(cellOf(f)) || f.skip || f.inset || (env.decorFace && env.decorFace(f));
+  // (with the plan: a wall lamp never goes on a side the plan gives band decor, which the kit may furnish now or when it arrives)
+  const banded = f => !!(env.arch && f.used && f.used.includes('band'));
+  const props = new THREE.Group(); props.name = 'HouseProps'; group.add(props);    // (the furniture and props: dropped by upgrade())
+  const clear = env.clear || (() => true);
   const ceilXZ = env.ceilXZ || (() => H);
   const P = {                                           // per floor: colours of the woodwork and the lamps
     wood:     { trim: '#9e927e', rail: '#8f8470', lamp: 0xffc9b8, shade: '#f2b8c6', light: 0xffc0a8 },
@@ -142,22 +152,22 @@ function build(THREE, env) {
   /* ---------- lamps ---------- */
   const fixMetal = std({ color: style === 'concrete' ? 0x2a2622 : 0x8a6a2e, metalness: 0.8, roughness: 0.35 });
   const fixStatic = new Merge(THREE), lampFaces = new Set();
-  const addFixture = (x, y, z, kind) => {
+  const addFixture = (x, y, z, kind, prop) => {
     const r = Math.random(), state = r < 0.12 ? 'dead' : r < 0.32 ? 'flicker' : 'ok';
     const mat = new THREE.MeshStandardMaterial({ color: 0x222222, emissive: P.lamp, emissiveIntensity: state === 'dead' ? 0.05 : 1.6, roughness: 0.6 });
     let glowObj;
     if (kind === 'bulb') glowObj = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), mat);
     else if (kind === 'candle') { glowObj = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.045, 8), mat); }
     else glowObj = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.11, 0.14, 14, 1, true), mat);
-    glowObj.position.set(x, y, z); group.add(glowObj);
+    glowObj.position.set(x, y, z); (prop ? props : group).add(glowObj);
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: env.glowTex, color: new THREE.Color(P.lamp).multiplyScalar(kind === 'shade' ? 1.3 : 2), transparent: true,
       blending: THREE.AdditiveBlending, depthWrite: false, opacity: state === 'dead' ? 0 : 0.5 }));
-    glow.position.set(x, y, z); glow.scale.setScalar(kind === 'candle' ? 0.35 : 0.45); group.add(glow);
-    fixtures.push({ pos: new THREE.Vector3(x, y, z), mat, glow, state, phase: Math.random() * 100, base: kind === 'candle' ? 0.6 : 1, level: 1, em: kind === 'shade' ? 0.9 : 1.8 });
+    glow.position.set(x, y, z); glow.scale.setScalar(kind === 'candle' ? 0.35 : 0.45); (prop ? props : group).add(glow);
+    fixtures.push({ pos: new THREE.Vector3(x, y, z), mat, glow, state, phase: Math.random() * 100, base: kind === 'candle' ? 0.6 : 1, level: 1, em: kind === 'shade' ? 0.9 : 1.8, prop: !!prop });
   };
   const fixDen = { wood: 0.16, tile: 0.2 }[style] || 0;
   for (const f of faces) {
-    if (busy(f) || hash(f.x * 5 + f.nx, f.y * 5 + f.nz, 95) > fixDen) continue;
+    if (busy(f) || banded(f) || hash(f.x * 5 + f.nx, f.y * 5 + f.nz, 95) > fixDen) continue;
     const cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2, ry = Math.atan2(f.nx, f.nz);
     lampFaces.add(f);
     if (style === 'wood') {                               // a wall lamp with a fabric shade
@@ -261,26 +271,31 @@ function build(THREE, env) {
     const pm = pipes.mesh(std({ map: tex(rustCanvas(), true), metalness: 0.55, roughness: 0.55 }), true); if (pm) group.add(pm);
   }
 
-  /* ---------- furniture and props, against the walls (never deep enough to get in anyone's way) ---------- */
+  /* ---------- furniture and props, against the walls (never deep enough to get in anyone's way) ----------
+     Only as the fallback: when js/kit.js furnishes the floor's band decor (env.furnished), there are none here. With the plan the
+     scare dolls sit where it says (env.dolls), so they are the same whoever furnishes, and a late kit leaves them alone. */
+  const dollFaces = new Set((env.dolls || []).map(d => faces[d.face]).filter(Boolean));
   const spots = [];
-  for (const f of faces) if (!busy(f) && !lampFaces.has(f)) spots.push(f);
+  if (!env.furnished) for (const f of faces) if (!busy(f) && !lampFaces.has(f) && !dollFaces.has(f)) spots.push(f);
   const placeAt = (f, along, depth) => {
     const tx = -f.nz, tz = f.nx, cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2;
     return { x: cx + tx * along + f.nx * depth, z: cz + tz * along + f.nz * depth, ry: Math.atan2(f.nx, f.nz) };
   };
+  const ownDolls = !env.dolls;                            // (no plan: the dolls among the props, as before)
+  if (env.dolls) env.dolls.forEach((d, i) => dolls.push(makeDoll(THREE, env, { x: d.x, z: d.z, y: d.y || 0, ry: d.ry }, i)));
   const woodMat = std({ map: tex(woodCanvas(style === 'tile' ? '#4a2c18' : style === 'wood' ? '#8a6446' : '#6b5238', 128, 128, true), true), roughness: 0.6 });
   if (style === 'wood') {
     const blocks = new Merge(THREE), bears = [];
     spots.forEach((f, i) => {
       const r = hash(f.x * 3 + f.nx, f.y * 3 + f.nz, 160);
-      if (r < 0.1 * dens) { const p = placeAt(f, (hash(f.x, f.y, 161) - 0.5) * 0.9, 0.22); dolls.push(makeDoll(THREE, env, p, i)); }
-      else if (r < 0.17 * dens) { const p = placeAt(f, (hash(f.x, f.y, 162) - 0.5) * 0.9, 0.2); group.add(makeBear(THREE, p)); }
+      if (r < 0.1 * dens) { const p = placeAt(f, (hash(f.x, f.y, 161) - 0.5) * 0.9, 0.22); if (ownDolls && clear(p.x, p.z, 0.2)) dolls.push(makeDoll(THREE, env, p, i)); }
+      else if (r < 0.17 * dens) { const p = placeAt(f, (hash(f.x, f.y, 162) - 0.5) * 0.9, 0.2); if (clear(p.x, p.z, 0.2)) props.add(makeBear(THREE, p)); }
       else if (r < 0.27 * dens) {                         // a few toy blocks, some stacked
-        const p = placeAt(f, (hash(f.x, f.y, 163) - 0.5) * 1.0, 0.28), n = 1 + (hash(f.x, f.y, 164) * 4 | 0);
+        const p = placeAt(f, (hash(f.x, f.y, 163) - 0.5) * 1.0, 0.28), n = clear(p.x, p.z, 0.25) ? 1 + (hash(f.x, f.y, 164) * 4 | 0) : 0;
         for (let k = 0; k < n; k++) { const s = 0.11; blocks.box(s, s, s, p.x + (k % 2) * 0.13 * Math.cos(p.ry), s / 2 + (k >> 1) * s, p.z - (k % 2) * 0.13 * Math.sin(p.ry), p.ry + k * 0.4); }
       }
     });
-    const bm = blocks.mesh(std({ map: tex(blocksCanvas()), roughness: 0.6 }), true); if (bm) group.add(bm);
+    const bm = blocks.mesh(std({ map: tex(blocksCanvas()), roughness: 0.6 }), true); if (bm) props.add(bm);
   }
   if (style === 'tile') {
     const tables = new Merge(THREE);
@@ -288,19 +303,21 @@ function build(THREE, env) {
       const r = hash(f.x * 3 + f.nx, f.y * 3 + f.nz, 170);
       if (r < 0.1 * dens) {                               // a side table with a vase, or a candle, or a doll sitting on it
         const p = placeAt(f, (hash(f.x, f.y, 171) - 0.5) * 0.6, 0.2), c = Math.cos(p.ry), s = Math.sin(p.ry);
+        if (!clear(p.x, p.z, 0.34)) return;
         tables.box(0.62, 0.04, 0.34, p.x, 0.8, p.z, p.ry);
         tables.box(0.56, 0.1, 0.3, p.x, 0.73, p.z, p.ry);
         for (const [a, b] of [[-0.27, -0.13], [0.27, -0.13], [-0.27, 0.13], [0.27, 0.13]]) tables.box(0.035, 0.78, 0.035, p.x + a * c + b * s, 0.39, p.z - a * s + b * c, p.ry);
         const what = hash(f.x, f.y, 172);
-        if (what < 0.4) group.add(makeVase(THREE, p.x, 0.82, p.z));
-        else if (what < 0.7) { tables.box(0.07, 0.02, 0.07, p.x, 0.83, p.z, 0); tables.box(0.03, 0.16, 0.03, p.x, 0.92, p.z, 0); addFixture(p.x, 1.02, p.z, 'candle'); }
-        else dolls.push(makeDoll(THREE, env, { x: p.x, z: p.z, ry: p.ry, y: 0.82 }, i));
+        if (what < 0.4) props.add(makeVase(THREE, p.x, 0.82, p.z));
+        else if (what < 0.7) { tables.box(0.07, 0.02, 0.07, p.x, 0.83, p.z, 0); tables.box(0.03, 0.16, 0.03, p.x, 0.92, p.z, 0); addFixture(p.x, 1.02, p.z, 'candle', true); }
+        else if (ownDolls) dolls.push(makeDoll(THREE, env, { x: p.x, z: p.z, ry: p.ry, y: 0.82 }, i));
       } else if (r < 0.13 * dens) {                       // a grandfather clock
         const p = placeAt(f, 0, 0.19);
-        clocks.push(makeClock(THREE, p, woodMat)); group.add(clocks[clocks.length - 1].obj);
+        if (!clear(p.x, p.z, 0.3)) return;
+        clocks.push(makeClock(THREE, p, woodMat)); props.add(clocks[clocks.length - 1].obj);
       }
     });
-    const tm = tables.mesh(woodMat, true); if (tm) group.add(tm);
+    const tm = tables.mesh(woodMat, true); if (tm) props.add(tm);
   }
   if (style === 'concrete') {
     const crates = new Merge(THREE), barrels = new Merge(THREE);
@@ -308,15 +325,17 @@ function build(THREE, env) {
       const r = hash(f.x * 3 + f.nx, f.y * 3 + f.nz, 180);
       if (r < 0.14 * dens) {
         const p = placeAt(f, (hash(f.x, f.y, 181) - 0.5) * 0.7, 0.21);
+        if (!clear(p.x, p.z, 0.3)) return;
         crates.box(0.4, 0.4, 0.4, p.x, 0.2, p.z, p.ry + (hash(f.x, f.y, 182) - 0.5) * 0.3);
         if (hash(f.x, f.y, 183) < 0.5) crates.box(0.32, 0.32, 0.32, p.x, 0.56, p.z, p.ry + 0.3);
       } else if (r < 0.22 * dens) {
         const p = placeAt(f, (hash(f.x, f.y, 184) - 0.5) * 0.8, 0.23);
+        if (!clear(p.x, p.z, 0.22)) return;
         barrels.add(new THREE.CylinderGeometry(0.2, 0.2, 0.82, 16), new THREE.Matrix4().makeTranslation(p.x, 0.41, p.z));
       }
     });
-    const cm = crates.mesh(std({ map: tex(crateCanvas()), roughness: 0.8 }), true); if (cm) group.add(cm);
-    const bm = barrels.mesh(std({ map: tex(barrelCanvas(), true), metalness: 0.35, roughness: 0.6 }), true); if (bm) group.add(bm);
+    const cm = crates.mesh(std({ map: tex(crateCanvas()), roughness: 0.8 }), true); if (cm) props.add(cm);
+    const bm = barrels.mesh(std({ map: tex(barrelCanvas(), true), metalness: 0.35, roughness: 0.6 }), true); if (bm) props.add(bm);
   }
   const swingers = [];                                    // (dolls hanging on strings: they sway)
   if (style === 'attic') {
@@ -325,14 +344,15 @@ function build(THREE, env) {
     spots.forEach((f, i) => {
       const r = hash(f.x * 3 + f.nx, f.y * 3 + f.nz, 190);
       if (r < 0.14 * dens) { const tall = hash(f.x, f.y, 191) < 0.35, p = placeAt(f, (hash(f.x, f.y, 192) - 0.5) * 0.7, 0.3);
+        if (!clear(p.x, p.z, 0.45)) return;
         const g = new THREE.CylinderGeometry(tall ? 0.24 : 0.28, tall ? 0.38 : 0.44, tall ? 1.7 : 0.9, 4, 1); g.rotateY(Math.PI / 4);
         sheets.add(g, new THREE.Matrix4().compose(new THREE.Vector3(p.x, tall ? 0.85 : 0.45, p.z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, p.ry + (hash(f.x, f.y, 193) - 0.5) * 0.3, 0)), new THREE.Vector3(1, 1, 0.75))); }
-      else if (r < 0.22 * dens) { const p = placeAt(f, (hash(f.x, f.y, 194) - 0.5) * 0.7, 0.24);
+      else if (r < 0.22 * dens) { const p = placeAt(f, (hash(f.x, f.y, 194) - 0.5) * 0.7, 0.24); if (!clear(p.x, p.z, 0.42)) return;
         trunks.box(0.8, 0.42, 0.42, p.x, 0.21, p.z, p.ry); trunks.box(0.82, 0.06, 0.44, p.x, 0.45, p.z, p.ry); }
-      else if (r < 0.28 * dens) { const p = placeAt(f, (hash(f.x, f.y, 195) - 0.5) * 0.8, 0.22); dolls.push(makeDoll(THREE, env, p, i)); }
+      else if (r < 0.28 * dens) { const p = placeAt(f, (hash(f.x, f.y, 195) - 0.5) * 0.8, 0.22); if (ownDolls && clear(p.x, p.z, 0.2)) dolls.push(makeDoll(THREE, env, p, i)); }
     });
-    const sm = sheets.mesh(std({ map: tex(clothCanvas('#b8b0a0'), true), roughness: 0.95 }), true); if (sm) group.add(sm);
-    const tm = trunks.mesh(std({ map: tex(crateCanvas()), color: 0x8a6a4a, roughness: 0.7 }), true); if (tm) group.add(tm);
+    const sm = sheets.mesh(std({ map: tex(clothCanvas('#b8b0a0'), true), roughness: 0.95 }), true); if (sm) props.add(sm);
+    const tm = trunks.mesh(std({ map: tex(crateCanvas()), color: 0x8a6a4a, roughness: 0.7 }), true); if (tm) props.add(tm);
     // cobwebs across the top corners
     const web = std({ map: tex(webCanvas()), transparent: true, alphaTest: 0.1, side: THREE.DoubleSide, roughness: 1, depthWrite: false });
     for (const f of faces) { if (hash(f.x * 5 + f.nx, f.y * 5 + f.nz, 196) > 0.14 || f.inset) continue;
@@ -340,7 +360,7 @@ function build(THREE, env) {
       const ex = end ? f.x1 : f.x0, ez = end ? f.z1 : f.z0, tx = f.x1 - f.x0, tz = f.z1 - f.z0, tl = Math.hypot(tx, tz);
       const wx = ex - (end ? 1 : -1) * tx / tl * 0.25 + f.nx * 0.25, wz = ez - (end ? 1 : -1) * tz / tl * 0.25 + f.nz * 0.25;
       w.position.set(wx, ceilXZ(wx, wz) - 0.25, wz);
-      w.rotation.set(0, Math.atan2(f.nx, f.nz) + (end ? -1 : 1) * Math.PI / 4, 0); group.add(w); }
+      w.rotation.set(0, Math.atan2(f.nx, f.nz) + (end ? -1 : 1) * Math.PI / 4, 0); props.add(w); }
   }
   if (style === 'workshop') {
     const bench = new Merge(THREE), shelf = new Merge(THREE), parts = new Merge(THREE), heads = [], forms = [];
@@ -348,6 +368,7 @@ function build(THREE, env) {
       const r = hash(f.x * 3 + f.nx, f.y * 3 + f.nz, 200), p0 = placeAt(f, 0, 0);
       if (r < 0.12 * dens) {                              // a workbench with doll parts on it
         const p = placeAt(f, (hash(f.x, f.y, 201) - 0.5) * 0.4, 0.26), c = Math.cos(p.ry), s = Math.sin(p.ry);
+        if (!clear(p.x, p.z, 0.55)) return;
         bench.box(1.1, 0.05, 0.48, p.x, 0.86, p.z, p.ry);
         for (const [a, b] of [[-0.5, -0.2], [0.5, -0.2], [-0.5, 0.2], [0.5, 0.2]]) bench.box(0.05, 0.84, 0.05, p.x + a * c + b * s, 0.42, p.z - a * s + b * c, p.ry);
         for (let k = 0; k < 4; k++) { const a = (hash(f.x, f.y, 202 + k) - 0.5) * 0.9, b = (hash(f.x, f.y, 206 + k) - 0.5) * 0.3, x = p.x + a * c + b * s, z = p.z - a * s + b * c;
@@ -358,36 +379,40 @@ function build(THREE, env) {
         for (const h of [1.3, 1.78]) { const p = placeAt(f, 0, 0.13); shelf.box(along, 0.03, 0.24, p.x, h, p.z, p.ry);
           const n = 5 + (hash(f.x, f.y, 220 + h * 10) * 3 | 0);
           for (let k = 0; k < n; k++) { const q = placeAt(f, (k / (n - 1) - 0.5) * along * 0.9, 0.13); heads.push([q.x, h + 0.085, q.z, q.ry + (hash(f.x + k, f.y, 230) - 0.5) * 0.6]); } }
-      } else if (r < 0.31 * dens) { forms.push(placeAt(f, (hash(f.x, f.y, 240) - 0.5) * 0.7, 0.3)); }   // a dress form
+      } else if (r < 0.31 * dens) { const p = placeAt(f, (hash(f.x, f.y, 240) - 0.5) * 0.7, 0.3); if (clear(p.x, p.z, 0.22)) forms.push(p); }   // a dress form
     });
-    const bm = bench.mesh(woodMat, true); if (bm) group.add(bm);
-    const sm = shelf.mesh(woodMat, true); if (sm) group.add(sm);
+    const bm = bench.mesh(woodMat, true); if (bm) props.add(bm);
+    const sm = shelf.mesh(woodMat, true); if (sm) props.add(sm);
     const porcelain = std({ color: 0xf2ebe4, roughness: 0.25 });
-    const pm = parts.mesh(porcelain, true); if (pm) group.add(pm);
+    const pm = parts.mesh(porcelain, true); if (pm) props.add(pm);
     if (heads.length) {                                   // all the heads: one instanced mesh (one draw call)
       const faceTex = env.toTex(dollFaceCanvas(false)); faceTex.offset.set(0.25, 0);
       const im = new THREE.InstancedMesh(new THREE.SphereGeometry(0.075, 16, 12), std({ map: faceTex, roughness: 0.3 }), heads.length);
       const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1), v = new THREE.Vector3();
       heads.forEach(([x, y, z, ry], i) => { q.setFromEuler(e.set(0, ry, 0)); m4.compose(v.set(x, y, z), q, one); im.setMatrixAt(i, m4); });
-      im.castShadow = true; group.add(im);
+      im.castShadow = true; props.add(im);
     }
     const fabric = std({ color: 0x6a5a4a, roughness: 0.9 }), metal = std({ color: 0x222222, metalness: 0.7, roughness: 0.4 });
     const torso = new THREE.LatheGeometry([[0, 0], [0.17, 0.02], [0.2, 0.18], [0.16, 0.36], [0.19, 0.55], [0.14, 0.68], [0.05, 0.74], [0, 0.76]].map(([a, b]) => new THREE.Vector2(a, b)), 20);
     for (const p of forms) { const g = new THREE.Group(), t = new THREE.Mesh(torso, fabric); t.position.y = 0.95; t.scale.set(1, 1, 0.75); t.castShadow = true; g.add(t);
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.95, 6), metal); pole.position.y = 0.48; g.add(pole);
       const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.03, 12), metal); foot.position.y = 0.015; g.add(foot);
-      g.position.set(p.x, 0, p.z); g.rotation.y = p.ry; group.add(g); }
+      g.position.set(p.x, 0, p.z); g.rotation.y = p.ry; props.add(g); }
     // dolls hanging from the ceiling on strings, in some rooms
-    for (let y = 1; y < env.GH; y += 2) for (let x = 1; x < env.GW; x += 2) {
+    if (!env.furnished) for (let y = 1; y < env.GH; y += 2) for (let x = 1; x < env.GW; x += 2) {
       if (isWall(x, y) || env.keep.has(x + ',' + y) || hash(x, y, 250) > 0.12 * dens || (env.ceilKeep && env.ceilKeep.has(x + ',' + y))) continue;
       const px = (x + 0.5 + (hash(x, y, 251) - 0.5) * 0.4) * L, pz = (y + 0.5 + (hash(x, y, 252) - 0.5) * 0.4) * L, pivot = new THREE.Group(); pivot.position.set(px, ceilXZ(px, pz), pz);
       const len = 0.9 + hash(x, y, 253) * 0.4, str = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, len, 3), metal); str.position.y = -len / 2; pivot.add(str);
       const d = makeDoll(THREE, env, { x: 0, z: 0, ry: 0, y: 0 }, x * 7 + y);
       d.obj.position.set(0, -len - 0.45, 0); d.obj.rotation.set(0, hash(x, y, 254) * 6, 0); pivot.add(d.obj);
-      group.add(pivot); swingers.push({ pivot, ph: hash(x, y, 255) * 6, sp: 0.6 + hash(x, y, 256) * 0.5 });
+      props.add(pivot); swingers.push({ pivot, ph: hash(x, y, 255) * 6, sp: 0.6 + hash(x, y, 256) * 0.5 });
     }
   }
   dolls.forEach(d => group.add(d.obj));
+  {                                                       // (materials made for furniture that wasn't placed: freed now, nothing holds them)
+    const used = new Set(); group.traverse(o => { for (const m of [].concat(o.material || [])) used.add(m); });
+    for (const m of made) if (!used.has(m)) { for (const k of ['map', 'alphaMap']) if (m[k] && m[k] !== env.glowTex) m[k].dispose(); m.dispose(); }
+  }
 
   /* ---------- a flashlight beam you can see in the dusty air ---------- */
   let beam = null;
@@ -439,13 +464,27 @@ function build(THREE, env) {
     for (const s of swingers) { s.pivot.rotation.z = Math.sin(t * s.sp + s.ph) * 0.06; s.pivot.rotation.x = Math.sin(t * s.sp * 0.7 + s.ph * 2) * 0.04; }
     if (beam) { beam.material.uniforms.uT.value = t; beam.material.uniforms.uI.value = flash && flash.visible ? 0.045 * Math.min(1.2, flash.intensity / 25) : 0; }
   }
-  function dispose() {
-    const seen = new Set();
-    group.traverse(o => { if (o.geometry && !o.userData.sharedGeo && !seen.has(o.geometry)) { seen.add(o.geometry); o.geometry.dispose(); }   // (a doll's geometry is the loaded model's)
+  function freeTree(root, seen) {
+    root.traverse(o => { if (o.geometry && !o.userData.sharedGeo && !seen.has(o.geometry)) { seen.add(o.geometry); o.geometry.dispose(); }   // (a doll's geometry is the loaded model's)
       if (o.material && !seen.has(o.material)) { seen.add(o.material); for (const k of ['map', 'alphaMap']) if (o.material[k] && o.material[k] !== env.glowTex) o.material[k].dispose(); o.material.dispose(); } });
+  }
+  function dispose() {
+    freeTree(group, new Set());
     if (beam) { if (beam.parent) beam.parent.remove(beam); beam.geometry.dispose(); beam.material.dispose(); }
   }
-  const api = { group, update, dispose, beam, fixtures, dolls, doorTiles, calm: false };
+  // the kit came late and furnished the band decor (Kit.upgradeInPlace calls this): the props go, with their candles and clocks; the
+  // dolls (scares.doll may hold one), lamps, rugs and pipes stay
+  function upgrade(kit, R) {
+    if (R) api.kitCount = R.kitCount;
+    if (!R || !R.items || !R.items.some(x => x.kind === 'band') || !props.parent) return;
+    group.remove(props);
+    for (let k = fixtures.length - 1; k >= 0; k--) if (fixtures[k].prop) fixtures.splice(k, 1);
+    for (const l of pool) if (l.userData.fix && l.userData.fix.prop) { l.userData.fix = null; l.intensity = 0; }
+    clocks.length = 0; swingers.length = 0;
+    const keep = new Set(); group.traverse(o => { if (o.geometry) keep.add(o.geometry); if (o.material) keep.add(o.material); });   // (shared with what stays)
+    freeTree(props, keep); api.furnished = true;
+  }
+  const api = { group, update, dispose, upgrade, beam, fixtures, dolls, doorTiles, calm: false, kitCount: 0, furnished: !!env.furnished };
   return api;
 }
 
