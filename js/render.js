@@ -171,7 +171,8 @@ function render3D(t) {
   animatePuzzles(t); updatePaintings(lastDt);
   for (const n of notes) if (n.obj) n.obj.visible = !n.read;
   const D = level.door;
-  if (D) { if (powerOn && !D.open) { D.open = true; D.door.material = D.openMat; }
+  // (the kit's exit door opens itself: the boards drop, the leaf swings out, js/kit.js; the painted one swaps to its open picture)
+  if (D) { if (D.setOpen) D.setOpen(powerOn); else if (powerOn && !D.open) { D.open = true; D.door.material = D.openMat; }
     D.lamp.material.color.setHex(powerOn ? 0x4dff88 : (Math.sin(t * 6) > 0 ? 0xff3030 : 0x401010)).multiplyScalar(4);
     exitLight.intensity = powerOn ? 2.5 + Math.sin(t * 5) * 0.5 : 0; }
   const P = level.prints;
@@ -188,6 +189,13 @@ function render3D(t) {
     col.setXYZ(i, b, b * 0.92, b * 0.8);
   });
   pos.needsUpdate = col.needsUpdate = true;
+  // the doorways' leaves creak open as anyone comes near (you, the others, her; positions in metres: js/arch.js), and drift back after
+  if (level.arch) {
+    const acts = [{ x: p.x * S, z: p.y * S }];
+    if (MP.on) for (const o of MP.others.values()) if (!o.dead && !o.away) acts.push({ x: o.x * S, z: o.y * S });
+    if (m.active) acts.push({ x: m.x * S, z: m.y * S });
+    Arch.updateDoors(lastDt, acts);
+  }
   if (level.house) { level.house.calm = calm(); level.house.dark = scares.dim < 0.5; }
   if (level.house) level.house.update(lastDt, t, camera, p, flash);
   draw(scene, camera);

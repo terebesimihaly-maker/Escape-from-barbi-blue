@@ -11,7 +11,7 @@ function disposeLevel() {
   const seen = new Set();
   // (a texture marked shared outlives the floor: the portraits painted in Blender, loaded once for every floor)
   const tex = t => { if (t && t !== glowTex && !t.userData.shared && !seen.has(t)) { seen.add(t); t.dispose(); } };
-  const mat = m => { if (seen.has(m)) return; seen.add(m);
+  const mat = m => { if (!m || seen.has(m) || m.userData.shared) return; seen.add(m);   // (shared: the kit's own, left on a module's wall part)
     for (const k of TEX_KEYS) tex(m[k]);
     if (m.userData) { tex(m.userData.overlay); if (m.userData.disposables) m.userData.disposables.forEach(tex); }
     m.dispose(); };
@@ -23,37 +23,50 @@ function disposeLevel() {
   });
   // (not always in the scene: a changer's second picture until it has changed, the exit door's open look until it opens)
   if (level.paintings) for (const p of level.paintings) if (p.mat) mat(p.mat);
-  if (level.door) { mat(level.door.openMat); mat(level.door.lockedMat); }
+  if (level.door && !level.door.kit) { mat(level.door.openMat); mat(level.door.lockedMat); }   // (the kit's door frees its own: js/kit.js)
+  // the architecture's own geometry and instance buffers (js/arch.js); the kit's pieces in it stay (H21)
+  if (level.arch) level.arch.dispose();
   level = null;
 }
 function buildLevel() {
   disposeLevel();
   const F = FLOORS[floorIdx], G = new THREE.Group(), L = TILE_M;
-  level = { grid, group: G, door: null, prints: null };
+  level = { grid, group: G, door: null, prints: null, plan: null, arch: null };
   const ftx = floorTexture(F);   // the floor's own picture doubles as its relief: dark seams and grout sit lower
   // (a physically based floor: varnished boards and polished tiles throw the flashlight and the lamps back at you)
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(GW * L, GH * L), new THREE.MeshStandardMaterial({ map: ftx, bumpMap: ftx, bumpScale: 2.5,
     roughness: { wood: 0.5, tile: 0.28, concrete: 0.85 }[floorKind(F)], metalness: 0, color: new THREE.Color().setScalar(floorKind(F) === 'tile' ? 2.6 : 1.8) }));
   floor.rotation.x = -Math.PI / 2; floor.position.set(GW * L / 2, 0, GH * L / 2); floor.receiveShadow = true; G.add(floor);
-  const ct = ceilingTexture(F); ct.repeat.set(GW, GH);
-  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(GW * L, GH * L), new THREE.MeshLambertMaterial({ map: ct, bumpMap: ct, bumpScale: 2 }));
-  ceil.rotation.x = Math.PI / 2; ceil.position.set(GW * L / 2, WALL_H, GH * L / 2); G.add(ceil);
-  const faces = [];
-  const wallTx = wallTexture(F);
-  const walls = new THREE.Mesh(wallGeometry(faces), new THREE.MeshLambertMaterial({ map: wallTx, bumpMap: wallTx.userData.bump, bumpScale: 3,
-    vertexColors: true, color: new THREE.Color().setScalar(wallKind(F) === 'tile' ? 2.2 : wallKind(F) === 'attic' ? 1.4 : 1) }));
-  walls.castShadow = walls.receiveShadow = true; G.add(walls); walls.material.userData.wallSurface = true;
-  // the house around the maze: woodwork, doorways, lamps, furniture and props (js/house.js)
+  // the house's shell: from the floor's plan (js/dress.js), the walls at their real heights, the ceilings and their steps and gables,
+  // the mouldings, beams, doorways with their leaves, and the kit's doors, windows, fireplaces and holes (js/arch.js). Without those
+  // files (or if the plan fails) the old flat walls and ceiling stand in
+  const plan = floorPlan();
+  let faces, walls = null, ceil = null, wallMat;
+  if (plan) { level.plan = plan; faces = plan.faces; wallMat = buildArch(F, plan, G).wall; }
+  else {
+    const ct = ceilingTexture(F); ct.repeat.set(GW, GH);
+    ceil = new THREE.Mesh(new THREE.PlaneGeometry(GW * L, GH * L), new THREE.MeshLambertMaterial({ map: ct, bumpMap: ct, bumpScale: 2 }));
+    ceil.rotation.x = Math.PI / 2; ceil.position.set(GW * L / 2, WALL_H, GH * L / 2); G.add(ceil);
+    faces = [];
+    const wallTx = wallTexture(F);
+    walls = new THREE.Mesh(wallGeometry(faces), new THREE.MeshLambertMaterial({ map: wallTx, bumpMap: wallTx.userData.bump, bumpScale: 3,
+      vertexColors: true, color: new THREE.Color().setScalar(wallKind(F) === 'tile' ? 2.2 : wallKind(F) === 'attic' ? 1.4 : 1) }));
+    walls.castShadow = walls.receiveShadow = true; G.add(walls); walls.material.userData.wallSurface = true; wallMat = walls.material;
+  }
+  // the house around the maze: lamps, furniture and props (js/house.js; without the plan its woodwork and doorways too)
   const pzFaces = puzzleFaces(), onPuzzleFace = f => pzFaces.has(f.x + ',' + f.y + ',' + f.nx + ',' + f.nz);   // (walls with a labyrinth box)
   const keep = new Set([...closets.map(c => Math.floor(c.x / T) + ',' + Math.floor(c.y / T)), exit.tx + ',' + exit.ty]);
-  level.house = House.build(THREE, { style: F.style, L, H: WALL_H, GW, GH, isWall, faces, keep, wallMat: walls.material, hash, toTex, glowTex, exitFace: faces.find(isExitFace), doll: dollTemplate || null,
-    decorFace: f => onPuzzleFace(f) || hash(f.x * 7 + f.nx, f.y * 7 + f.nz, 91) < F.frames + 0.045, quality: settings.quality, lowq: LOWQ });
+  level.house = House.build(THREE, { style: F.style, L, H: WALL_H, GW, GH, isWall, faces, keep, wallMat, hash, toTex, glowTex, doll: dollTemplate || null,
+    exitFace: plan ? null : faces.find(isExitFace), arch: !!plan, doorKeys: plan ? plan.doorKeys : null, ceilXZ: plan && typeof ceilAtXZ === 'function' ? ceilAtXZ : null,
+    ceilKeep: plan ? new Set(plan.modules.filter(m => m.face < 0 && m.kind !== 'ceilingrose').map(m => m.x + ',' + m.y)) : null,
+    decorFace: plan ? f => f.busy.includes('decor') || f.busy.includes('puzzle') : f => onPuzzleFace(f) || hash(f.x * 7 + f.nx, f.y * 7 + f.nz, 91) < F.frames + 0.045,
+    quality: settings.quality, lowq: LOWQ });
   G.add(level.house.group);
   if (level.house.beam) { level.house.beam.position.copy(flash.position); camera.add(level.house.beam); }
-  wallDecor(G, F, faces, level.house.doorTiles, f => onPuzzleFace(f) || isExitFace(f));   // (no picture on the exit door's wall)
+  wallDecor(G, F, faces, level.house.doorTiles, f => onPuzzleFace(f) || isExitFace(f), plan);   // (no picture on the exit door's wall)
   const wt = wardrobeMaterials();
   for (const c of closets) G.add(makeWardrobe(c, wt));
-  makeExit(G);
+  if (!kitExit(level, level.archKit)) makeExit(G);
   // the furniture you bump into (SOLIDS, js/layout.js): grey boxes of its exact size, so nothing solid is ever invisible (H5), until
   // the Blender kit's models are wired in here (js/kit.js furnishes with them when given the kit)
   if (typeof Kit !== 'undefined') Kit.furnish(level, { style: F.style, floorIdx }, { kit: null, evict: false });
@@ -63,6 +76,102 @@ function buildLevel() {
   if (boardsTemplate) for (const b of creaks) G.add(makeBoard(b));    // (the loose floorboards, in 3D; otherwise painted on the floor)
   level.prints = makePrints(); G.add(level.prints);
   scene.add(G);
+}
+
+/* ---------- the house's shell from the floor's plan (js/dress.js, js/arch.js, spec E2 step 3-4) ---------- */
+function floorPlan() {
+  if (typeof Dress === 'undefined' || typeof Arch === 'undefined' || typeof LightBaker === 'undefined') return null;
+  try { return Dress.plan(Dress.envFromGame()); } catch (e) { console.error('Dress.plan', e); return null; }
+}
+const BAKE_TIER = { low: 'lo', medium: 'md', high: 'hi' };
+// Builds the shell with the floor's kit when it has loaded (Kit.get: doors, windows, fireplaces, holes, the exit's porch), else with
+// procedural doorways and every face kept (E7); a kit that arrives during the floor rebuilds the shell alone (lateKit). Returns the materials.
+function buildArch(F, plan, G) {
+  const kit = typeof Kit !== 'undefined' ? Kit.get(F.style) : null, B = Dress.bakeInput(plan, Dress.envFromGame());
+  // (the wall faces' cells in the light atlas, uv1: the same ones LightBaker.bake will give, for the bake's tier)
+  const tier = BAKE_TIER[settings.quality] || 'lo', atlas = LightBaker.packAtlas(B.faces, tier, LightBaker.faceHeights(B, B.faces));
+  const materials = archMaterials(F, plan);
+  level.archOpts = { bake: B, cells: atlas.cells, tier, materials, windows: true };
+  level.arch = Arch.build(plan, kit, level.archOpts); level.archKit = kit;
+  G.add(level.arch.group);
+  if (typeof Kit !== 'undefined') {
+    // this floor's kit and the next floor's stay; in multiplayer every floor still ahead (E4, E5)
+    const next = FLOORS[floorIdx + 1], keep = [F.style, next && next.style].concat(MP.on ? FLOORS.slice(floorIdx).map(q => q.style) : []);
+    Kit.evict(keep.filter(Boolean));
+    if (next) Kit.want(next.style);                        // (fetched while you play this one)
+    const lv = level;
+    if (!kit) Kit.want(F.style).then(k => { if (k && level === lv && !lv.archKit) lateKit(lv, k); });
+  }
+  return materials;
+}
+// The floor's kit came after the floor was built (multiplayer, a slow connection): the shell again with it, compiled off screen first
+// (no stutter, H13), then swapped in. Nothing else is rebuilt: the boards, the paintings and scares.doll stay (E4, brief B11).
+function lateKit(lv, kit) {
+  const A = Arch.build(lv.plan, kit, lv.archOpts);
+  const swap = () => {
+    if (level !== lv || lv.archKit) { A.dispose(); return; }
+    lv.arch.dispose(); lv.arch = A; lv.archKit = kit; lv.group.add(A.group);
+    const old = lv.door;
+    if (old && !old.kit && kitExit(lv, kit)) {               // (the kit's exit door in place of the painted one, open if it was)
+      for (const m of [old.door, old.lamp]) { if (m.parent) m.parent.remove(m); m.geometry.dispose(); }
+      for (const m of new Set([old.lockedMat, old.openMat, old.lamp.material])) { if (m.map) m.map.dispose(); if (m.bumpMap) m.bumpMap.dispose(); m.dispose(); }
+      if (old.open) lv.door.setOpen(true, 10);
+    }
+    lv.compiled = false;
+  };
+  if (renderer.compileAsync) renderer.compileAsync(A.group, camera, scene).then(swap, swap); else swap();
+}
+// the kit's exit (Kit.exit: its porch, the leaf that swings out, the boards that drop, the lamp) on the plan's exit face -> level.door
+function kitExit(lv, kit) {
+  if (!kit || !lv.plan || typeof Kit === 'undefined') return false;
+  const ex = Kit.exit(lv.plan.style, { plan: lv.plan, kit, wallMat: lv.archOpts.materials.wall, wallCells: lv.archOpts.cells, bakeTier: lv.archOpts.tier, level: lv });
+  if (!ex) return false;
+  lv.group.add(ex.group); lv.door = ex.door; exitLight.position.copy(ex.door.lightPos);
+  return true;
+}
+// The shell's materials: painted stand-ins at once, the surfaces baked in Blender (textures/surf/<style>/, B9) swapped into the same
+// materials when they've loaded (no rebuild), at the tier Kit.tierFor picks (lo on Low, with the lighter Lambert materials).
+function archMaterials(F, plan) {
+  const low = settings.quality === 'low', style = F.style;
+  const lit = o => { if (!low) return new THREE.MeshStandardMaterial(Object.assign({ roughness: 0.85, metalness: 0 }, o));
+    const q = Object.assign({}, o); delete q.roughness; return new THREE.MeshLambertMaterial(q); };
+  const col = c => new THREE.Color(c);
+  // (the painted wallpaper is one wall tile wide: repeated twice, so the variant trick's half-width u (u / 2 + variant / 2) covers it once)
+  const wt = wallTexture(F); wt.repeat.set(2, 1); wt.userData.bump.repeat.set(2, 1);
+  const ct = ceilingTexture(F);
+  const wood = { wood: '#a39680', tile: '#3a2616', concrete: '#3a2c20', attic: '#3a2a1c', workshop: '#2a1d14' }[style];
+  const M = {
+    wall: new THREE.MeshLambertMaterial({ map: wt, bumpMap: wt.userData.bump, bumpScale: 3, color: new THREE.Color().setScalar(wallKind(F) === 'tile' ? 2.2 : wallKind(F) === 'attic' ? 1.4 : 1) }),
+    upper: new THREE.MeshLambertMaterial({ color: col(F.face) }),
+    service: new THREE.MeshLambertMaterial({ color: col(F.face) }),
+    ceiling: lit({ map: ct, bumpMap: ct, bumpScale: 2 }),
+    trim: lit({ color: col({ wood: '#9e927e', tile: '#3b2718', concrete: '#3a3631', attic: '#2e2218', workshop: '#2a1d14' }[style]), roughness: 0.55 }),
+    beam: lit({ color: col('#3a2a1c') }), ibeam: lit({ color: col('#34302c'), roughness: 0.6 }),
+    frame: lit({ color: col(wood), roughness: 0.7 }), leaf: lit({ color: col(wood), roughness: 0.7 }),
+    glass: lit({ color: 0x9db0c4, transparent: true, opacity: 0.18, depthWrite: false, roughness: 0.06 }),
+    sky: new THREE.MeshBasicMaterial({ color: 0x0b1530, fog: false }),            // (E7: no sky yet -> flat dark blue)
+  };
+  M.header = M.wall;                                       // (the wall above a doorway: look A of the wallpaper, Arch gives it u / 2)
+  const lv = level, tier = surfTier();
+  // a part's baked set into its materials: copies of the cached pictures, repeated as the part's uv needs (the level's own, freed with it)
+  const swap = (part, mats, rx, nx, clampV) => bakedSet(style, part, tier).then(s => {
+    if (!s || level !== lv) return;
+    const rep = (t, x) => { const c = t.clone(); c.repeat.set(x, 1); if (clampV) c.wrapT = 1001; c.needsUpdate = true; return c; };   // (1001: ClampToEdgeWrapping)
+    for (const m of mats) {
+      for (const k of ['map', 'bumpMap']) if (m[k]) m[k].dispose();
+      const orh = rep(s.orh, nx);
+      m.map = rep(s.map, rx); m.normalMap = rep(s.normalMap, nx); m.bumpMap = null; m.aoMap = orh;
+      if (m.isMeshStandardMaterial) { m.roughnessMap = orh; m.roughness = 1; }
+      m.color.setScalar(part === 'wall' || part === 'upper' || part === 'service' ? 1.1 : 1); m.needsUpdate = true;
+    }
+  });
+  // the wall's colour holds looks A and B side by side (uv0 u = u / 2 + variant / 2 from Arch): colour repeat 1, the relief (one look
+  // wide) repeat 2 across, which recovers the face's u
+  swap('wall', [M.wall], 1, 2); swap('upper', [M.upper], 1, 1); swap('service', [M.service], 1, 1); swap('ceil', [M.ceiling], 1, 1);
+  swap('trim', [M.trim], 1, 1, true);
+  if (plan.beams.some(b => b.kind !== 'ibeam')) swap('beam', [M.beam], 1, 1);
+  if (plan.beams.some(b => b.kind === 'ibeam')) swap('ibeam', [M.ibeam], 1, 1);
+  return M;
 }
 
 /* ---------- the surfaces baked in Blender (textures/surf/<style>/, made by tools/blender/kit/surfaces2.py) ----------
@@ -116,7 +225,8 @@ function upgradeSurfaces(F, floorMat, G, walls, faces, ceil) {
     };
     floorMat.customProgramCacheKey = () => 'floorOverlay'; floorMat.needsUpdate = true;
   });
-  bakedSet(style, 'wall', tier).then(s => {
+  // (the walls and ceiling below are the old flat ones, used only without the plan: archMaterials dresses the shell built from it)
+  if (walls) bakedSet(style, 'wall', tier).then(s => {
     if (!s || level !== lv) return;
     // each wall face picks look A or B: its u moves into the left or the right half of the colour picture. The normal and
     // orh pictures hold one tile only (both looks share the relief), so they repeat twice across, which undoes the halving.
@@ -131,7 +241,7 @@ function upgradeSurfaces(F, floorMat, G, walls, faces, ceil) {
       m.map = rep(s.map, own ? 1 : 0.5, 1); m.normalMap = rep(s.normalMap, own ? 2 : 1, 1); m.bumpMap = null; m.color.setScalar(1.1); m.needsUpdate = true; }
     for (const t of painted) if (t) t.dispose();
   });
-  bakedSet(style, 'ceil', tier).then(s => {
+  if (ceil) bakedSet(style, 'ceil', tier).then(s => {
     if (!s || level !== lv) return;
     const old = ceil.material;                            // (painted and flat-shaded: now a real plaster/board ceiling that takes the flashlight)
     ceil.material = new THREE.MeshStandardMaterial({ map: rep(s.map, GW, GH), normalMap: rep(s.normalMap, GW, GH), roughnessMap: rep(s.orh, GW, GH), roughness: 1, metalness: 0 });
@@ -406,7 +516,7 @@ function wallGeometry(faces) {
 // doll portraits (some with glowing eyes) and words written on the walls. Some portraits are more than paint:
 //   watchers - bigger, with real glass eyes that turn to follow you
 //   changers - look away from one you've been looking at, and when you look back it isn't the same picture any more
-function wallDecor(G, F, faces, doorTiles, skip) {
+function wallDecor(G, F, faces, doorTiles, skip, plan) {
   const plain = portraitTexture(false), eyed = portraitTexture(true), eyeGlow = portraitEyes();
   level.paintings = [];
   const wGeoBig = new THREE.PlaneGeometry(0.66, 0.84), wMat = new THREE.MeshLambertMaterial({ map: portraitTexture('sockets') });
@@ -425,31 +535,47 @@ function wallDecor(G, F, faces, doorTiles, skip) {
   const eyeAt = k => P ? [P.eyes[k][0] * 1.5, P.eyes[k][1] * 1.5] : [k ? 0.0464 : -0.0464, 0.0307];   // (the watcher's frame is 1.5 times the size)
   const glowDot = P && new THREE.MeshBasicMaterial({ color: new THREE.Color(0x9fe6ff).multiplyScalar(2.5) }), dotGeo = P && new THREE.CircleGeometry(0.009, 12);
   const words = {};
-  const exitFace = f => f.x === exit.tx && f.y === exit.ty;
-  const inWardrobe = new Set(closets.map(c => Math.floor(c.x / T) + ',' + Math.floor(c.y / T)));   // (nothing on the walls of a wardrobe's dead end: it would hang inside it)
-  faces.forEach((f, i) => {
-    if (exitFace(f) || inWardrobe.has(f.x + ',' + f.y) || (doorTiles && doorTiles.has(f.x + ',' + f.y)) || (skip && skip(f))) return;
-    const r = hash(f.x * 7 + f.nx, f.y * 7 + f.nz, 91), cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2, rot = Math.atan2(f.nx, f.nz);
-    if (r < F.frames) {
-      // (a few of each per floor: every pair of eyes is extra drawing)
-      const kind = hash(f.x, f.y, 97), nw = level.paintings.filter(q => q.kind === 'watch').length, nc = level.paintings.length - nw;
-      const watch = kind < 0.3 && nw < 6, glow = hash(f.x, f.y, 98) > 0.55;
-      const m = new THREE.Mesh(watch ? wGeoBig : pGeo, watch ? wMat : glow ? eMat : pMats ? pMats[(hash(f.x, f.y, 99) * 3) | 0] : pMat);
-      if (P && glow && !watch) for (const k of [0, 1]) { const d = new THREE.Mesh(dotGeo, glowDot); d.position.set(P.eyes[k][0], P.eyes[k][1], 0.002); m.add(d); }   // (glowing eyes)
-      m.position.set(cx + f.nx * 0.015, watch ? 1.66 : 1.72, cz + f.nz * 0.015); m.rotation.y = rot; G.add(m);
+  // what hangs where: the plan's decorFaces (js/dress.js: the same rule, never on a doorway, a wardrobe's dead end, the exit, a module,
+  // a window or a servant corridor, and never behind tall furniture); without the plan, the rule here on the old faces
+  let list;
+  if (plan) list = plan.decorFaces.map(d => ({ f: faces[d.face], kind: d.kind, watch: d.watch, glow: d.glow, change: d.change, pick: d.pick, text: d.text, y: d.y, rz: d.rz }));
+  else {
+    list = [];
+    const exitFace = f => f.x === exit.tx && f.y === exit.ty;
+    const inWardrobe = new Set(closets.map(c => Math.floor(c.x / T) + ',' + Math.floor(c.y / T)));   // (nothing on the walls of a wardrobe's dead end: it would hang inside it)
+    let nw = 0, nc = 0;
+    faces.forEach(f => {
+      if (exitFace(f) || inWardrobe.has(f.x + ',' + f.y) || (doorTiles && doorTiles.has(f.x + ',' + f.y)) || (skip && skip(f))) return;
+      const r = hash(f.x * 7 + f.nx, f.y * 7 + f.nz, 91);
+      if (r < F.frames) {
+        // (a few of each per floor: every pair of eyes is extra drawing)
+        const kind = hash(f.x, f.y, 97), watch = kind < 0.3 && nw < 6, glow = hash(f.x, f.y, 98) > 0.55, change = !watch && !glow && kind > 0.55 && nc < 6;
+        if (watch) nw++; else if (change) nc++;
+        list.push({ f, kind: 'portrait', watch, glow, change, pick: (hash(f.x, f.y, 99) * 3) | 0, y: watch ? 1.66 : 1.72 });
+      } else if (r < F.frames + 0.045) list.push({ f, kind: 'word', text: DECAL_WORDS[(hash(f.x, f.y, 92) * DECAL_WORDS.length) | 0], y: 1.2 + hash(f.x, f.y, 93) * 0.6, rz: (hash(f.x, f.y, 94) - 0.5) * 0.25 });
+    });
+  }
+  for (const d of list) {
+    const f = d.f; if (!f) continue;
+    const cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2, rot = Math.atan2(f.nx, f.nz);
+    if (d.kind === 'portrait') {
+      const watch = d.watch, glow = d.glow;
+      const m = new THREE.Mesh(watch ? wGeoBig : pGeo, watch ? wMat : glow ? eMat : pMats ? pMats[d.pick % 3] : pMat);
+      if (P && glow && !watch) for (const k of [0, 1]) { const q = new THREE.Mesh(dotGeo, glowDot); q.position.set(P.eyes[k][0], P.eyes[k][1], 0.002); m.add(q); }   // (glowing eyes)
+      m.position.set(cx + f.nx * 0.015, d.y, cz + f.nz * 0.015); m.rotation.y = rot; G.add(m);
       if (watch) {               // (eye positions: where the eyes are painted in portraitTexture, scaled to this frame)
         const eyes = [makeEye(...eyeAt(0)), makeEye(...eyeAt(1))]; m.add(...eyes);
         level.paintings.push({ kind: 'watch', mesh: m, eyes, x: (cx + f.nx * 0.3) / S, y: (cz + f.nz * 0.3) / S });
-      } else if (!glow && kind > 0.55 && nc < 6) level.paintings.push({ kind: 'change', mesh: m, mat: cMat, x: (cx + f.nx * 0.3) / S, y: (cz + f.nz * 0.3) / S, seen: false, away: 0, changed: false });
-    } else if (r < F.frames + 0.045) {
-      const txt = DECAL_WORDS[(hash(f.x, f.y, 92) * DECAL_WORDS.length) | 0];
+      } else if (d.change) level.paintings.push({ kind: 'change', mesh: m, mat: cMat, x: (cx + f.nx * 0.3) / S, y: (cz + f.nz * 0.3) / S, seen: false, away: 0, changed: false });
+    } else {
+      const txt = d.text || DECAL_WORDS[0];
       const mat = words[txt] || (words[txt] = new THREE.MeshLambertMaterial({ map: wordTexture(txt), transparent: true, depthWrite: false,
         polygonOffset: true, polygonOffsetFactor: -1 }));
       const m = new THREE.Mesh(wGeo, mat);
-      m.position.set(cx + f.nx * 0.01, 1.2 + hash(f.x, f.y, 93) * 0.6, cz + f.nz * 0.01); m.rotation.y = rot; m.rotation.z = (hash(f.x, f.y, 94) - 0.5) * 0.25;
+      m.position.set(cx + f.nx * 0.01, d.y, cz + f.nz * 0.01); m.rotation.y = rot; m.rotation.z = d.rz || 0;
       G.add(m);
     }
-  });
+  }
 }
 // the paintings on every frame: watchers' eyes turn towards you; a changer you looked at, then looked away from, changes
 function updatePaintings(dt) {

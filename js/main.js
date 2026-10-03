@@ -38,6 +38,8 @@ function frame(now) {
 init3D(); renderer.info.autoReset = false;
 addEventListener('resize', resize); resize(); applySettings();
 loadBarbi(); loadDollTemplate(); loadBoardsTemplate(); loadPortraits();
+if (typeof Kit !== 'undefined' && renderer) Kit.preload(['common', FLOORS[0].style]);   // (the first floor's doors, windows, exit: js/kit.js, E4)
+if (typeof Arch !== 'undefined') FLOORS.forEach(F => Arch.loadProfiles(F.style));       // (the mouldings' profiles from Blender, tiny: js/arch.js)
 loadBest(); updateRejoinBtn();
 startAccount();                                          // (sign in, or play as a guest: js/account.js)
 requestAnimationFrame(frame);

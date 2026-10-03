@@ -8,7 +8,10 @@
      workshop - green-shaded lamps, workbenches covered in doll parts, shelves of doll heads, dress forms, dolls hanging on strings
    Usage: const h = House.build(THREE, env); scene.add(h.group); every frame: h.update(dt, t, camera, player);
    env: { style, L (tile, m), H (wall height), GW, GH, isWall(x,y), faces, keep (Set of 'x,y' tiles to leave empty),
-          wallMat, hash, toTex, glowTex, quality: 'low'|'medium'|'high', lowq (true on phones) } */
+          wallMat, hash, toTex, glowTex, quality: 'low'|'medium'|'high', lowq (true on phones),
+          arch (js/arch.js built the shell: no woodwork or doorways here; faces are the plan's, js/dress.js), doorKeys (the plan's
+          doorway tiles 'x,y'), ceilXZ(xm, zm) (the ceiling's height there; else H everywhere), ceilKeep (Set of 'x,y' tiles whose
+          ceiling has a skylight, a hole or the loft ladder: nothing hangs there) } */
 (function () {
 'use strict';
 
@@ -69,7 +72,9 @@ function build(THREE, env) {
   const tex = (c, rep) => env.toTex(c, rep);
   const cellOf = f => f.x + ',' + f.y;
   // a wall side that already has something on it (a picture, the exit, a wardrobe, a door frame) gets no lamp or furniture
-  const busy = f => env.keep.has(cellOf(f)) || doorTiles.has(cellOf(f)) || (env.decorFace && env.decorFace(f));
+  // (and with the plan: a face a module or window replaces, or a servant corridor's wall standing 0.30 m proud: f.skip, f.inset)
+  const busy = f => env.keep.has(cellOf(f)) || doorTiles.has(cellOf(f)) || f.skip || f.inset || (env.decorFace && env.decorFace(f));
+  const ceilXZ = env.ceilXZ || (() => H);
   const P = {                                           // per floor: colours of the woodwork and the lamps
     wood:     { trim: '#9e927e', rail: '#8f8470', lamp: 0xffc9b8, shade: '#f2b8c6', light: 0xffc0a8 },
     tile:     { trim: '#3b2718', rail: '#2f1f13', lamp: 0xffcf8a, shade: '#e6c07a', light: 0xffc47a },
@@ -98,7 +103,7 @@ function build(THREE, env) {
     }
     trim.box(len + 0.02, y1 - y0, d, cx + f.nx * d / 2, (y0 + y1) / 2, cz + f.nz * d / 2, ry);
   };
-  for (const f of faces) {
+  if (!env.arch) for (const f of faces) {             // (with the plan, js/arch.js sweeps the style's mouldings itself)
     if (style === 'concrete') strip(f, 0, 0.1, 0.04);    // (a concrete curb in the basement)
     else if (style === 'attic') strip(f, 0, 0.09, 0.02);  // (a plain floor board)
     else { strip(f, 0, 0.16, 0.026); strip(f, 0.155, 0.175, 0.034); }
@@ -107,16 +112,17 @@ function build(THREE, env) {
     if (style === 'workshop') strip(f, 0.93, 0.97, 0.05);
     if (style !== 'concrete' && style !== 'attic') strip(f, H - 0.12, H, 0.1, true);
   }
-  if (env.exitFace) {                                       // a proper frame round the exit door
+  if (env.exitFace && !env.arch) {                          // a proper frame round the exit door
     const f = env.exitFace, tx = f.x1 - f.x0, tz = f.z1 - f.z0, tl = Math.hypot(tx, tz), cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2, ry = Math.atan2(f.nx, f.nz);
     for (const s of [-1, 1]) trim.box(0.11, 2.42, 0.05, cx + tx / tl * s * 0.63 + f.nx * 0.025, 1.21, cz + tz / tl * s * 0.63 + f.nz * 0.025, ry);
     trim.box(1.37, 0.13, 0.055, cx + f.nx * 0.0275, 2.4, cz + f.nz * 0.0275, ry);
   }
 
   /* ---------- doorways: between the rooms of the maze, a framed opening with a header wall above it ---------- */
-  const frame = new Merge(THREE), header = new Merge(THREE), doorTiles = new Set();
+  // (with the plan, js/arch.js draws them, frames, leaves and headers, on the plan's doorway tiles: those are the ones kept clear here)
+  const frame = new Merge(THREE), header = new Merge(THREE), doorTiles = new Set(env.arch ? env.doorKeys || [] : []);
   const DOOR_H = 2.6;                                     // (she is tall: her head clears it)
-  for (let y = 1; y < env.GH - 1; y++) for (let x = 1; x < env.GW - 1; x++) {
+  if (!env.arch) for (let y = 1; y < env.GH - 1; y++) for (let x = 1; x < env.GW - 1; x++) {
     if (isWall(x, y) || (x + y) % 2 === 0) continue;       // (connecting tiles sit between the maze's cells)
     const ns = isWall(x - 1, y) && isWall(x + 1, y), ew = isWall(x, y - 1) && isWall(x, y + 1);
     if (!ns && !ew) continue;
@@ -129,8 +135,9 @@ function build(THREE, env) {
     frame.box(L, 0.12, 0.34, cx, DOOR_H + 0.03, cz, ry);
   }
   const frameMat = std({ map: tex(woodCanvas({ wood: '#a39680', tile: '#3a2616', concrete: '#3a2c20', attic: '#3a2a1c', workshop: '#2a1d14' }[style], 64, 256, true), true), roughness: 0.7 });
-  const headerMat = env.wallMat.clone(); headerMat.vertexColors = false; headerMat.userData = { wallSurface: true };   // (the walls' own corner shading doesn't apply here)
-  [trim.mesh(trimMat, false), frame.mesh(frameMat, true), header.mesh(headerMat, true)].forEach(m => { if (m) group.add(m); });
+  const headerMat = env.arch ? null : env.wallMat.clone(); if (headerMat) { headerMat.vertexColors = false; headerMat.userData = { wallSurface: true }; }   // (the walls' own corner shading doesn't apply here)
+  [trim.mesh(trimMat, false), frame.mesh(frameMat, true), headerMat && header.mesh(headerMat, true)].forEach(m => { if (m) group.add(m); });
+  for (const m of [trimMat, frameMat]) if (!group.children.some(o => o.material === m)) { if (m.map) m.map.dispose(); m.dispose(); }   // (unused with the plan)
 
   /* ---------- lamps ---------- */
   const fixMetal = std({ color: style === 'concrete' ? 0x2a2622 : 0x8a6a2e, metalness: 0.8, roughness: 0.35 });
@@ -172,11 +179,12 @@ function build(THREE, env) {
   const shades = new Merge(THREE);
   if (bulbs) {                                            // lamps hanging from the ceiling: bare bulbs, or (workshop) under a green metal shade
     for (let y = 1; y < env.GH; y += 2) for (let x = 1; x < env.GW; x += 2) {
-      if (isWall(x, y) || hash(x, y, 97) > (style === 'workshop' ? 0.36 : 0.3)) continue;
-      const cx = (x + 0.5) * L, cz = (y + 0.5) * L;
-      fixStatic.box(0.008, 0.55, 0.008, cx, H - 0.27, cz, 0); fixStatic.box(0.05, 0.05, 0.05, cx, H - 0.56, cz, 0);
-      if (style === 'workshop') { const g = new THREE.CylinderGeometry(0.05, 0.24, 0.16, 16, 1, true); shades.add(g, new THREE.Matrix4().makeTranslation(cx, H - 0.64, cz)); }
-      addFixture(cx, H - 0.63, cz, 'bulb');
+      if (isWall(x, y) || hash(x, y, 97) > (style === 'workshop' ? 0.36 : 0.3) || (env.ceilKeep && env.ceilKeep.has(x + ',' + y))) continue;
+      // (hung from this tile's ceiling: the drop is min(0.63, h - 2.35), so the bulb never comes below 2.35 m, spec A10)
+      const cx = (x + 0.5) * L, cz = (y + 0.5) * L, h = ceilXZ(cx, cz), dr = Math.max(0.2, Math.min(0.63, h - 2.35));
+      fixStatic.box(0.008, dr - 0.08, 0.008, cx, h - (dr - 0.08) / 2, cz, 0); fixStatic.box(0.05, 0.05, 0.05, cx, h - dr + 0.07, cz, 0);
+      if (style === 'workshop') { const g = new THREE.CylinderGeometry(0.05, 0.24, 0.16, 16, 1, true); shades.add(g, new THREE.Matrix4().makeTranslation(cx, h - dr - 0.01, cz)); }
+      addFixture(cx, h - dr, cz, 'bulb');
     }
   }
   const shm = shades.mesh(std({ color: 0x2f5a36, metalness: 0.5, roughness: 0.45, side: THREE.DoubleSide }), false); if (shm) group.add(shm);
@@ -239,14 +247,16 @@ function build(THREE, env) {
   if (style === 'concrete') {
     const pipes = new Merge(THREE);
     for (const f of faces) {
-      const len = Math.hypot(f.x1 - f.x0, f.z1 - f.z0), cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2;
+      // (not through a doorway's frame and leaves, a module or the exit; under the tile's own ceiling: ceil - 0.38 and - 0.22, spec A10)
+      if (env.arch && (doorTiles.has(cellOf(f)) || f.skip || f.inset || env.keep.has(cellOf(f)))) continue;
+      const len = Math.hypot(f.x1 - f.x0, f.z1 - f.z0), cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2, fh = env.arch ? f.h || H : H;
       const along = new THREE.Vector3(f.x1 - f.x0, 0, f.z1 - f.z0).normalize();
       const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), along);
-      for (const [h, r, d] of [[2.62, 0.055, 0.12], [2.78, 0.035, 0.09]]) {
-        if (hash(f.x, f.y, 140 + h * 10) > 0.8) continue;
+      for (const [h, r, d, k] of [[env.arch ? fh - 0.38 : 2.62, 0.055, 0.12, 166], [env.arch ? fh - 0.22 : 2.78, 0.035, 0.09, 167]]) {
+        if (hash(f.x, f.y, k) > 0.8) continue;
         pipes.add(new THREE.CylinderGeometry(r, r, len + 0.02, 10), new THREE.Matrix4().compose(new THREE.Vector3(cx + f.nx * d, h, cz + f.nz * d), q, new THREE.Vector3(1, 1, 1)));
       }
-      if (hash(f.x, f.y, 150) < 0.12) pipes.add(new THREE.CylinderGeometry(0.045, 0.045, H, 10), new THREE.Matrix4().makeTranslation(cx + f.nx * 0.1, H / 2, cz + f.nz * 0.1));
+      if (hash(f.x, f.y, 150) < 0.12) pipes.add(new THREE.CylinderGeometry(0.045, 0.045, fh, 10), new THREE.Matrix4().makeTranslation(cx + f.nx * 0.1, fh / 2, cz + f.nz * 0.1));
     }
     const pm = pipes.mesh(std({ map: tex(rustCanvas(), true), metalness: 0.55, roughness: 0.55 }), true); if (pm) group.add(pm);
   }
@@ -325,10 +335,11 @@ function build(THREE, env) {
     const tm = trunks.mesh(std({ map: tex(crateCanvas()), color: 0x8a6a4a, roughness: 0.7 }), true); if (tm) group.add(tm);
     // cobwebs across the top corners
     const web = std({ map: tex(webCanvas()), transparent: true, alphaTest: 0.1, side: THREE.DoubleSide, roughness: 1, depthWrite: false });
-    for (const f of faces) { if (hash(f.x * 5 + f.nx, f.y * 5 + f.nz, 196) > 0.14) continue;
+    for (const f of faces) { if (hash(f.x * 5 + f.nx, f.y * 5 + f.nz, 196) > 0.14 || f.inset) continue;
       const w = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.7), web), end = hash(f.x, f.y, 197) < 0.5 ? 0 : 1;
       const ex = end ? f.x1 : f.x0, ez = end ? f.z1 : f.z0, tx = f.x1 - f.x0, tz = f.z1 - f.z0, tl = Math.hypot(tx, tz);
-      w.position.set(ex - (end ? 1 : -1) * tx / tl * 0.25 + f.nx * 0.25, H - 0.25, ez - (end ? 1 : -1) * tz / tl * 0.25 + f.nz * 0.25);
+      const wx = ex - (end ? 1 : -1) * tx / tl * 0.25 + f.nx * 0.25, wz = ez - (end ? 1 : -1) * tz / tl * 0.25 + f.nz * 0.25;
+      w.position.set(wx, ceilXZ(wx, wz) - 0.25, wz);
       w.rotation.set(0, Math.atan2(f.nx, f.nz) + (end ? -1 : 1) * Math.PI / 4, 0); group.add(w); }
   }
   if (style === 'workshop') {
@@ -368,8 +379,8 @@ function build(THREE, env) {
       g.position.set(p.x, 0, p.z); g.rotation.y = p.ry; group.add(g); }
     // dolls hanging from the ceiling on strings, in some rooms
     for (let y = 1; y < env.GH; y += 2) for (let x = 1; x < env.GW; x += 2) {
-      if (isWall(x, y) || env.keep.has(x + ',' + y) || hash(x, y, 250) > 0.12 * dens) continue;
-      const pivot = new THREE.Group(); pivot.position.set((x + 0.5 + (hash(x, y, 251) - 0.5) * 0.4) * L, H, (y + 0.5 + (hash(x, y, 252) - 0.5) * 0.4) * L);
+      if (isWall(x, y) || env.keep.has(x + ',' + y) || hash(x, y, 250) > 0.12 * dens || (env.ceilKeep && env.ceilKeep.has(x + ',' + y))) continue;
+      const px = (x + 0.5 + (hash(x, y, 251) - 0.5) * 0.4) * L, pz = (y + 0.5 + (hash(x, y, 252) - 0.5) * 0.4) * L, pivot = new THREE.Group(); pivot.position.set(px, ceilXZ(px, pz), pz);
       const len = 0.9 + hash(x, y, 253) * 0.4, str = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, len, 3), metal); str.position.y = -len / 2; pivot.add(str);
       const d = makeDoll(THREE, env, { x: 0, z: 0, ry: 0, y: 0 }, x * 7 + y);
       d.obj.position.set(0, -len - 0.45, 0); d.obj.rotation.set(0, hash(x, y, 254) * 6, 0); pivot.add(d.obj);

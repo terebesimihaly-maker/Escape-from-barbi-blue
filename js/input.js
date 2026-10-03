@@ -219,7 +219,27 @@ const fmtTime = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padSt
 $('play').onclick = () => { unlockAudio(); renderLevels(); openPanel('levels'); };
 function playFloor(i) {
   if (!unlocked(i)) return;
-  closePanel(); primeVoice(); show('title', false); runTime = 0; runFrom = i; startFloor(i); lockMouse();
+  withKit(i, document.querySelector('#lvList button[data-lv="' + i + '"]'), () => {
+    closePanel(); primeVoice(); show('title', false); runTime = 0; runFrom = i; startFloor(i); lockMouse(); });
+}
+// Single player: a floor waits for its kit (js/kit.js: its doors, windows, fireplaces, the exit) before it's built, the button it was
+// started from saying how far the house has loaded; at most 30 s, then it starts anyway (procedural doorways; the kit, when it
+// comes, rebuilds the shell alone: js/level.js lateKit). startFloor itself stays synchronous (the tests call it directly).
+let kitWait = 0;
+function withKit(i, btn, go) {
+  const F = FLOORS[i];
+  if (typeof Kit === 'undefined' || !F || MP.on || Kit.ready(F.style)) { go(); return; }
+  const my = ++kitWait, st = state, label = btn ? btn.innerHTML : '';
+  let done = false;
+  const tick = setInterval(() => { if (btn) btn.textContent = 'Loading the house… ' + Math.round(Kit.progress() * 100) + '%'; }, 250);
+  const finish = () => {
+    if (done) return; done = true; clearInterval(tick); clearTimeout(cap);
+    if (btn) { btn.innerHTML = label; btn.disabled = false; }
+    if (my === kitWait && state === st) go();               // (not if something else was started meanwhile, or you left that screen)
+  };
+  const cap = setTimeout(finish, 30000);
+  if (btn) btn.disabled = true;
+  Promise.all([Kit.want(F.style), typeof Arch !== 'undefined' ? Arch.loadProfiles(F.style) : null]).then(finish, finish);
 }
 function renderLevels() {
   document.querySelectorAll('#diffSeg button').forEach(b => b.classList.toggle('on', b.dataset.d === settings.difficulty));
@@ -243,11 +263,12 @@ function renderLevels() {
   $('lvNotes').textContent = 'Torn notes found: ' + progress.notes.length + ' of ' + NOTES_TOTAL;
 }
 document.querySelectorAll('#diffSeg button').forEach(b => b.onclick = () => { settings.difficulty = b.dataset.d; saveSettings(); renderLevels(); });
-$('retry').onclick = () => { unlockAudio(); stopSong(); show('dead', false); if (MP.on) { showLobby(); return; } startFloor(floorIdx); lockMouse(); };
+$('retry').onclick = () => { unlockAudio(); stopSong(); if (MP.on) { show('dead', false); showLobby(); return; }
+  withKit(floorIdx, $('retry'), () => { show('dead', false); startFloor(floorIdx); lockMouse(); }); };
 $('menu1').onclick = () => { if (MP.on) leaveMP(); toTitle(); };
 $('menu2').onclick = () => { if (ac) ac.resume(); if (MP.on) leaveMP(); toTitle(); };
 $('winLeave').onclick = () => { leaveMP(); toTitle(); };
-$('tGo').onclick = () => { unlockAudio(); show('trans', false); startFloor(floorIdx + 1); lockMouse(); };
+$('tGo').onclick = () => { unlockAudio(); withKit(floorIdx + 1, $('tGo'), () => { show('trans', false); startFloor(floorIdx + 1); lockMouse(); }); };
 $('again').onclick = () => { show('win', false); if (MP.on) { showLobby(); return; } toTitle(); };
 $('pause').onclick = pause;
 $('resume').onclick = () => { show('paused', false); unlockAudio(); if (MP.on) MP.menu = false; else state = 'play'; lockMouse(); };
