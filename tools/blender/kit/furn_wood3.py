@@ -215,4 +215,16 @@ def build_islands(want):
         G = S.Geo(1, 1, False, False); folding_screen(G, M, rnd, (-0.68, 0.52, 0.0), (0.35, -0.45, 0.35), H=1.65)
         scr = F.build_obj('isl_screen', G); new_parts.append(scr)
         roots.append(('Isl_bed_screen', [bed, scr], None, None, None, []))
+    import furn_wood4 as W4
+    if want('isl_tea_party'):
+        G = S.Geo(1, 1, False, False); W4.tea_party(G, W4.tea_materials(), rnd); o = F.build_obj('isl_tea', G); new_parts.append(o)
+        roots.append(('Isl_tea_party', [o], None, None, None, []))
+    if want('isl_dollhouse'):
+        d = append('furn_wood_doll_house', ['Solid_doll_house']); h = d['Solid_doll_house']
+        place(h, (0.0, 0.15, 0.0), scale=(1.13, 1.13, 1.13)); bake_world(h)
+        G = S.Geo(1, 1, False, False); W4.dollhouse_set(G, W4.dh_materials(), rnd); o = F.build_obj('isl_dh', G); new_parts.append(o)
+        roots.append(('Isl_dollhouse', [h, o], None, None, None, []))
+    if want('isl_washstand'):
+        G = S.Geo(1, 1, False, False); W4.washstand_set(G, W4.ws_materials(), rnd); o = F.build_obj('isl_wash', G); new_parts.append(o)
+        roots.append(('Isl_washstand', [o], None, None, None, []))
     return roots, new_parts, M

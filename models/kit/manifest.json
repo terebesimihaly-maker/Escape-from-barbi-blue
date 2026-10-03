@@ -5,27 +5,27 @@
  "axes": "three.js: y up, front +z; aabb [min, max] in metres in the node frame",
  "tiers": {
   "hi": {
-   "wood": 23521116,
+   "wood": 24523224,
    "tile": 10755068,
-   "concrete": 11227500,
-   "attic": 10284316,
-   "workshop": 13140876,
+   "concrete": 11265116,
+   "attic": 10358868,
+   "workshop": 13133704,
    "common": 1079144
   },
   "md": {
-   "wood": 9383872,
+   "wood": 10187420,
    "tile": 4650344,
-   "concrete": 3799400,
-   "attic": 3642736,
-   "workshop": 4615724,
+   "concrete": 3800680,
+   "attic": 3664536,
+   "workshop": 4611144,
    "common": 400152
   },
   "lo": {
-   "wood": 5051680,
+   "wood": 5549680,
    "tile": 2725048,
-   "concrete": 1810740,
-   "attic": 1909600,
-   "workshop": 2486528,
+   "concrete": 1813412,
+   "attic": 1915060,
+   "workshop": 2490104,
    "common": 188652
   }
  },
@@ -2751,7 +2751,7 @@
     [
      1.125,
      3.0,
-     0.02
+     0.0205
     ]
    ],
    "tris": {
@@ -2776,12 +2776,12 @@
     [
      -1.125,
      0.0,
-     -0.1892
+     -0.1905
     ],
     [
      1.125,
      2.678,
-     0.1892
+     0.1905
     ]
    ],
    "tris": {
@@ -2806,12 +2806,12 @@
     [
      -1.125,
      0.0,
-     -0.189
+     -0.1905
     ],
     [
      1.125,
      2.678,
-     0.189
+     0.1905
     ]
    ],
    "tris": {
@@ -2896,12 +2896,12 @@
     [
      -1.125,
      0.0,
-     -0.1885
+     -0.1905
     ],
     [
      1.125,
      2.678,
-     0.1868
+     0.1885
     ]
    ],
    "tris": {
@@ -2925,12 +2925,12 @@
    "aabb": [
     [
      0.0,
-     0.0026,
+     0.0035,
      -0.0225
     ],
     [
      1.0,
-     2.5496,
+     2.5478,
      0.0349
     ]
    ],
@@ -4024,28 +4024,29 @@
    "id": "isl_dollhouse",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_doll_house",
+    "Kit_isl_wood"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.8,
-     0.0,
-     -0.65
+     -0.795,
+     -0.01,
+     -0.645
     ],
     [
-     0.8,
-     1.45,
-     0.65
+     0.795,
+     1.4487,
+     0.645
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 5572,
+    "md": 5572,
+    "lo": 5039
    },
    "slot": "island",
    "foot": [
@@ -4576,28 +4577,28 @@
    "id": "isl_tea_party",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_isl_wood"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.75,
-     0.0,
-     -0.7
+     -0.7508,
+     -0.0021,
+     -0.7007
     ],
     [
-     0.75,
-     0.95,
-     0.7
+     0.7478,
+     0.9509,
+     0.7007
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 17374,
+    "md": 17374,
+    "lo": 5500
    },
    "slot": "island",
    "foot": [
@@ -4739,28 +4740,28 @@
    "id": "isl_washstand",
    "mount": "floor",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_isl_wood"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.7,
+     -0.695,
      0.0,
-     -0.65
+     -0.645
     ],
     [
-     0.7,
+     0.695,
      1.1,
-     0.65
+     0.6504
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 3574,
+    "md": 3574,
+    "lo": 2130
    },
    "slot": "island",
    "foot": [

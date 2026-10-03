@@ -204,7 +204,7 @@ def main():
     if want('pram'): run('pram', [('Solid_pram', 'pram', W2.pram, W2.pram_materials, 19)])
     import furn_wood3 as W3
     if want('nursery_table'): run('nursery_table', [('Solid_nursery_table', 'nursery_table', W3.nursery_table, W3.table_materials, 29)])
-    isl = [k for k in ('isl_crib_rocker', 'isl_twin_cribs', 'isl_bed_screen') if want(k) or want('islands')]
+    isl = [k for k in ('isl_crib_rocker', 'isl_twin_cribs', 'isl_bed_screen', 'isl_tea_party', 'isl_dollhouse', 'isl_washstand') if want(k) or want('islands')]
     if isl: islands(W3, isl)
 
 def islands(W3, ids):
@@ -226,7 +226,15 @@ def islands(W3, ids):
         if o not in roots and o.parent not in roots and o.type in ('EMPTY',): bpy.data.objects.remove(o)
     if '--sheets' in sys.argv: print('sheet', F.sheet('islands_wood', roots, STYLE))
     json.dump({'info': info, 'bake': files['times']['total'] if files else 0}, open(os.path.join(TMP, 'furn_wood_islands.json'), 'w'), indent=1)
-    kitlib.register('furn_wood_islands', roots); print(f'islands: {time.time() - t0:.0f}s', flush=True)
+    # (one registration per island: building some of them again never takes the others out of the kit)
+    blend = os.path.join(TMP, 'furn_wood_islands_' + '_'.join(sorted(r.name[4:] for r in roots)) + '.blend')
+    kitlib.register('furn_wood_islands_tmp', roots, blend=blend)
+    reg = os.path.join(TMP, 'assets', 'furn_wood_islands_tmp.json'); r_ = json.load(open(reg)); os.remove(reg)
+    old = os.path.join(TMP, 'assets', 'furn_wood_islands.json')
+    if os.path.exists(old): os.remove(old)
+    for n in r_['nodes']:
+        e = dict(r_); e['asset'] = 'furn_wood_' + n; e['nodes'] = [n]; json.dump(e, open(os.path.join(TMP, 'assets', f'furn_wood_{n}.json'), 'w'), indent=1)
+    print(f'islands: {time.time() - t0:.0f}s', flush=True)
 
 if __name__ == '__main__':
     main()
