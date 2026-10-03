@@ -1,0 +1,1968 @@
+{
+"version": 1,
+"W": 4096,
+"H": 4096,
+"note": "rect in px of the hi atlas (4096; y down): scale by image width / W for md and lo",
+"decals": [
+{
+"id": "stain_0",
+"rect": [
+3498,
+10,
+364,
+494
+],
+"size_m": [
+0.7,
+0.95
+],
+"kinds": [
+"stain"
+],
+"heights": [
+0.6,
+2.8
+],
+"styles": null
+},
+{
+"id": "stain_1",
+"rect": [
+3498,
+514,
+364,
+494
+],
+"size_m": [
+0.7,
+0.95
+],
+"kinds": [
+"stain"
+],
+"heights": [
+0.6,
+2.8
+],
+"styles": null
+},
+{
+"id": "stain_2",
+"rect": [
+2178,
+515,
+364,
+494
+],
+"size_m": [
+0.7,
+0.95
+],
+"kinds": [
+"stain"
+],
+"heights": [
+0.6,
+2.8
+],
+"styles": null
+},
+{
+"id": "stain_3",
+"rect": [
+2554,
+515,
+364,
+494
+],
+"size_m": [
+0.7,
+0.95
+],
+"kinds": [
+"stain"
+],
+"heights": [
+0.6,
+2.8
+],
+"styles": null
+},
+{
+"id": "stain_4",
+"rect": [
+2930,
+515,
+364,
+494
+],
+"size_m": [
+0.7,
+0.95
+],
+"kinds": [
+"stain"
+],
+"heights": [
+0.6,
+2.8
+],
+"styles": null
+},
+{
+"id": "stain_5",
+"rect": [
+3306,
+1018,
+364,
+494
+],
+"size_m": [
+0.7,
+0.95
+],
+"kinds": [
+"stain"
+],
+"heights": [
+0.6,
+2.8
+],
+"styles": null
+},
+{
+"id": "stain_6",
+"rect": [
+3682,
+1018,
+364,
+494
+],
+"size_m": [
+0.7,
+0.95
+],
+"kinds": [
+"stain"
+],
+"heights": [
+0.6,
+2.8
+],
+"styles": null
+},
+{
+"id": "stain_7",
+"rect": [
+2178,
+1019,
+364,
+494
+],
+"size_m": [
+0.7,
+0.95
+],
+"kinds": [
+"stain"
+],
+"heights": [
+0.6,
+2.8
+],
+"styles": null
+},
+{
+"id": "mould_0",
+"rect": [
+2670,
+2325,
+341,
+310
+],
+"size_m": [
+0.55,
+0.5
+],
+"kinds": [
+"mould"
+],
+"heights": [
+0.0,
+2.9
+],
+"styles": null
+},
+{
+"id": "mould_1",
+"rect": [
+3562,
+2596,
+341,
+310
+],
+"size_m": [
+0.55,
+0.5
+],
+"kinds": [
+"mould"
+],
+"heights": [
+0.0,
+2.9
+],
+"styles": null
+},
+{
+"id": "mould_2",
+"rect": [
+10,
+2602,
+341,
+310
+],
+"size_m": [
+0.55,
+0.5
+],
+"kinds": [
+"mould"
+],
+"heights": [
+0.0,
+2.9
+],
+"styles": null
+},
+{
+"id": "mould_3",
+"rect": [
+362,
+2602,
+341,
+310
+],
+"size_m": [
+0.55,
+0.5
+],
+"kinds": [
+"mould"
+],
+"heights": [
+0.0,
+2.9
+],
+"styles": null
+},
+{
+"id": "soot_0",
+"rect": [
+1734,
+1020,
+234,
+416
+],
+"size_m": [
+0.45,
+0.8
+],
+"kinds": [
+"soot"
+],
+"heights": [
+1.9,
+3.0
+],
+"styles": null
+},
+{
+"id": "soot_1",
+"rect": [
+1734,
+1446,
+234,
+416
+],
+"size_m": [
+0.45,
+0.8
+],
+"kinds": [
+"soot"
+],
+"heights": [
+1.9,
+3.0
+],
+"styles": null
+},
+{
+"id": "scratch_0",
+"rect": [
+1186,
+1462,
+390,
+390
+],
+"size_m": [
+0.3,
+0.3
+],
+"kinds": [
+"scratch"
+],
+"heights": [
+0.3,
+1.9
+],
+"styles": null
+},
+{
+"id": "scratch_1",
+"rect": [
+1978,
+1523,
+390,
+390
+],
+"size_m": [
+0.3,
+0.3
+],
+"kinds": [
+"scratch"
+],
+"heights": [
+0.3,
+1.9
+],
+"styles": null
+},
+{
+"id": "scratch_2",
+"rect": [
+1186,
+1862,
+390,
+390
+],
+"size_m": [
+0.3,
+0.3
+],
+"kinds": [
+"scratch"
+],
+"heights": [
+0.3,
+1.9
+],
+"styles": null
+},
+{
+"id": "scratch_3",
+"rect": [
+10,
+1868,
+390,
+390
+],
+"size_m": [
+0.3,
+0.3
+],
+"kinds": [
+"scratch"
+],
+"heights": [
+0.3,
+1.9
+],
+"styles": null
+},
+{
+"id": "scratch_4",
+"rect": [
+410,
+1868,
+390,
+390
+],
+"size_m": [
+0.3,
+0.3
+],
+"kinds": [
+"scratch"
+],
+"heights": [
+0.3,
+1.9
+],
+"styles": null
+},
+{
+"id": "scratch_5",
+"rect": [
+2378,
+1881,
+390,
+390
+],
+"size_m": [
+0.3,
+0.3
+],
+"kinds": [
+"scratch"
+],
+"heights": [
+0.3,
+1.9
+],
+"styles": null
+},
+{
+"id": "drawing_0",
+"rect": [
+198,
+10,
+648,
+495
+],
+"size_m": [
+0.72,
+0.55
+],
+"kinds": [
+"drawing"
+],
+"heights": [
+0.25,
+1.25
+],
+"styles": null
+},
+{
+"id": "drawing_1",
+"rect": [
+858,
+10,
+648,
+495
+],
+"size_m": [
+0.72,
+0.55
+],
+"kinds": [
+"drawing"
+],
+"heights": [
+0.25,
+1.25
+],
+"styles": null
+},
+{
+"id": "drawing_2",
+"rect": [
+1518,
+10,
+648,
+495
+],
+"size_m": [
+0.72,
+0.55
+],
+"kinds": [
+"drawing"
+],
+"heights": [
+0.25,
+1.25
+],
+"styles": null
+},
+{
+"id": "drawing_3",
+"rect": [
+2178,
+10,
+648,
+495
+],
+"size_m": [
+0.72,
+0.55
+],
+"kinds": [
+"drawing"
+],
+"heights": [
+0.25,
+1.25
+],
+"styles": null
+},
+{
+"id": "drawing_4",
+"rect": [
+2838,
+10,
+648,
+495
+],
+"size_m": [
+0.72,
+0.55
+],
+"kinds": [
+"drawing"
+],
+"heights": [
+0.25,
+1.25
+],
+"styles": null
+},
+{
+"id": "drawing_5",
+"rect": [
+198,
+515,
+648,
+495
+],
+"size_m": [
+0.72,
+0.55
+],
+"kinds": [
+"drawing"
+],
+"heights": [
+0.25,
+1.25
+],
+"styles": null
+},
+{
+"id": "drawing_6",
+"rect": [
+858,
+515,
+648,
+495
+],
+"size_m": [
+0.72,
+0.55
+],
+"kinds": [
+"drawing"
+],
+"heights": [
+0.25,
+1.25
+],
+"styles": null
+},
+{
+"id": "drawing_7",
+"rect": [
+1518,
+515,
+648,
+495
+],
+"size_m": [
+0.72,
+0.55
+],
+"kinds": [
+"drawing"
+],
+"heights": [
+0.25,
+1.25
+],
+"styles": null
+},
+{
+"id": "handprint_0",
+"rect": [
+3730,
+1522,
+300,
+360
+],
+"size_m": [
+0.2,
+0.24
+],
+"kinds": [
+"handprint"
+],
+"heights": [
+0.5,
+1.7
+],
+"styles": null
+},
+{
+"id": "handprint_1",
+"rect": [
+810,
+1868,
+300,
+360
+],
+"size_m": [
+0.2,
+0.24
+],
+"kinds": [
+"handprint"
+],
+"heights": [
+0.5,
+1.7
+],
+"styles": null
+},
+{
+"id": "handprint_2",
+"rect": [
+3730,
+1892,
+300,
+360
+],
+"size_m": [
+0.2,
+0.24
+],
+"kinds": [
+"handprint"
+],
+"heights": [
+0.5,
+1.7
+],
+"styles": null
+},
+{
+"id": "handprint_3",
+"rect": [
+1986,
+1923,
+300,
+360
+],
+"size_m": [
+0.2,
+0.24
+],
+"kinds": [
+"handprint"
+],
+"heights": [
+0.5,
+1.7
+],
+"styles": null
+},
+{
+"id": "handprint_4",
+"rect": [
+3178,
+1928,
+300,
+360
+],
+"size_m": [
+0.2,
+0.24
+],
+"kinds": [
+"handprint"
+],
+"heights": [
+0.5,
+1.7
+],
+"styles": null
+},
+{
+"id": "handprint_5",
+"rect": [
+810,
+2238,
+300,
+360
+],
+"size_m": [
+0.2,
+0.24
+],
+"kinds": [
+"handprint"
+],
+"heights": [
+0.5,
+1.7
+],
+"styles": null
+},
+{
+"id": "footprint_0",
+"rect": [
+3490,
+1928,
+110,
+330
+],
+"size_m": [
+0.1,
+0.3
+],
+"kinds": [
+"footprint"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "footprint_1",
+"rect": [
+3610,
+1928,
+110,
+330
+],
+"size_m": [
+0.1,
+0.3
+],
+"kinds": [
+"footprint"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "footprint_2",
+"rect": [
+1122,
+2262,
+110,
+330
+],
+"size_m": [
+0.1,
+0.3
+],
+"kinds": [
+"footprint"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "footprint_3",
+"rect": [
+1242,
+2262,
+110,
+330
+],
+"size_m": [
+0.1,
+0.3
+],
+"kinds": [
+"footprint"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "crack_0",
+"rect": [
+10,
+1462,
+576,
+396
+],
+"size_m": [
+0.8,
+0.55
+],
+"kinds": [
+"crack"
+],
+"heights": [
+0.3,
+2.9
+],
+"styles": null
+},
+{
+"id": "crack_1",
+"rect": [
+598,
+1462,
+576,
+396
+],
+"size_m": [
+0.8,
+0.55
+],
+"kinds": [
+"crack"
+],
+"heights": [
+0.3,
+2.9
+],
+"styles": null
+},
+{
+"id": "crack_2",
+"rect": [
+2554,
+1475,
+576,
+396
+],
+"size_m": [
+0.8,
+0.55
+],
+"kinds": [
+"crack"
+],
+"heights": [
+0.3,
+2.9
+],
+"styles": null
+},
+{
+"id": "crack_3",
+"rect": [
+3142,
+1522,
+576,
+396
+],
+"size_m": [
+0.8,
+0.55
+],
+"kinds": [
+"crack"
+],
+"heights": [
+0.3,
+2.9
+],
+"styles": null
+},
+{
+"id": "flakes_0",
+"rect": [
+3730,
+2262,
+360,
+324
+],
+"size_m": [
+0.4,
+0.36
+],
+"kinds": [
+"flakes"
+],
+"heights": [
+0.3,
+2.6
+],
+"styles": null
+},
+{
+"id": "flakes_1",
+"rect": [
+10,
+2268,
+360,
+324
+],
+"size_m": [
+0.4,
+0.36
+],
+"kinds": [
+"flakes"
+],
+"heights": [
+0.3,
+2.6
+],
+"styles": null
+},
+{
+"id": "flakes_2",
+"rect": [
+382,
+2268,
+360,
+324
+],
+"size_m": [
+0.4,
+0.36
+],
+"kinds": [
+"flakes"
+],
+"heights": [
+0.3,
+2.6
+],
+"styles": null
+},
+{
+"id": "flakes_3",
+"rect": [
+2298,
+2281,
+360,
+324
+],
+"size_m": [
+0.4,
+0.36
+],
+"kinds": [
+"flakes"
+],
+"heights": [
+0.3,
+2.6
+],
+"styles": null
+},
+{
+"id": "rust_0",
+"rect": [
+2554,
+1019,
+173,
+446
+],
+"size_m": [
+0.24,
+0.619
+],
+"kinds": [
+"rust"
+],
+"heights": [
+0.6,
+2.6
+],
+"styles": [
+"concrete",
+"workshop",
+"attic"
+]
+},
+{
+"id": "rust_1",
+"rect": [
+2738,
+1019,
+173,
+446
+],
+"size_m": [
+0.24,
+0.619
+],
+"kinds": [
+"rust"
+],
+"heights": [
+0.6,
+2.6
+],
+"styles": [
+"concrete",
+"workshop",
+"attic"
+]
+},
+{
+"id": "rust_2",
+"rect": [
+2922,
+1019,
+173,
+446
+],
+"size_m": [
+0.24,
+0.619
+],
+"kinds": [
+"rust"
+],
+"heights": [
+0.6,
+2.6
+],
+"styles": [
+"concrete",
+"workshop",
+"attic"
+]
+},
+{
+"id": "ghost_0",
+"rect": [
+3334,
+2618,
+210,
+277
+],
+"size_m": [
+0.5,
+0.66
+],
+"kinds": [
+"ghost"
+],
+"heights": [
+1.1,
+2.2
+],
+"styles": null
+},
+{
+"id": "ghost_1",
+"rect": [
+2458,
+2645,
+210,
+277
+],
+"size_m": [
+0.5,
+0.66
+],
+"kinds": [
+"ghost"
+],
+"heights": [
+1.1,
+2.2
+],
+"styles": null
+},
+{
+"id": "damp_0",
+"rect": [
+714,
+2919,
+860,
+284
+],
+"size_m": [
+2.0,
+0.66
+],
+"kinds": [
+"damp"
+],
+"heights": [
+0.0,
+0.7
+],
+"styles": null
+},
+{
+"id": "damp_1",
+"rect": [
+1586,
+2925,
+860,
+284
+],
+"size_m": [
+2.0,
+0.66
+],
+"kinds": [
+"damp"
+],
+"heights": [
+0.0,
+0.7
+],
+"styles": null
+},
+{
+"id": "peel_under_0",
+"rect": [
+198,
+1020,
+372,
+432
+],
+"size_m": [
+0.62,
+0.72
+],
+"kinds": [
+"peel_under"
+],
+"heights": [
+0.4,
+1.7
+],
+"styles": [
+"wood",
+"tile",
+"workshop"
+]
+},
+{
+"id": "peel_under_1",
+"rect": [
+582,
+1020,
+372,
+432
+],
+"size_m": [
+0.62,
+0.72
+],
+"kinds": [
+"peel_under"
+],
+"heights": [
+0.4,
+1.7
+],
+"styles": [
+"wood",
+"tile",
+"workshop"
+]
+},
+{
+"id": "peel_under_2",
+"rect": [
+966,
+1020,
+372,
+432
+],
+"size_m": [
+0.62,
+0.72
+],
+"kinds": [
+"peel_under"
+],
+"heights": [
+0.4,
+1.7
+],
+"styles": [
+"wood",
+"tile",
+"workshop"
+]
+},
+{
+"id": "peel_under_3",
+"rect": [
+1350,
+1020,
+372,
+432
+],
+"size_m": [
+0.62,
+0.72
+],
+"kinds": [
+"peel_under"
+],
+"heights": [
+0.4,
+1.7
+],
+"styles": [
+"wood",
+"tile",
+"workshop"
+]
+},
+{
+"id": "tile_missing_0",
+"rect": [
+2234,
+3219,
+204,
+204
+],
+"size_m": [
+0.17,
+0.17
+],
+"kinds": [
+"tile_missing"
+],
+"heights": [
+0.05,
+0.85
+],
+"styles": [
+"tile"
+]
+},
+{
+"id": "tile_missing_1",
+"rect": [
+2234,
+3433,
+204,
+204
+],
+"size_m": [
+0.17,
+0.17
+],
+"kinds": [
+"tile_missing"
+],
+"heights": [
+0.05,
+0.85
+],
+"styles": [
+"tile"
+]
+},
+{
+"id": "height_chart_0",
+"rect": [
+10,
+10,
+176,
+1160
+],
+"size_m": [
+0.22,
+1.45
+],
+"kinds": [
+"height_chart"
+],
+"heights": [
+0.1,
+1.55
+],
+"styles": [
+"wood"
+]
+},
+{
+"id": "floor_puddle_0",
+"rect": [
+3334,
+2916,
+344,
+258
+],
+"size_m": [
+0.8,
+0.6
+],
+"kinds": [
+"floor_puddle",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "floor_puddle_1",
+"rect": [
+3690,
+2916,
+344,
+258
+],
+"size_m": [
+0.8,
+0.6
+],
+"kinds": [
+"floor_puddle",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "floor_puddle_2",
+"rect": [
+10,
+2922,
+344,
+258
+],
+"size_m": [
+0.8,
+0.6
+],
+"kinds": [
+"floor_puddle",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "floor_puddle_3",
+"rect": [
+2950,
+2928,
+344,
+258
+],
+"size_m": [
+0.8,
+0.6
+],
+"kinds": [
+"floor_puddle",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "floor_puddle_4",
+"rect": [
+3306,
+3184,
+344,
+258
+],
+"size_m": [
+0.8,
+0.6
+],
+"kinds": [
+"floor_puddle",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "floor_puddle_5",
+"rect": [
+3662,
+3184,
+344,
+258
+],
+"size_m": [
+0.8,
+0.6
+],
+"kinds": [
+"floor_puddle",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "floor_puddle_6",
+"rect": [
+2458,
+3185,
+344,
+258
+],
+"size_m": [
+0.8,
+0.6
+],
+"kinds": [
+"floor_puddle",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "floor_puddle_7",
+"rect": [
+10,
+3190,
+344,
+258
+],
+"size_m": [
+0.8,
+0.6
+],
+"kinds": [
+"floor_puddle",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "floor_ring_0",
+"rect": [
+2814,
+3196,
+248,
+248
+],
+"size_m": [
+0.4,
+0.4
+],
+"kinds": [
+"floor_ring",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "floor_ring_1",
+"rect": [
+634,
+3213,
+248,
+248
+],
+"size_m": [
+0.4,
+0.4
+],
+"kinds": [
+"floor_ring",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "floor_ring_2",
+"rect": [
+894,
+3213,
+248,
+248
+],
+"size_m": [
+0.4,
+0.4
+],
+"kinds": [
+"floor_ring",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "floor_ring_3",
+"rect": [
+1154,
+3213,
+248,
+248
+],
+"size_m": [
+0.4,
+0.4
+],
+"kinds": [
+"floor_ring",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "floor_ring_4",
+"rect": [
+1414,
+3219,
+248,
+248
+],
+"size_m": [
+0.4,
+0.4
+],
+"kinds": [
+"floor_ring",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "floor_ring_5",
+"rect": [
+1674,
+3219,
+248,
+248
+],
+"size_m": [
+0.4,
+0.4
+],
+"kinds": [
+"floor_ring",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "floor_rust_0",
+"rect": [
+2678,
+2645,
+260,
+260
+],
+"size_m": [
+0.5,
+0.5
+],
+"kinds": [
+"floor_rust",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": [
+"concrete",
+"workshop"
+]
+},
+{
+"id": "floor_rust_1",
+"rect": [
+2678,
+2915,
+260,
+260
+],
+"size_m": [
+0.5,
+0.5
+],
+"kinds": [
+"floor_rust",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": [
+"concrete",
+"workshop"
+]
+},
+{
+"id": "floor_scorch_0",
+"rect": [
+366,
+2922,
+258,
+258
+],
+"size_m": [
+0.6,
+0.6
+],
+"kinds": [
+"floor_scorch",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "floor_scorch_1",
+"rect": [
+366,
+3190,
+258,
+258
+],
+"size_m": [
+0.6,
+0.6
+],
+"kinds": [
+"floor_scorch",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "floor_paint_0",
+"rect": [
+3178,
+2298,
+372,
+310
+],
+"size_m": [
+0.6,
+0.5
+],
+"kinds": [
+"floor_paint",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": [
+"workshop"
+]
+},
+{
+"id": "floor_paint_1",
+"rect": [
+1362,
+2320,
+372,
+310
+],
+"size_m": [
+0.6,
+0.5
+],
+"kinds": [
+"floor_paint",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": [
+"workshop"
+]
+},
+{
+"id": "floor_paint_2",
+"rect": [
+1746,
+2320,
+372,
+310
+],
+"size_m": [
+0.6,
+0.5
+],
+"kinds": [
+"floor_paint",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": [
+"workshop"
+]
+},
+{
+"id": "floor_dust_0",
+"rect": [
+1934,
+3219,
+288,
+216
+],
+"size_m": [
+0.4,
+0.3
+],
+"kinds": [
+"floor_dust",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "floor_dust_1",
+"rect": [
+1934,
+3445,
+288,
+216
+],
+"size_m": [
+0.4,
+0.3
+],
+"kinds": [
+"floor_dust",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "floor_dust_2",
+"rect": [
+3074,
+3452,
+288,
+216
+],
+"size_m": [
+0.4,
+0.3
+],
+"kinds": [
+"floor_dust",
+"floor"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "ceil_ring_0",
+"rect": [
+1586,
+1923,
+387,
+387
+],
+"size_m": [
+0.9,
+0.9
+],
+"kinds": [
+"ceil_ring"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "ceil_ring_1",
+"rect": [
+2778,
+1928,
+387,
+387
+],
+"size_m": [
+0.9,
+0.9
+],
+"kinds": [
+"ceil_ring"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "ceil_mould_0",
+"rect": [
+2130,
+2615,
+300,
+300
+],
+"size_m": [
+0.6,
+0.6
+],
+"kinds": [
+"ceil_mould"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "ceil_mould_1",
+"rect": [
+3022,
+2618,
+300,
+300
+],
+"size_m": [
+0.6,
+0.6
+],
+"kinds": [
+"ceil_mould"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "ceil_soot_0",
+"rect": [
+714,
+2608,
+301,
+301
+],
+"size_m": [
+0.7,
+0.7
+],
+"kinds": [
+"ceil_soot"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+},
+{
+"id": "ceil_soot_1",
+"rect": [
+1026,
+2608,
+301,
+301
+],
+"size_m": [
+0.7,
+0.7
+],
+"kinds": [
+"ceil_soot"
+],
+"heights": [
+0.0,
+0.0
+],
+"styles": null
+}
+]
+}

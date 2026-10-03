@@ -5,28 +5,28 @@
  "axes": "three.js: y up, front +z; aabb [min, max] in metres in the node frame",
  "tiers": {
   "hi": {
-   "wood": 11267648,
-   "tile": 8048704,
-   "concrete": 9138088,
-   "attic": 7819820,
-   "workshop": 10075024,
-   "common": 6844
+   "wood": 14921912,
+   "tile": 10870556,
+   "concrete": 11238448,
+   "attic": 10341764,
+   "workshop": 13325460,
+   "common": 1079144
   },
   "md": {
-   "wood": 4176332,
-   "tile": 3332376,
-   "concrete": 2981632,
-   "attic": 2847436,
-   "workshop": 3446292,
-   "common": 6844
+   "wood": 5483324,
+   "tile": 4620384,
+   "concrete": 3783348,
+   "attic": 3669636,
+   "workshop": 4589636,
+   "common": 400148
   },
   "lo": {
-   "wood": 2361464,
-   "tile": 2013592,
-   "concrete": 1417848,
-   "attic": 1572452,
-   "workshop": 1929904,
-   "common": 6844
+   "wood": 2994028,
+   "tile": 2708848,
+   "concrete": 1806196,
+   "attic": 1918724,
+   "workshop": 2475220,
+   "common": 188652
   }
  },
  "nodes": {
@@ -3259,9 +3259,9 @@
    "id": "anglepoise",
    "mount": "surface",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey",
+    "Kit_fix_workshop",
     "Emit"
    ],
    "uv1": false,
@@ -3270,20 +3270,20 @@
    ],
    "aabb": [
     [
-     -0.15,
+     -0.085,
      0.0,
-     -0.275
+     -0.24
     ],
     [
-     0.15,
-     0.7,
-     0.275
+     0.085,
+     0.6511,
+     0.289
     ]
    ],
    "tris": {
-    "hi": 24,
-    "md": 24,
-    "lo": 24
+    "hi": 2462,
+    "md": 2462,
+    "lo": 2446
    }
   },
   "Fix_bare_bulb": {
@@ -3292,9 +3292,9 @@
    "id": "bare_bulb",
    "mount": "ceiling",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey",
+    "Kit_fix_concrete",
     "Emit"
    ],
    "uv1": false,
@@ -3303,20 +3303,20 @@
    ],
    "aabb": [
     [
-     -0.04,
-     -0.16,
-     -0.04
+     -0.0285,
+     -0.159,
+     -0.0285
     ],
     [
-     0.04,
+     0.0285,
      0.0,
-     0.04
+     0.0285
     ]
    ],
    "tris": {
-    "hi": 24,
-    "md": 24,
-    "lo": 24
+    "hi": 404,
+    "md": 404,
+    "lo": 404
    }
   },
   "Fix_batten_light": {
@@ -3325,9 +3325,9 @@
    "id": "batten_light",
    "mount": "ceiling",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey",
+    "Kit_fix_common",
     "Emit"
    ],
    "uv1": false,
@@ -3336,20 +3336,20 @@
    ],
    "aabb": [
     [
-     -0.3,
-     -0.08,
-     -0.05
+     -0.312,
+     -0.074,
+     -0.032
     ],
     [
-     0.3,
+     0.312,
      0.0,
-     0.05
+     0.032
     ]
    ],
    "tris": {
-    "hi": 24,
-    "md": 24,
-    "lo": 24
+    "hi": 368,
+    "md": 368,
+    "lo": 368
    }
   },
   "Fix_boiler_glow": {
@@ -3358,9 +3358,9 @@
    "id": "boiler_glow",
    "mount": "practical",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey",
+    "Kit_fix_concrete",
     "Emit"
    ],
    "uv1": false,
@@ -3376,13 +3376,13 @@
     [
      0.175,
      0.25,
-     0.05
+     0.0502
     ]
    ],
    "tris": {
-    "hi": 24,
-    "md": 24,
-    "lo": 24
+    "hi": 1296,
+    "md": 1296,
+    "lo": 1296
    }
   },
   "Fix_bulb_batten": {
@@ -3391,9 +3391,9 @@
    "id": "bulb_batten",
    "mount": "ceiling",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey",
+    "Kit_fix_attic",
     "Emit"
    ],
    "uv1": false,
@@ -3402,20 +3402,20 @@
    ],
    "aabb": [
     [
-     -0.06,
-     -0.18,
-     -0.06
+     -0.056,
+     -0.174,
+     -0.056
     ],
     [
-     0.06,
+     0.056,
      0.0,
-     0.06
+     0.056
     ]
    ],
    "tris": {
-    "hi": 24,
-    "md": 24,
-    "lo": 24
+    "hi": 558,
+    "md": 558,
+    "lo": 542
    }
   },
   "Fix_bulkhead": {
@@ -3424,9 +3424,9 @@
    "id": "bulkhead",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey",
+    "Kit_fix_concrete",
     "Emit"
    ],
    "uv1": false,
@@ -3435,20 +3435,20 @@
    ],
    "aabb": [
     [
-     -0.11,
-     1.95,
+     -0.1,
+     1.943,
      0.0
     ],
     [
-     0.11,
-     2.25,
-     0.15
+     0.1,
+     2.257,
+     0.1379
     ]
    ],
    "tris": {
-    "hi": 24,
-    "md": 24,
-    "lo": 24
+    "hi": 1352,
+    "md": 1352,
+    "lo": 1336
    }
   },
   "Fix_candelabrum": {
@@ -3457,9 +3457,9 @@
    "id": "candelabrum",
    "mount": "surface",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey",
+    "Kit_fix_tile",
     "Emit"
    ],
    "uv1": false,
@@ -3468,20 +3468,20 @@
    ],
    "aabb": [
     [
-     -0.175,
+     -0.148,
      0.0,
-     -0.075
+     -0.062
     ],
     [
-     0.175,
-     0.45,
-     0.075
+     0.148,
+     0.432,
+     0.062
     ]
    ],
    "tris": {
-    "hi": 24,
-    "md": 24,
-    "lo": 24
+    "hi": 2555,
+    "md": 2555,
+    "lo": 2141
    }
   },
   "Fix_chandelier": {
@@ -3490,9 +3490,9 @@
    "id": "chandelier",
    "mount": "ceiling",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey",
+    "Kit_fix_tile",
     "Emit"
    ],
    "uv1": false,
@@ -3501,20 +3501,20 @@
    ],
    "aabb": [
     [
-     -0.45,
-     -0.8,
-     -0.45
+     -0.3637,
+     -0.785,
+     -0.3619
     ],
     [
-     0.45,
+     0.3637,
      0.0,
-     0.45
+     0.3619
     ]
    ],
    "tris": {
-    "hi": 24,
-    "md": 24,
-    "lo": 24
+    "hi": 3902,
+    "md": 3902,
+    "lo": 3746
    }
   },
   "Fix_fire_embers": {
@@ -3523,9 +3523,9 @@
    "id": "fire_embers",
    "mount": "practical",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey",
+    "Kit_fix_common",
     "Emit"
    ],
    "uv1": false,
@@ -3534,20 +3534,20 @@
    ],
    "aabb": [
     [
-     -0.275,
+     -0.256,
      0.0,
-     -0.15
+     -0.12
     ],
     [
-     0.275,
-     0.15,
-     0.15
+     0.256,
+     0.1245,
+     0.14
     ]
    ],
    "tris": {
-    "hi": 24,
-    "md": 24,
-    "lo": 24
+    "hi": 1248,
+    "md": 1248,
+    "lo": 1248
    }
   },
   "Fix_green_shade": {
@@ -3556,9 +3556,9 @@
    "id": "green_shade",
    "mount": "ceiling",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey",
+    "Kit_fix_workshop",
     "Emit"
    ],
    "uv1": false,
@@ -3567,20 +3567,20 @@
    ],
    "aabb": [
     [
-     -0.225,
-     -0.3,
-     -0.225
+     -0.2235,
+     -0.2745,
+     -0.2235
     ],
     [
-     0.225,
+     0.2235,
      0.0,
-     0.225
+     0.2235
     ]
    ],
    "tris": {
-    "hi": 24,
-    "md": 24,
-    "lo": 24
+    "hi": 1490,
+    "md": 1490,
+    "lo": 1490
    }
   },
   "Fix_hurricane_lantern": {
@@ -3589,9 +3589,9 @@
    "id": "hurricane_lantern",
    "mount": "surface",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey",
+    "Kit_fix_attic",
     "Emit"
    ],
    "uv1": false,
@@ -3600,20 +3600,20 @@
    ],
    "aabb": [
     [
-     -0.1,
+     -0.0845,
      0.0,
-     -0.1
+     -0.078
     ],
     [
-     0.1,
-     0.35,
-     0.1
+     0.0845,
+     0.3371,
+     0.078
     ]
    ],
    "tris": {
-    "hi": 24,
-    "md": 24,
-    "lo": 24
+    "hi": 1208,
+    "md": 1208,
+    "lo": 1154
    }
   },
   "Fix_kiln_glow": {
@@ -3622,9 +3622,9 @@
    "id": "kiln_glow",
    "mount": "practical",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey",
+    "Kit_fix_workshop",
     "Emit"
    ],
    "uv1": false,
@@ -3635,7 +3635,7 @@
     [
      -0.2,
      0.0,
-     -0.05
+     -0.045
     ],
     [
      0.2,
@@ -3644,9 +3644,9 @@
     ]
    ],
    "tris": {
-    "hi": 24,
-    "md": 24,
-    "lo": 24
+    "hi": 1216,
+    "md": 1216,
+    "lo": 1036
    }
   },
   "Fix_night_light": {
@@ -3655,9 +3655,9 @@
    "id": "night_light",
    "mount": "surface",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey",
+    "Kit_fix_wood",
     "Emit"
    ],
    "uv1": false,
@@ -3666,20 +3666,20 @@
    ],
    "aabb": [
     [
-     -0.075,
+     -0.068,
      0.0,
-     -0.075
+     -0.068
     ],
     [
-     0.075,
-     0.25,
-     0.075
+     0.068,
+     0.232,
+     0.068
     ]
    ],
    "tris": {
-    "hi": 24,
-    "md": 24,
-    "lo": 24
+    "hi": 1190,
+    "md": 1190,
+    "lo": 1152
    }
   },
   "Fix_pendant_shade": {
@@ -3688,9 +3688,9 @@
    "id": "pendant_shade",
    "mount": "ceiling",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey",
+    "Kit_fix_wood",
     "Emit"
    ],
    "uv1": false,
@@ -3699,20 +3699,20 @@
    ],
    "aabb": [
     [
-     -0.225,
-     -0.35,
-     -0.225
+     -0.209,
+     -0.3538,
+     -0.2083
     ],
     [
-     0.225,
+     0.209,
      0.0,
-     0.225
+     0.2083
     ]
    ],
    "tris": {
-    "hi": 24,
-    "md": 24,
-    "lo": 24
+    "hi": 3060,
+    "md": 3060,
+    "lo": 3054
    }
   },
   "Fix_sconce_candles": {
@@ -3721,9 +3721,9 @@
    "id": "sconce_candles",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey",
+    "Kit_fix_tile",
     "Emit"
    ],
    "uv1": false,
@@ -3732,20 +3732,20 @@
    ],
    "aabb": [
     [
-     -0.175,
-     1.75,
-     0.0
+     -0.161,
+     1.765,
+     -0.008
     ],
     [
-     0.175,
-     2.2,
-     0.22
+     0.161,
+     2.129,
+     0.166
     ]
    ],
    "tris": {
-    "hi": 24,
-    "md": 24,
-    "lo": 24
+    "hi": 1944,
+    "md": 1944,
+    "lo": 1724
    }
   },
   "Fix_sconce_shade": {
@@ -3754,9 +3754,9 @@
    "id": "sconce_shade",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey",
+    "Kit_fix_wood",
     "Emit"
    ],
    "uv1": false,
@@ -3765,20 +3765,20 @@
    ],
    "aabb": [
     [
-     -0.15,
-     1.8,
+     -0.1162,
+     1.891,
      0.0
     ],
     [
-     0.15,
-     2.2,
-     0.25
+     0.1162,
+     2.1148,
+     0.2455
     ]
    ],
    "tris": {
-    "hi": 24,
-    "md": 24,
-    "lo": 24
+    "hi": 2322,
+    "md": 2322,
+    "lo": 2306
    }
   },
   "Fix_standard_lamp": {
@@ -3787,9 +3787,9 @@
    "id": "standard_lamp",
    "mount": "floor",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey",
+    "Kit_fix_tile",
     "Emit"
    ],
    "uv1": false,
@@ -3798,20 +3798,20 @@
    ],
    "aabb": [
     [
-     -0.225,
+     -0.2115,
      0.0,
-     -0.225
+     -0.2115
     ],
     [
-     0.225,
-     1.6,
-     0.225
+     0.2115,
+     1.588,
+     0.212
     ]
    ],
    "tris": {
-    "hi": 24,
-    "md": 24,
-    "lo": 24
+    "hi": 3680,
+    "md": 3680,
+    "lo": 2632
    }
   },
   "Isl_bed_screen": {
@@ -6934,28 +6934,28 @@
    "id": "Ward_body_attic",
    "mount": "floor",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_ward_attic_body"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.625,
+     -0.643,
      0.0,
-     -0.33
+     -0.345
     ],
     [
-     0.625,
-     2.35,
-     0.33
+     0.609,
+     2.3498,
+     0.326
     ]
    ],
    "tris": {
-    "hi": 72,
-    "md": 72,
-    "lo": 72
+    "hi": 5938,
+    "md": 5938,
+    "lo": 2969
    }
   },
   "Ward_body_concrete": {
@@ -6964,28 +6964,28 @@
    "id": "Ward_body_concrete",
    "mount": "floor",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_ward_concrete_body"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.625,
+     -0.58,
      0.0,
-     -0.33
+     -0.3
     ],
     [
-     0.625,
-     2.35,
-     0.33
+     0.58,
+     2.335,
+     0.296
     ]
    ],
    "tris": {
-    "hi": 72,
-    "md": 72,
-    "lo": 72
+    "hi": 1952,
+    "md": 1952,
+    "lo": 1235
    }
   },
   "Ward_body_tile": {
@@ -6994,28 +6994,28 @@
    "id": "Ward_body_tile",
    "mount": "floor",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_ward_tile_body"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.625,
+     -0.621,
      0.0,
-     -0.33
+     -0.3
     ],
     [
-     0.625,
+     0.621,
      2.35,
-     0.33
+     0.334
     ]
    ],
    "tris": {
-    "hi": 72,
-    "md": 72,
-    "lo": 72
+    "hi": 4034,
+    "md": 4034,
+    "lo": 2750
    }
   },
   "Ward_body_wood": {
@@ -7024,28 +7024,28 @@
    "id": "Ward_body_wood",
    "mount": "floor",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_ward_wood_body"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.625,
+     -0.617,
      0.0,
-     -0.33
+     -0.3
     ],
     [
-     0.625,
-     2.35,
+     0.617,
+     2.34,
      0.33
     ]
    ],
    "tris": {
-    "hi": 72,
-    "md": 72,
-    "lo": 72
+    "hi": 4018,
+    "md": 4018,
+    "lo": 2647
    }
   },
   "Ward_body_workshop": {
@@ -7054,28 +7054,28 @@
    "id": "Ward_body_workshop",
    "mount": "floor",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_ward_workshop_body"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.625,
+     -0.595,
      0.0,
-     -0.33
+     -0.3
     ],
     [
-     0.625,
-     2.35,
-     0.33
+     0.595,
+     2.275,
+     0.308
     ]
    ],
    "tris": {
-    "hi": 72,
-    "md": 72,
-    "lo": 72
+    "hi": 2754,
+    "md": 2754,
+    "lo": 1610
    }
   },
   "Ward_leafL_attic": {
@@ -7084,28 +7084,28 @@
    "id": "Ward_leafL_attic",
    "mount": "hinge",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_ward_attic_leaves"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     0.0,
-     0.0,
+     -0.0033,
+     0.0006,
      -0.015
     ],
     [
-     0.575,
-     2.2,
-     0.015
+     0.5744,
+     2.1994,
+     0.031
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 892,
+    "md": 892,
+    "lo": 566
    },
    "hinge": [
     -0.575,
@@ -7119,28 +7119,28 @@
    "id": "Ward_leafL_concrete",
    "mount": "hinge",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_ward_concrete_leaves"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
+     -0.0045,
      0.0,
-     0.0,
-     -0.015
+     -0.0039
     ],
     [
      0.575,
      2.2,
-     0.015
+     0.027
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1444,
+    "md": 1444,
+    "lo": 722
    },
    "hinge": [
     -0.575,
@@ -7154,28 +7154,28 @@
    "id": "Ward_leafL_tile",
    "mount": "hinge",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_ward_tile_leaves"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     0.0,
-     0.0,
-     -0.015
+     -0.0033,
+     0.0006,
+     -0.0224
     ],
     [
-     0.575,
-     2.2,
-     0.015
+     0.5744,
+     2.1994,
+     0.027
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1068,
+    "md": 1068,
+    "lo": 576
    },
    "hinge": [
     -0.575,
@@ -7189,28 +7189,28 @@
    "id": "Ward_leafL_wood",
    "mount": "hinge",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_ward_wood_leaves"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     0.0,
-     0.0,
+     -0.0033,
+     0.0006,
      -0.015
     ],
     [
-     0.575,
-     2.2,
-     0.015
+     0.5744,
+     2.1994,
+     0.032
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 948,
+    "md": 948,
+    "lo": 598
    },
    "hinge": [
     -0.575,
@@ -7224,28 +7224,28 @@
    "id": "Ward_leafL_workshop",
    "mount": "hinge",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_ward_workshop_leaves"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     0.0,
-     0.0,
+     -0.0033,
+     0.0006,
      -0.015
     ],
     [
-     0.575,
-     2.2,
-     0.015
+     0.5744,
+     2.1994,
+     0.0318
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1356,
+    "md": 1356,
+    "lo": 1084
    },
    "hinge": [
     -0.575,
@@ -7259,28 +7259,28 @@
    "id": "Ward_leafR_attic",
    "mount": "hinge",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_ward_attic_leaves"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.575,
-     0.0,
+     -0.5744,
+     0.0006,
      -0.015
     ],
     [
-     0.0,
-     2.2,
-     0.015
+     0.0033,
+     2.1994,
+     0.031
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 892,
+    "md": 892,
+    "lo": 566
    },
    "hinge": [
     0.575,
@@ -7294,9 +7294,9 @@
    "id": "Ward_leafR_concrete",
    "mount": "hinge",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_ward_concrete_leaves"
    ],
    "uv1": false,
    "children": [],
@@ -7304,18 +7304,18 @@
     [
      -0.575,
      0.0,
-     -0.015
+     -0.0052
     ],
     [
-     0.0,
+     0.006,
      2.2,
-     0.015
+     0.025
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1288,
+    "md": 1288,
+    "lo": 644
    },
    "hinge": [
     0.575,
@@ -7329,28 +7329,28 @@
    "id": "Ward_leafR_tile",
    "mount": "hinge",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_ward_tile_leaves"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.575,
-     0.0,
-     -0.015
+     -0.5744,
+     0.0006,
+     -0.0224
     ],
     [
-     0.0,
-     2.2,
-     0.015
+     0.0033,
+     2.1994,
+     0.0224
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1140,
+    "md": 1140,
+    "lo": 788
    },
    "hinge": [
     0.575,
@@ -7364,28 +7364,28 @@
    "id": "Ward_leafR_wood",
    "mount": "hinge",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_ward_wood_leaves"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.575,
-     0.0,
+     -0.5744,
+     0.0006,
      -0.015
     ],
     [
-     0.0,
-     2.2,
-     0.015
+     0.0033,
+     2.1994,
+     0.032
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1072,
+    "md": 1072,
+    "lo": 721
    },
    "hinge": [
     0.575,
@@ -7399,28 +7399,28 @@
    "id": "Ward_leafR_workshop",
    "mount": "hinge",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_ward_workshop_leaves"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.575,
-     0.0,
+     -0.5744,
+     0.0006,
      -0.015
     ],
     [
-     0.0,
-     2.2,
-     0.015
+     0.0033,
+     2.1994,
+     0.0318
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1200,
+    "md": 1200,
+    "lo": 928
    },
    "hinge": [
     0.575,
