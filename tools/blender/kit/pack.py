@@ -32,6 +32,24 @@ def _dedupe(coll):
         if dot and num.isdigit() and base in coll and base in SHARED:
             d.user_remap(coll[base]); coll.remove(d)
 
+def _same_images(a, b):
+    files = lambda m: sorted(bpy.path.abspath(n.image.filepath) for n in m.node_tree.nodes if n.type == 'TEX_IMAGE' and n.image) if m.node_tree else []
+    return files(a) == files(b) and files(a)
+
+def _share():
+    """a baked piece used again inside an island (or anywhere) comes in twice from two .blend files: the images that are the same file,
+       and the Kit_ materials over the same images, made one again, so the GLB holds their textures once"""
+    by = {}
+    for im in list(bpy.data.images):
+        if not im.filepath: continue
+        k = os.path.normcase(os.path.abspath(bpy.path.abspath(im.filepath)))
+        if k in by and by[k] is not im: im.user_remap(by[k]); bpy.data.images.remove(im)
+        else: by.setdefault(k, im)
+    for m in list(bpy.data.materials):
+        base, dot, num = m.name.rpartition('.')
+        if dot and num.isdigit() and base.startswith('Kit_') and base in bpy.data.materials and _same_images(m, bpy.data.materials[base]):
+            m.user_remap(bpy.data.materials[base]); bpy.data.materials.remove(m)
+
 def _load(want):
     """append the wanted roots (and everything under them) from each blend, nothing else"""
     by_blend = {}
@@ -50,6 +68,7 @@ def _load(want):
             bpy.context.scene.collection.objects.link(o)
             if o.parent is None: roots.append(o)
         for coll in (bpy.data.materials, bpy.data.node_groups): _dedupe(coll)
+        _share()
     for o in bpy.data.objects:                              # (names back to exact, now the clashing copies are gone)
         base, dot, num = o.name.rpartition('.')
         if dot and num.isdigit() and base not in bpy.data.objects: o.name = base
@@ -83,7 +102,23 @@ def _split(ob):
     bpy.data.objects.remove(ob); holder.name = name
     return holder
 
-def _lo_targets(style, roots):
+def _lo_decimate(style, roots):
+    """the lo tier's deep cuts (an island's 25k to 6k): meshopt keeps every UV seam and a kit piece is all seams, so these are cut
+       in Blender (collapse, which crosses seams and carries the UVs along) before export -> the meshes it cut"""
+    done = set(); budget = {n['name']: n['trisLo'] for n in defs.nodes(style)}
+    for r in roots:
+        meshes = [o for o in [r] + list(r.children_recursive) if o.type == 'MESH']
+        t = sum(kitlib.tris(o) for o in meshes)
+        if not t or 0.92 * budget[r.name] / t >= 0.65: continue            # (meshopt's half is enough above that; it stalls short of it below)
+        ratio = min(0.5, 0.92 * budget[r.name] / t)
+        for o in meshes:
+            if o.data.users > 1: o.data = o.data.copy()
+            m = o.modifiers.new('lo', 'DECIMATE'); m.decimate_type = 'COLLAPSE'; m.ratio = ratio; m.use_collapse_triangulate = True
+            with bpy.context.temp_override(object=o, active_object=o): bpy.ops.object.modifier_apply(modifier=m.name)
+            done.add(o.data.name)
+    return done
+
+def _lo_targets(style, roots, cut=()):
     """lo keeps about half the triangles (B1), less where a node's trisLo budget needs it (islands: 25k -> 6k); written as
        {mesh name: [ratio, error]} for compress-kit.mjs"""
     out = {}; budget = {n['name']: n['trisLo'] for n in defs.nodes(style)}
@@ -92,7 +127,7 @@ def _lo_targets(style, roots):
         t = sum(kitlib.tris(o) for o in meshes)
         if not t: continue
         ratio = min(0.5, 0.92 * budget[r.name] / t); err = 0.0015 if ratio >= 0.5 else 0.004   # (a deep cut may move a vertex 4 mm per m)
-        for o in meshes: out[o.data.name] = [round(ratio, 4), err]
+        for o in meshes: out[o.data.name] = [1.0, 0.0015] if o.data.name in cut else [round(ratio, 4), err]
     path = os.path.join(TMP, 'pack', 'lo', style + '.targets.json'); json.dump(out, open(path, 'w')); return path
 
 def stale(style, tier):
@@ -116,9 +151,10 @@ def pack(style, tier):
         if o.type == 'MESH' and len(o.data.materials) > 2: _split(o)
     roots = [bpy.data.objects[n] for n in want]
     raw = os.path.join(TMP, 'pack', tier, style + '.glb'); os.makedirs(os.path.dirname(raw), exist_ok=True)
+    cut = _lo_decimate(style, roots) if tier == 'lo' else set()
     kitlib.export_glb(roots, raw)
     out = os.path.join(KITDIR, tier, style + '.glb'); os.makedirs(os.path.dirname(out), exist_ok=True)
-    if tier == 'lo': kitlib.compress(raw, out, 0.5, 0.0015, _lo_targets(style, roots))
+    if tier == 'lo': kitlib.compress(raw, out, 0.5, 0.0015, _lo_targets(style, roots, cut))
     else: kitlib.compress(raw, out)
     manifest(style, tier, out, {n: ('placeholder' in b) for n, b in want.items()})
     print(f'pack {style}/{tier}: {len(want)} nodes, {os.path.getsize(out) / 1e3:.0f} KB, {time.time() - t0:.1f}s')
