@@ -149,25 +149,44 @@ function build(THREE, env) {
   [trim.mesh(trimMat, false), frame.mesh(frameMat, true), headerMat && header.mesh(headerMat, true)].forEach(m => { if (m) group.add(m); });
   for (const m of [trimMat, frameMat]) if (!group.children.some(o => o.material === m)) { if (m.map) m.map.dispose(); m.dispose(); }   // (unused with the plan)
 
-  /* ---------- lamps ---------- */
+  /* ---------- lamps ----------
+     env.lamps: left out -> house.js hangs its own (no plan: the classic house); an array -> the plan's lamps (js/dress.js) that the kit
+     can't show: plain bodies at exactly those spots, with the plan's states and flicker groups (their light is baked, js/lightbake.js,
+     from the same lamps, so body and light agree); [] -> none (the kit's fixtures, js/kit.js). No real lights here: the old pool of
+     point lights is gone (spec C2), so the number of lights never changes. */
+  const lampGroup = new THREE.Group(); lampGroup.name = 'HouseLamps'; group.add(lampGroup);
   const fixMetal = std({ color: style === 'concrete' ? 0x2a2622 : 0x8a6a2e, metalness: 0.8, roughness: 0.35 });
   const fixStatic = new Merge(THREE), lampFaces = new Set();
-  const addFixture = (x, y, z, kind, prop) => {
-    const r = Math.random(), state = r < 0.12 ? 'dead' : r < 0.32 ? 'flicker' : 'ok';
+  const addFixture = (x, y, z, kind, prop, st) => {
+    const r = Math.random(), state = st ? st.state : r < 0.12 ? 'dead' : r < 0.32 ? 'flicker' : 'ok';
     const mat = new THREE.MeshStandardMaterial({ color: 0x222222, emissive: P.lamp, emissiveIntensity: state === 'dead' ? 0.05 : 1.6, roughness: 0.6 });
     let glowObj;
     if (kind === 'bulb') glowObj = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), mat);
     else if (kind === 'candle') { glowObj = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.045, 8), mat); }
     else glowObj = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.11, 0.14, 14, 1, true), mat);
-    glowObj.position.set(x, y, z); (prop ? props : group).add(glowObj);
+    glowObj.position.set(x, y, z); (prop ? props : lampGroup).add(glowObj);
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: env.glowTex, color: new THREE.Color(P.lamp).multiplyScalar(kind === 'shade' ? 1.3 : 2), transparent: true,
       blending: THREE.AdditiveBlending, depthWrite: false, opacity: state === 'dead' ? 0 : 0.5 }));
-    glow.position.set(x, y, z); glow.scale.setScalar(kind === 'candle' ? 0.35 : 0.45); (prop ? props : group).add(glow);
-    fixtures.push({ pos: new THREE.Vector3(x, y, z), mat, glow, state, phase: Math.random() * 100, base: kind === 'candle' ? 0.6 : 1, level: 1, em: kind === 'shade' ? 0.9 : 1.8, prop: !!prop });
+    glow.position.set(x, y, z); glow.scale.setScalar(kind === 'candle' ? 0.35 : 0.45); (prop ? props : lampGroup).add(glow);
+    fixtures.push({ pos: new THREE.Vector3(x, y, z), mat, glow, state, group: st && st.group >= 0 ? st.group : -1, phase: st ? st.phase : Math.random() * 100,
+      base: kind === 'candle' ? 0.6 : 1, level: 1, em: kind === 'shade' ? 0.9 : 1.8, prop: !!prop });
   };
-  const fixDen = { wood: 0.16, tile: 0.2 }[style] || 0;
+  if (Array.isArray(env.lamps)) for (const fx of env.lamps) {              // the plan's lamps, where the kit has no body for them
+    const st = { state: fx.state === 'dead' ? 'dead' : fx.state === 'flicker' ? 'flicker' : 'ok', group: fx.group, phase: hash(fx.tile || 0, fx.face || 0, 96) * 100 };
+    if (fx.face >= 0 && faces[fx.face]) {                                  // on a wall: a plate and an arm, the shade (or a candle) on it
+      const f = faces[fx.face], ry = Math.atan2(f.nx, f.nz), wx = fx.x - f.nx * 0.2, wz = fx.z - f.nz * 0.2;
+      fixStatic.box(0.09, 0.16, 0.03, wx + f.nx * 0.015, fx.y - 0.05, wz + f.nz * 0.015, ry);
+      fixStatic.box(0.02, 0.02, 0.18, wx + f.nx * 0.1, fx.y - 0.04, wz + f.nz * 0.1, ry);
+      addFixture(fx.x, fx.y, fx.z, style === 'tile' ? 'candle' : 'shade', false, st);
+    } else {                                                               // hanging (a cord up to the ceiling) or standing: a bulb
+      const top = ceilXZ(fx.x, fx.z);
+      if (fx.cord > 0.005 || top - fx.y < 1) fixStatic.box(0.008, Math.max(0.02, top - fx.y - 0.05), 0.008, fx.x, (top + fx.y + 0.05) / 2, fx.z, 0);
+      addFixture(fx.x, fx.y, fx.z, 'bulb', false, st);
+    }
+  }
+  const fixDen = env.lamps !== undefined ? 0 : { wood: 0.16, tile: 0.2 }[style] || 0;
   for (const f of faces) {
-    if (busy(f) || banded(f) || hash(f.x * 5 + f.nx, f.y * 5 + f.nz, 95) > fixDen) continue;
+    if (!fixDen || busy(f) || banded(f) || hash(f.x * 5 + f.nx, f.y * 5 + f.nz, 95) > fixDen) continue;
     const cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2, ry = Math.atan2(f.nx, f.nz);
     lampFaces.add(f);
     if (style === 'wood') {                               // a wall lamp with a fabric shade
@@ -187,7 +206,7 @@ function build(THREE, env) {
     }
   }
   const shades = new Merge(THREE);
-  if (bulbs) {                                            // lamps hanging from the ceiling: bare bulbs, or (workshop) under a green metal shade
+  if (bulbs && env.lamps === undefined) {                // lamps hanging from the ceiling: bare bulbs, or (workshop) under a green metal shade
     for (let y = 1; y < env.GH; y += 2) for (let x = 1; x < env.GW; x += 2) {
       if (isWall(x, y) || hash(x, y, 97) > (style === 'workshop' ? 0.36 : 0.3) || (env.ceilKeep && env.ceilKeep.has(x + ',' + y))) continue;
       // (hung from this tile's ceiling: the drop is min(0.63, h - 2.35), so the bulb never comes below 2.35 m, spec A10)
@@ -197,12 +216,8 @@ function build(THREE, env) {
       addFixture(cx, h - dr, cz, 'bulb');
     }
   }
-  const shm = shades.mesh(std({ color: 0x2f5a36, metalness: 0.5, roughness: 0.45, side: THREE.DoubleSide }), false); if (shm) group.add(shm);
-  const fs = fixStatic.mesh(fixMetal, false); if (fs) group.add(fs);
-  // the closest lamps get real lights (a small pool, moved around as you walk)
-  const poolN = env.quality === 'low' ? 0 : lowq || env.quality === 'medium' ? 2 : 4;
-  const pool = [];
-  for (let i = 0; i < poolN; i++) { const l = new THREE.PointLight(P.light, 0, 6.5, 1.6); l.userData.fix = null; group.add(l); pool.push(l); }
+  const shm = shades.mesh(std({ color: 0x2f5a36, metalness: 0.5, roughness: 0.45, side: THREE.DoubleSide }), false); if (shm) lampGroup.add(shm);
+  const fs = fixStatic.mesh(fixMetal, false); if (fs) lampGroup.add(fs);
 
   /* ---------- rugs and carpets ---------- */
   if (style === 'tile') {                                 // a long runner down the middle of the hallways
@@ -434,24 +449,18 @@ function build(THREE, env) {
   }
 
   /* ---------- every frame ---------- */
-  let poolT = 0;
   const v3 = new THREE.Vector3(), fwd = new THREE.Vector3();
   function lampLevel(fx, t) {
     if (fx.state === 'dead' || api.dark) return 0;      // (dark: a jump scare turned every light off)
     const n = Math.sin(t * 13 + fx.phase) * 0.5 + Math.sin(t * 29 + fx.phase * 2) * 0.5;
     if (fx.state === 'flicker' && api.calm) return 0.8;          // ("Calm effects": no flickering lamps)
+    if (fx.state === 'flicker' && fx.group >= 0 && api.flick) return api.flick[fx.group];   // (the level the baked light of its group has: level.js)
     if (fx.state === 'flicker') return (Math.sin(t * 2.3 + fx.phase) > 0.35 && Math.random() < 0.55) ? 0.08 : 0.85 + 0.15 * n;
     return fx.base === 1 ? 0.95 + 0.05 * n : 0.8 + 0.2 * n;   // candles waver more
   }
   function update(dt, t, camera, player, flash) {
     for (const fx of fixtures) { const lv = lampLevel(fx, t); fx.level = lv;
       fx.mat.emissiveIntensity = 0.05 + fx.em * lv; fx.glow.material.opacity = 0.55 * lv; }
-    // the nearest working lamps get the real lights
-    poolT -= dt;
-    if (pool.length && poolT <= 0) { poolT = 0.3;
-      const near = fixtures.filter(f => f.state !== 'dead').map(f => [f, f.pos.distanceToSquared(camera.position)]).sort((a, b) => a[1] - b[1]).slice(0, pool.length);
-      pool.forEach((l, i) => { const f = near[i] && near[i][1] < 196 ? near[i][0] : null; l.userData.fix = f; if (f) l.position.copy(f.pos); }); }
-    for (const l of pool) { const f = l.userData.fix; l.intensity = f ? 5.5 * f.level * f.base : 0; }
     // the dolls: when you're not looking at one, its head turns to watch you
     camera.getWorldDirection(fwd);
     for (const d of dolls) {
@@ -476,17 +485,20 @@ function build(THREE, env) {
   }
   // the kit came late and furnished the band decor (Kit.upgradeInPlace calls this): the props go, with their candles and clocks; the
   // dolls (scares.doll may hold one), lamps, rugs and pipes stay
+  // (and when it brought the lamps, the stand-in lamps go too)
   function upgrade(kit, R) {
     if (R) api.kitCount = R.kitCount;
-    if (!R || !R.items || !R.items.some(x => x.kind === 'band') || !props.parent) return;
-    group.remove(props);
-    for (let k = fixtures.length - 1; k >= 0; k--) if (fixtures[k].prop) fixtures.splice(k, 1);
-    for (const l of pool) if (l.userData.fix && l.userData.fix.prop) { l.userData.fix = null; l.intensity = 0; }
+    if (!R || !R.items) return;
+    const drop = (sub, test) => { group.remove(sub);
+      for (let k = fixtures.length - 1; k >= 0; k--) if (test(fixtures[k])) fixtures.splice(k, 1);
+      const keep = new Set(); group.traverse(o => { if (o.geometry) keep.add(o.geometry); if (o.material) keep.add(o.material); });   // (shared with what stays)
+      freeTree(sub, keep); };
+    if (Array.isArray(env.lamps) && lampGroup.parent && R.items.some(x => x.kind === 'fixture')) drop(lampGroup, f => !f.prop);
+    if (!R.items.some(x => x.kind === 'band') || !props.parent) return;
     clocks.length = 0; swingers.length = 0;
-    const keep = new Set(); group.traverse(o => { if (o.geometry) keep.add(o.geometry); if (o.material) keep.add(o.material); });   // (shared with what stays)
-    freeTree(props, keep); api.furnished = true;
+    drop(props, f => f.prop); api.furnished = true;
   }
-  const api = { group, update, dispose, upgrade, beam, fixtures, dolls, doorTiles, calm: false, kitCount: 0, furnished: !!env.furnished };
+  const api = { group, update, dispose, upgrade, beam, fixtures, dolls, doorTiles, calm: false, dark: false, flick: null, kitCount: 0, furnished: !!env.furnished };
   return api;
 }
 
