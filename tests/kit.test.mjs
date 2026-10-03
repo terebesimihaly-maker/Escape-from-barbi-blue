@@ -205,6 +205,7 @@ for (let i = 0; i < 5; i++) {
     return { kit: !!kit, levelKit: !!R && R.kit === kit, n: SOLIDS.length, ph: R.solids.filter(s => s.placeholder).length, standIn: R.solids.filter(s => s.placeholder && s.standIn).length,
       phNodes: R.solids.filter(s => s.placeholder).map(s => s.id), invisible, offBox, grey, covers: Kit.covers(kit, plan, { placeholders: false }),
       band: R.items.filter(x => x.kind === 'band').length, planBand: plan.band.length, fixtures: R.items.filter(x => x.kind === 'fixture').length, windows: R.items.filter(x => x.kind === 'window').length,
+      fixArt: plan.fixtures.filter(fx => kit.nodes[fx.node] && !kit.isPlaceholder(fx.node)).length, houseLamps: level.house.fixtures.length, planFix: plan.fixtures.length,
       furnished: level.house.furnished, props: props ? props.children.length : -1, dolls: level.house.dolls.length, planDolls: plan.dolls.length,
       dollsAt: level.house.dolls.every(d => plan.dolls.some(q => Math.abs(d.obj.position.x - q.x) < 1e-6 && Math.abs(d.obj.position.z - q.z) < 1e-6)),
       wards: closets.map(c => ({ kitW: !!c.kitWardrobe, doors: c.doors ? c.doors.length : 0,
@@ -223,7 +224,8 @@ for (let i = 0; i < 5; i++) {
   check(G.furnished === kitBand && (kitBand ? G.band > 0 && G.props === 0 : G.band === 0 && G.props > 0),
     `${tag}: band decor from the kit and no house.js props, or neither (kit art for ${(G.covers * 100).toFixed(0)}% of it: ${kitBand ? 'kit' : 'house.js'})`, [G.furnished, G.band, G.planBand, G.props]);
   if (realStyle(style)) check(kitBand, `${tag}: a floor with real furniture also gets the kit's band decor`, G.covers);
-  check(G.fixtures === 0 && G.windows === 0, `${tag}: no kit lamps (house.js lights the floor for now) and no kit windows (Arch places them)`, [G.fixtures, G.windows]);
+  check(G.fixtures === G.fixArt && G.fixArt > 0 && G.windows === 0, `${tag}: the kit's lamp at every plan lamp it has art for (${G.fixArt} of ${G.planFix}), no kit windows (Arch places them)`, [G.fixtures, G.fixArt, G.windows]);
+  check(G.houseLamps === G.planFix - G.fixArt, `${tag}: house.js hangs stand-ins only for the plan lamps without kit art`, [G.houseLamps, G.planFix - G.fixArt]);
   check(G.dolls <= G.planDolls && G.dollsAt && (G.planDolls < 6 || G.dolls > 0), `${tag}: the scare dolls sit where the plan says (${G.dolls} of its ${G.planDolls} on Low)`, [G.dolls, G.planDolls]);
   check(G.wards.length > 0 && G.wards.every(w => w.doors === 2 && w.hinges && w.inLevel && w.kitW === realWard(style)),
     `${tag}: the wardrobes are ${realWard(style) ? "the kit's" : 'the painted ones'}, with makeWardrobe's hinges`, G.wards.slice(0, 2));

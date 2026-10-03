@@ -239,7 +239,7 @@ function withKit(i, btn, go) {
   };
   const cap = setTimeout(finish, 30000);
   if (btn) btn.disabled = true;
-  Promise.all([Kit.want(F.style), typeof Arch !== 'undefined' ? Arch.loadProfiles(F.style) : null]).then(finish, finish);
+  Promise.all([Kit.want(F.style), typeof Arch !== 'undefined' ? Arch.loadProfiles(F.style) : null, typeof MatLib !== 'undefined' ? loadLightData() : null]).then(finish, finish);
 }
 function renderLevels() {
   document.querySelectorAll('#diffSeg button').forEach(b => b.classList.toggle('on', b.dataset.d === settings.difficulty));

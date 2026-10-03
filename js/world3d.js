@@ -8,7 +8,7 @@
 const S = 0.045, TILE_M = T * S, WALL_H = 3.0, EYE = 1.62, M_SCALE = 1.38;
 const LOWQ = matchMedia('(pointer: coarse)').matches;
 const FLASH_I = 25;
-let renderer = null, scene, camera, flash, aura, exitLight, dustPts, glowTex, level = null;
+let renderer = null, scene, camera, flash, aura, exitLight, hemi, dustPts, glowTex, level = null;
 let composer = null, renderPass = null, bloomPass = null, useBloom = false, flashCookie = null;
 let titleScene, titleCam, titleLight, titleBulb, titleBulbLight, titleKey, titleAim = null, barbi = null, deathCam = null;
 let mocapData = null, playerTemplate = null, playerTemplateLoad = null;   // (teammates in multiplayer: models/barbi.glb, the same skeleton as hers)
@@ -48,7 +48,8 @@ function init3D() {
 
   scene = new THREE.Scene(); scene.background = new THREE.Color(0x020205); scene.fog = new THREE.Fog(0x020205, 1.5, 16);
   camera = new THREE.PerspectiveCamera(70, 1, 0.05, 18); camera.rotation.order = 'YXZ'; scene.add(camera);   // (the fog hides everything past 16 m)
-  scene.add(new THREE.HemisphereLight(0x4a5a8a, 0x140c0c, 0.3));
+  // (the ambient: 0.16 now that the lamps and the moon are baked into the house, spec C1; 0.3 when the bake fails, E7)
+  hemi = new THREE.HemisphereLight(0x4a5a8a, 0x140c0c, typeof MatLib !== 'undefined' ? 0.16 : 0.3); scene.add(hemi);
   // the flashlight is held low and to the right, so her shadow falls on the walls behind her
   flash = new THREE.SpotLight(0xffe0b0, FLASH_I, 22, 0.52, 0.55, 0.95);
   flash.position.set(0.2, -0.25, 0.1); flash.target.position.set(0.1, -0.4, -6);
@@ -60,6 +61,8 @@ function init3D() {
     i.src = 'textures/flashlight_cookie.webp'; }
   flash.shadow.camera.near = 0.25; flash.shadow.camera.far = 22; flash.shadow.bias = -0.0006; flash.shadow.normalBias = 0.03;
   aura = new THREE.PointLight(0x8595c8, 1.2, 4.5, 1.4); camera.add(aura);     // a little light around you, even in the wardrobe
+  // (and where the flashlight lands, its bounce off that surface: js/atmos.js moves this same light there, spec C7; no new light)
+  if (typeof Atmos !== 'undefined') Atmos.bounce.init(aura, flash, scene);
   exitLight = new THREE.PointLight(0x50ff90, 0, 9, 1.3); scene.add(exitLight);
 
   const dg = new THREE.BufferGeometry();

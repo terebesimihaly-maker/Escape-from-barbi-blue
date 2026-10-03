@@ -7,10 +7,13 @@ const TEX_KEYS = ['map', 'emissiveMap', 'bumpMap', 'normalMap', 'roughnessMap', 
 function disposeLevel() {
   if (!level) return;
   if (level.house) level.house.dispose();
+  if (level.atmos) level.atmos.dispose();                  // (the shafts, motes, near layer: js/atmos.js)
+  if (level.surface) level.surface.dispose();              // (the decals' and prints' own geometry and textures: js/surface.js)
   scene.remove(level.group);
   const seen = new Set();
   // (a texture marked shared outlives the floor: the portraits painted in Blender, loaded once for every floor)
-  const tex = t => { if (t && t !== glowTex && !t.userData.shared && !seen.has(t)) { seen.add(t); t.dispose(); } };
+  // (nor MatLib's 1-pixel stand-ins, which every floor's materials share: js/matlib.js)
+  const tex = t => { if (t && t !== glowTex && !t.userData.shared && !t.userData.mlStandIn && !seen.has(t)) { seen.add(t); t.dispose(); } };
   const mat = m => { if (!m || seen.has(m) || m.userData.shared) return; seen.add(m);   // (shared: the kit's own, left on a module's wall part)
     for (const k of TEX_KEYS) tex(m[k]);
     if (m.userData) { tex(m.userData.overlay); if (m.userData.disposables) m.userData.disposables.forEach(tex); }
@@ -28,21 +31,26 @@ function disposeLevel() {
   if (level.arch) level.arch.dispose();
   // (and its materials: some sit only on the kit's pieces, which the traversal above leaves alone)
   if (level.archOpts) for (const m of Object.values(level.archOpts.materials)) mat(m);
+  if (typeof MatLib !== 'undefined') MatLib.releaseLevel();   // (the level's lightmaps and overlays, back to the stand-ins)
   level = null;
 }
 function buildLevel() {
   disposeLevel();
   const F = FLOORS[floorIdx], G = new THREE.Group(), L = TILE_M;
   level = { grid, group: G, door: null, prints: null, plan: null, arch: null };
-  const ftx = floorTexture(F);   // the floor's own picture doubles as its relief: dark seams and grout sit lower
-  // (a physically based floor: varnished boards and polished tiles throw the flashlight and the lamps back at you)
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(GW * L, GH * L), new THREE.MeshStandardMaterial({ map: ftx, bumpMap: ftx, bumpScale: 2.5,
-    roughness: { wood: 0.5, tile: 0.28, concrete: 0.85 }[floorKind(F)], metalness: 0, color: new THREE.Color().setScalar(floorKind(F) === 'tile' ? 2.6 : 1.8) }));
-  floor.rotation.x = -Math.PI / 2; floor.position.set(GW * L / 2, 0, GH * L / 2); floor.receiveShadow = true; G.add(floor);
   // the house's shell: from the floor's plan (js/dress.js), the walls at their real heights, the ceilings and their steps and gables,
   // the mouldings, beams, doorways with their leaves, and the kit's doors, windows, fireplaces and holes (js/arch.js). Without those
   // files (or if the plan fails) the old flat walls and ceiling stand in
-  const plan = floorPlan();
+  const plan = floorPlan(), lit = !!plan && typeof MatLib !== 'undefined';   // (lit: the baked light and MatLib's materials, below)
+  if (lit) MatLib.tier = settings.quality;
+  // the floor: with the plan, MatLib's (the baked lamps and moonlight, js/surface.js's overlays: dust, wet, corner shade, decals),
+  // the painted boards standing in until the Blender ones load; else the painted floor, its own picture doubling as its relief
+  const ftx = floorTexture(F, lit), fRough = { wood: 0.5, tile: 0.28, concrete: 0.85 }[floorKind(F)], fCol = new THREE.Color().setScalar(floorKind(F) === 'tile' ? 2.6 : 1.8);
+  const floorMat = lit ? MatLib.floorMaterial({ map: ftx, GW: 1, GH: 1, roughness: fRough, color: fCol, env: envTex(F.style) || undefined })
+    : new THREE.MeshStandardMaterial({ map: ftx, bumpMap: ftx, bumpScale: 2.5, roughness: fRough, metalness: 0, color: fCol });
+  if (lit) ftx.dispose();                                   // (MatLib keeps its own copy of it, same picture)
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(GW * L, GH * L), floorMat);
+  floor.rotation.x = -Math.PI / 2; floor.position.set(GW * L / 2, 0, GH * L / 2); floor.receiveShadow = true; G.add(floor);
   let faces, walls = null, ceil = null, wallMat;
   if (plan) { level.plan = plan; faces = plan.faces; wallMat = buildArch(F, plan, G).wall; }
   else {
@@ -62,7 +70,7 @@ function buildLevel() {
   const pzFaces = puzzleFaces(), onPuzzleFace = f => pzFaces.has(f.x + ',' + f.y + ',' + f.nx + ',' + f.nz);   // (walls with a labyrinth box)
   const keep = new Set([...closets.map(c => Math.floor(c.x / T) + ',' + Math.floor(c.y / T)), exit.tx + ',' + exit.ty]);
   level.house = House.build(THREE, { style: F.style, L, H: WALL_H, GW, GH, isWall, faces, keep, wallMat, hash, toTex, glowTex, doll: dollTemplate || null,
-    furnished: kitBand, dolls: plan ? plan.dolls : null, clear: clearOfSolids,
+    furnished: kitBand, lamps: plan ? fallbackLamps(kit, plan) : undefined, dolls: plan ? plan.dolls : null, clear: clearOfSolids,
     exitFace: plan ? null : faces.find(isExitFace), arch: !!plan, doorKeys: plan ? plan.doorKeys : null, ceilXZ: plan && typeof ceilAtXZ === 'function' ? ceilAtXZ : null,
     ceilKeep: plan ? new Set(plan.modules.filter(m => m.face < 0 && m.kind !== 'ceilingrose').map(m => m.x + ',' + m.y)) : null,
     decorFace: plan ? f => f.busy.includes('decor') || f.busy.includes('puzzle') : f => onPuzzleFace(f) || hash(f.x * 7 + f.nx, f.y * 7 + f.nz, 91) < F.frames + 0.045,
@@ -77,12 +85,13 @@ function buildLevel() {
   // the furniture you bump into (SOLIDS, js/layout.js), every box exactly on its footprint (H5), and the band decor along the walls,
   // from the kit (js/kit.js; see KIT_BAND_MIN for what is real and what stands in)
   if (typeof Kit !== 'undefined') { Kit.furnish(level, plan || { style: F.style, floorIdx }, furnishOpts(F, kit, kitBand)); level.house.kitCount = level.kit.kitCount; }
-  uploadKitTextures(G);                                  // (now, while the floor is being built, not the first time each piece comes into view)
   upgradeSurfaces(F, floor.material, G, walls, faces, ceil);   // (the surfaces baked in Blender, when they've loaded: tools/blender/kit/surfaces2.py)
   buildPuzzles3D(G);                                     // the labyrinth boxes on the walls (js/puzzles.js)
   notes.forEach(n => { const o = makeNote(n); n.obj = o; G.add(o); });
   if (boardsTemplate) for (const b of creaks) G.add(makeBoard(b));    // (the loose floorboards, in 3D; otherwise painted on the floor)
   level.prints = makePrints(); G.add(level.prints);
+  if (lit) lightLevel(level, F);                         // the light: baked lamps, moonlight, the floor's overlays, the night outside (below)
+  uploadKitTextures(G);                                  // (now, while the floor is being built, not the first time each piece comes into view)
   scene.add(G);
 }
 
@@ -95,11 +104,11 @@ const BAKE_TIER = { low: 'lo', medium: 'md', high: 'hi' };
 // Builds the shell with the floor's kit when it has loaded (Kit.get: doors, windows, fireplaces, holes, the exit's porch), else with
 // procedural doorways and every face kept (E7); a kit that arrives during the floor rebuilds the shell alone (lateKit). Returns the materials.
 function buildArch(F, plan, G) {
-  const kit = typeof Kit !== 'undefined' ? Kit.get(F.style) : null, B = Dress.bakeInput(plan, Dress.envFromGame());
+  const kit = typeof Kit !== 'undefined' ? Kit.get(F.style) : null, B = Dress.bakeInput(plan, Dress.envFromGame(), LIGHT_DATA.data || undefined);
   // (the wall faces' cells in the light atlas, uv1: the same ones LightBaker.bake will give, for the bake's tier)
   const tier = BAKE_TIER[settings.quality] || 'lo', atlas = LightBaker.packAtlas(B.faces, tier, LightBaker.faceHeights(B, B.faces));
   const materials = archMaterials(F, plan);
-  level.archOpts = { bake: B, cells: atlas.cells, tier, materials, windows: true };
+  level.archOpts = { bake: B, cells: atlas.cells, tier, materials, windows: true, lightData: !!LIGHT_DATA.data };
   level.arch = Arch.build(plan, kit, level.archOpts); level.archKit = kit;
   G.add(level.arch.group);
   if (typeof Kit !== 'undefined') {
@@ -125,10 +134,13 @@ function lateKit(lv, kit) {
       if (old.open) lv.door.setOpen(true, 10);
     }
     lv.compiled = false;
+    if (lv.light) {                                         // (the windows are open now: their moonlight in again, spec E4, and the night)
+      bakeLight(lv); if (lv.atmos) lv.atmos.dispose(); lv.atmos = buildAtmos(lv); }
     // then the furniture: the kit's pieces in place of the stand-ins, the kit's wardrobes in place of the painted ones (open as far
     // as they were), the band decor if the kit has it (house.js drops its props then: level.house.upgrade); compiled first too
     if (lv.kit) Kit.upgradeAsync(lv, lv.plan, { kit, band: kitFurnishesBand(kit, lv.plan), exitDoor: false })
-      .then(R => { if (R && level === lv) { if (lv.house) lv.house.kitCount = R.kitCount; lv.compiled = false; uploadKitTextures(lv.group, true); } });
+      .then(R => { if (R && level === lv) { if (lv.house) lv.house.kitCount = R.kitCount; lv.compiled = false; uploadKitTextures(lv.group, true);
+        if (lv.light) MatLib.withLightField(R.group); } });
   };
   if (renderer.compileAsync) renderer.compileAsync(A.group, camera, scene).then(swap, swap); else swap();
 }
@@ -143,7 +155,8 @@ function lateKit(lv, kit) {
      KIT_BAND_MIN of the plan's pieces (the few without are left out); then house.js places no furniture or props of its own (only
      its lamps, rugs, puddles and pipes). Below that, the kit places none and house.js's old props are the fallback, as without a
      kit: half a wall of real pieces beside half a wall of procedural ones would look worse than either.
-   - Lamps stay house.js's for now (fixtures: false: its lights and pool, until the lighting package); windows are Arch's.
+   - Lamps are the kit's (fixtures: the plan's lamps, js/dress.js, with their emission profiles: js/lightbake.js bakes their light);
+     house.js hangs plain stand-ins only for lamps the kit has no art for (or before it has loaded). Windows are Arch's.
    With the manifest as it is now, all five floors are furnished from the kit (only three common band pieces are still grey: they are
    left out); the stand-ins show only while a floor's kit is still loading, or for pieces a later manifest marks grey again. */
 const KIT_BAND_MIN = 0.8;
@@ -162,7 +175,18 @@ function uploadKitTextures(root, spread) {
 }
 function kitFurnishesBand(kit, plan) { return !!(kit && plan && typeof Kit !== 'undefined' && Kit.covers(kit, plan, { placeholders: false }) >= KIT_BAND_MIN); }
 function furnishOpts(F, kit, band) {
-  return { kit, placeholders: false, windows: false, fixtures: false, band, evict: false, standIn: (s, it, tier) => standInLook(F.style, s, tier) };
+  return { kit, placeholders: false, windows: false, fixtures: true, band, evict: false, standIn: (s, it, tier) => standInLook(F.style, s, tier),
+    glassMat: typeof MatLib !== 'undefined' ? pieceGlass(F.style) : undefined };
+}
+// the glass of the kit's pieces (bell jars, cabinet doors, lanterns; the windows have js/atmos.js's, with rain on it): clear, thin, with the
+// room's own reflections in it (textures/env/<style>.webp) instead of the night sky; one per style, kept (shared)
+const PIECE_GLASS = {};
+function pieceGlass(style) {
+  if (PIECE_GLASS[style]) return PIECE_GLASS[style];
+  const env = envTex(style), m = new THREE.MeshStandardMaterial({ name: 'KitGlass', color: 0xd4dce4, roughness: 0.12, metalness: 0, transparent: true, opacity: 0.14,
+    depthWrite: false, envMap: env || null, envMapIntensity: 0.6 });
+  m.userData.shared = true; m.userData.kit = true;
+  return env ? (PIECE_GLASS[style] = m) : m;                // (made again until the picture is in: a later swap would change its program)
 }
 // (house.js's props keep out of the boxes you bump into: a prop of radius rm at (xm, zm) m)
 function clearOfSolids(xm, zm, rm) {
@@ -256,6 +280,7 @@ function kitExit(lv, kit) {
 // The shell's materials: painted stand-ins at once, the surfaces baked in Blender (textures/surf/<style>/, B9) swapped into the same
 // materials when they've loaded (no rebuild), at the tier Kit.tierFor picks (lo on Low, with the lighter Lambert materials).
 function archMaterials(F, plan) {
+  if (typeof MatLib !== 'undefined') return archMaterialsLit(F, plan);
   const low = settings.quality === 'low', style = F.style;
   const lit = o => { if (!low) return new THREE.MeshStandardMaterial(Object.assign({ roughness: 0.85, metalness: 0 }, o));
     const q = Object.assign({}, o); delete q.roughness; return new THREE.MeshLambertMaterial(q); };
@@ -298,6 +323,139 @@ function archMaterials(F, plan) {
   return M;
 }
 
+// The same with MatLib's families (js/matlib.js): walls and ceilings that take the baked lamps and moonlight through uv1, the woodwork
+// lit by the light field. Every material has all its texture slots from the start (stand-ins), so the Blender sets swap in with no
+// new program (H13); on Low the walls are Lambert with the colour alone (no relief: lighter).
+function archMaterialsLit(F, plan) {
+  const low = settings.quality === 'low', style = F.style, tier = settings.quality;
+  const lit = o => { const m = low ? (() => { const q = Object.assign({}, o); delete q.roughness; return new THREE.MeshLambertMaterial(q); })()
+    : new THREE.MeshStandardMaterial(Object.assign({ roughness: 0.85, metalness: 0 }, o)); return MatLib.withLightField(m); };
+  const col = c => new THREE.Color(c);
+  const wt = wallTexture(F), ct = ceilingTexture(F);
+  const M = {
+    wall: MatLib.wallMaterial({ map: wt, tier, color: new THREE.Color().setScalar(wallKind(F) === 'tile' ? 2.2 : wallKind(F) === 'attic' ? 1.4 : 1) }),
+    upper: MatLib.wallMaterial({ variant: false, tier, color: col(F.face) }),
+    service: MatLib.wallMaterial({ variant: false, tier, color: col(F.face) }),
+    ceiling: MatLib.ceilingMaterial({ map: ct, tier }),
+    trim: lit({ color: col({ wood: '#9e927e', tile: '#3b2718', concrete: '#3a3631', attic: '#2e2218', workshop: '#2a1d14' }[style]), roughness: 0.55 }),
+    beam: lit({ color: col('#3a2a1c') }), ibeam: lit({ color: col('#34302c'), roughness: 0.6 }),
+    frame: lit({ color: col({ wood: '#a39680', tile: '#3a2616', concrete: '#3a2c20', attic: '#3a2a1c', workshop: '#2a1d14' }[style]), roughness: 0.7 }),
+    // the windows' glass (rain, grime, the sky in it) and the sky behind them: js/atmos.js's, one of each for every floor (shared)
+    glass: Atmos.glassMaterial(tier), sky: Atmos.skyMaterial(tier),
+  };
+  M.leaf = M.frame.clone(); M.header = M.wall;
+  M.glass.userData.shared = M.sky.userData.shared = true;
+  // (the painted wallpaper is one tile wide: twice across, so the variant trick's u / 2 + variant / 2 covers it once)
+  M.wall.map.repeat.set(2, 1);
+  wt.userData.bump.dispose(); wt.dispose();                 // (the material has its own copies of the painted pictures; no relief)
+  const lv = level, stier = surfTier();
+  // a part's baked set into its materials, in the slots they already have: copies repeated as the part's uv needs (freed with the level)
+  const swap = (part, mats, rx, nx, clampV) => bakedSet(style, part, stier).then(s => {
+    if (!s || level !== lv) return;
+    const rep = (t, x) => { const c = t.clone(); c.repeat.set(x, 1); if (clampV) c.wrapT = 1001; c.needsUpdate = true; return c; };   // (1001: ClampToEdgeWrapping)
+    const put = (m, k, t, x) => { const o = m[k]; if (!o) return; m[k] = rep(t, x); if (!o.userData.mlStandIn) o.dispose(); };
+    for (const m of mats) {
+      put(m, 'map', s.map, rx); put(m, 'normalMap', s.normalMap, nx); put(m, 'roughnessMap', s.orh, nx);
+      if (m.roughnessMap) m.roughness = 1;
+      if (m.userData.mlFamily) m.color.setScalar(part === 'wall' || part === 'upper' || part === 'service' ? 1.1 : 1);
+    }
+  });
+  swap('wall', [M.wall], 1, 2); swap('upper', [M.upper], 1, 1); swap('service', [M.service], 1, 1); swap('ceil', [M.ceiling], 1, 1);
+  return M;
+}
+
+/* ---------- the light (spec C, E2 steps 8-10, E3) ----------
+   The lamps are baked (js/lightbake.js): their light on the floor, walls and ceilings and a light field for everything else, from the
+   plan's lamps (js/dress.js) with their Blender emission profiles (textures/light/profiles.json), so no lamp is a real light (C2).
+   Moonlight comes in through the windows: baked patches shaped by each window's cookie (textures/light/cookies/), the night sky in
+   the windows, and on Medium and High beams of light with dust in them (js/atmos.js). js/surface.js paints the floor's overlays (corner
+   shade, contact shadows, dust, wet, walked paths) and the wall decals. Everything that changes during play is a uniform (MatLib.U:
+   the lamps dimmed by a scare, flicker, the clock), so nothing recompiles (H13). Without the plan (or MatLib) none of this runs. */
+const LIGHT_DATA = { data: null, loading: null }, MOON_GAIN = 1.7;
+const COOKIE_TYPES = ['sash', 'tall', 'cellar', 'cellar_short', 'dormer', 'industrial', 'oculus'];
+// the light data from Blender (emission profiles, AO curves, window cookies): once, at boot; the bake works without (isotropic lamps,
+// soft-edged window patches) and a floor built before it arrived is baked again when it does
+function loadLightData() {
+  if (LIGHT_DATA.loading) return LIGHT_DATA.loading;
+  const json = u => fetch(u).then(r => r.ok ? r.json() : null).catch(() => null);
+  const grey = u => new Promise(res => { const im = new Image();
+    im.onload = () => { try { const c = mkCanvas(im.width, im.height), g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(im, 0, 0);
+      const d = g.getImageData(0, 0, im.width, im.height); res({ w: d.width, h: d.height, data: d.data }); } catch (e) { res(null); } };
+    im.onerror = () => res(null); im.src = u; });
+  const names = COOKIE_TYPES.flatMap(t => [-30, 0, 30].map(a => t + '_' + a));
+  return (LIGHT_DATA.loading = Promise.all([json('textures/light/profiles.json'), json('textures/light/ao_profiles.json'),
+    Promise.all(names.map(n => grey('textures/light/cookies/' + n + '.webp')))]).then(([profiles, ao, ck]) => {
+    const cookies = {}; names.forEach((n, i) => { if (ck[i]) cookies[n] = ck[i]; });
+    LIGHT_DATA.data = { profiles: profiles || undefined, aoProfiles: ao || undefined, cookies };
+    const lv = level;                                       // (a floor already built without it: baked again, with it)
+    if (lv && lv.light && !lv.archOpts.lightData && renderer) { lv.archOpts.lightData = true; Object.assign(lv.archOpts.bake, LIGHT_DATA.data, { fixtures: Dress.forBake(lv.plan.fixtures, LIGHT_DATA.data.profiles) }); bakeLight(lv); }
+    return LIGHT_DATA.data;
+  }));
+}
+// the style's dim interior panorama (textures/env/<style>.webp): the wet floor's reflections on Medium and High. Loaded at boot, used
+// only when it's there as the floor is built (a later swap would change the reflection's program)
+const ENV_TEX = {};
+function envTex(style) {
+  if (!(style in ENV_TEX)) { ENV_TEX[style] = null;
+    loadTex('textures/env/' + style + '.webp', true).then(t => { if (t) { t.mapping = 303; t.userData.shared = true; ENV_TEX[style] = t; } }); }   // (303: equirect)
+  return ENV_TEX[style];
+}
+// the plan's lamps the kit can't show (no kit yet, or no art for that lamp): house.js hangs plain ones there (none: the kit's all)
+function fallbackLamps(kit, plan) {
+  return plan.fixtures.filter(fx => !(kit && fx.node && kit.nodes[fx.node] && !kit.isPlaceholder(fx.node)));
+}
+// the light of a new floor: bake, overlays, the night outside; everything else in the level takes the light field
+function lightLevel(lv, F) {
+  const t0 = performance.now();
+  lv.light = { flick: new Float32Array(16).fill(1), phase: Array.from({ length: 16 }, (_, g) => hash(g, floorIdx, 913) * 100), ms: {} };
+  if (lv.house) lv.house.flick = lv.light.flick;
+  try { lv.surface = Surface.build(Object.assign(Surface.lvFromGame({ tier: settings.quality, plan: lv.plan }), { cells: lv.archOpts.cells, aoProfiles: LIGHT_DATA.data && LIGHT_DATA.data.aoProfiles }));
+    lv.group.add(lv.surface.decals.group); if (lv.surface.dustPrints) lv.group.add(lv.surface.dustPrints); }
+  catch (e) { console.error('Surface.build', e); lv.surface = null; }
+  lv.light.ms.surface = +(performance.now() - t0).toFixed(1);
+  bakeLight(lv);
+  MatLib.withLightField(lv.group);                         // (the kit's pieces, wardrobes, woodwork, puzzles, props: lit where they stand)
+  lv.atmos = buildAtmos(lv);
+  lv.light.ms.total = +(performance.now() - t0).toFixed(1);
+}
+// the bake itself (again when the kit's windows or the light data arrive late), into the materials
+function bakeLight(lv) {
+  const t0 = performance.now(), B = lv.archOpts.bake;
+  let R = null;
+  // (no kit, no windows: the walls are closed there (E7), so no moonlight comes in until they open)
+  // (the moon's K: the formula K cookie sin(elevation) with K 0.7 gives floor patches of about 0.4; C9's target is about 0.7)
+  const moon = B.moon ? Object.assign({}, B.moon, { k: (B.moon.k || 0.7) * MOON_GAIN }) : B.moon;
+  try { R = LightBaker.bake(Object.assign({}, B, { moon }, lv.archKit ? {} : { windows: [] }), lv.archOpts.tier); }
+  catch (e) { console.error('LightBaker.bake', e); }
+  if (!R) { MatLib.setK(0, true, false); hemi.intensity = 0.3; lv.light.failed = true; return; }   // (E7: no baked lamps, the old ambient)
+  if (R.stats && R.stats.warnings && R.stats.warnings.length) console.warn('LightBaker:', R.stats.warnings.slice(0, 5).join(' | '));
+  const S = lv.surface;
+  MatLib.setLevelMaps(Object.assign({}, R, S ? S.maps : {}, { GW, GH }));
+  const cols = []; for (const g of R.groups || []) if (g.id >= 0 && g.id < 16) cols[g.id] = g.color;
+  for (let i = 0; i < 16; i++) if (!cols[i]) cols[i] = [1, 0.75, 0.5];
+  MatLib.setFlick(null, cols);
+  lv.light.bake = { groups: R.groups, fixGroup: R.fixGroup, moonlit: R.moonlit, stats: R.stats, windows: !!lv.archKit };
+  lv.light.ms.bake = +(performance.now() - t0).toFixed(1);
+}
+// the night outside: the sky in the windows, their glass, the moonlight's beams and the dust in them (js/atmos.js)
+function buildAtmos(lv) {
+  // (no kit yet: the walls are closed where the windows will be, so no beams either)
+  try { return Atmos.build(lv, lv.archKit ? lv.plan : Object.assign({}, lv.plan, { windows: [] }), { tier: settings.quality, grid }); }
+  catch (e) { console.error('Atmos.build', e); return null; }
+}
+// every frame (render.js): uniforms only. The lamps dim with a scare and go out in the dark one (the moon never does: C8), the
+// flickering groups follow house.js's curve (each group its own phase; "Calm effects" holds them at 0.8), the clock for the sky's
+// clouds and the dust
+function updateLight(dt, t) {
+  const L = level && level.light; if (!L) return;
+  const calmNow = calm();
+  for (let g = 0; g < 16; g++) { const ph = L.phase[g], n = Math.sin(t * 13 + ph) * 0.5 + Math.sin(t * 29 + ph * 2) * 0.5;
+    L.flick[g] = (Math.sin(t * 2.3 + ph) > 0.35 && Math.random() < 0.55) ? 0.08 : 0.85 + 0.15 * n; }
+  if (!L.failed) MatLib.setK(scares.dim, scares.dim < 0.5, calmNow, dt);
+  MatLib.setFlick(L.flick); MatLib.setTime(t);
+  if (level.atmos) level.atmos.update(t);
+}
+
 /* ---------- the surfaces baked in Blender (textures/surf/<style>/, made by tools/blender/kit/surfaces2.py) ----------
    Per floor style: the floor (one 2.25 m tile), the wall (2.25 x 3 m; two looks side by side in one picture: A as built,
    B damaged: stains, mould, peeling, flaking) and the ceiling, each with its colour, normal map (the relief) and orh map
@@ -329,8 +487,18 @@ function bakedSet(style, part, tier) {
   surfCache.set(key, p); return p;
 }
 function upgradeSurfaces(F, floorMat, G, walls, faces, ceil) {
-  const style = SURF_STYLES[floorIdx]; if (!style || settings.quality === 'low') return;   // (low quality: the painted ones, lighter)
+  const style = SURF_STYLES[floorIdx]; if (!style) return;
   const lv = level, tier = surfTier();
+  if (floorMat.userData.mlFamily) {                         // MatLib's floor: the set into the slots it has, one picture per tile
+    bakedSet(style, 'floor', tier).then(s => {
+      if (!s || level !== lv) return;
+      const rep = t => { const c = t.clone(); c.repeat.set(GW, GH); c.needsUpdate = true; return c; };
+      for (const [k, t] of [['map', s.map], ['normalMap', s.normalMap], ['roughnessMap', s.orh]]) { const o = floorMat[k]; floorMat[k] = rep(t); if (o && !o.userData.mlStandIn) o.dispose(); }
+      floorMat.roughness = 1; floorMat.color.setScalar(1.25);
+    });
+    return;
+  }
+  if (settings.quality === 'low') return;                   // (low quality: the painted ones, lighter)
   // (copies of the cached textures, repeated as the level needs: the level's own, disposed with it)
   const rep = (t, x, y) => { const c = t.clone(); c.repeat.set(x, y); c.needsUpdate = true; return c; };
   bakedSet(style, 'floor', tier).then(s => {
@@ -393,14 +561,14 @@ function makeBoard(b) {
   return g;
 }
 // the floor is painted once per floor, tile by tile, into one big texture
-function floorTexture(F) {
+function floorTexture(F, lit) {
   const res = Math.min(2, (LOWQ ? 1536 : 2048) / (Math.max(GW, GH) * T));
   const c = mkCanvas(Math.ceil(GW * T * res), Math.ceil(GH * T * res)), g = c.getContext('2d');
   g.setTransform(res * T / PT, 0, 0, res * T / PT, 0, 0);
   g.fillStyle = '#000'; g.fillRect(0, 0, GW * PT, GH * PT);
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (!grid[y][x]) paintFloor(g, F, x, y);
-  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (!grid[y][x]) paintShade(g, x, y);
-  for (const d of decals) paintDecal(g, d);
+  if (!lit) for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (!grid[y][x]) paintShade(g, x, y);   // (lit: js/surface.js's overlay has them)
+  if (!lit) for (const d of decals) paintDecal(g, d);
   if (!boardsTemplate) for (const b of creaks) paintBoard(g, b);   // the loose floorboards (js/stealth.js): painted, unless the 3D ones are here
   return toTex(c);
 }

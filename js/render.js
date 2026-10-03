@@ -101,7 +101,11 @@ function render3D(t) {
   placeCamera(t); setListener(camera);
   // (the flashlight is dimmed to 0 rather than switched off: switching lights on and off makes every material recompile, a stutter)
   flash.intensity = p.hidden || p.dead ? 0 : FLASH_I * (calm() ? 0.8 + 0.2 * flicker : flicker) * (p.down ? 0.5 : 1) * scares.dim;
-  aura.intensity = p.hidden ? (closetScene && closetScene.t > 0 ? 3.5 : 3.2) : 1.2 * (p.hidden ? 1 : scares.dim); aura.distance = p.hidden ? 8 : 4.5;
+  // the light around you: in a wardrobe (or out of the game) as it always was, at the camera; otherwise the flashlight's bounce off
+  // whatever it lands on (js/atmos.js, spec C7: the same aura light, moved there)
+  if (typeof Atmos !== 'undefined') Atmos.bounce.update(lastDt, camera, flash, p.hidden ? (closetScene && closetScene.t > 0 ? 3.5 : 3.2) : p.dead ? 1.2 * scares.dim : false, p.hidden ? 8 : 4.5);
+  else { aura.intensity = p.hidden ? (closetScene && closetScene.t > 0 ? 3.5 : 3.2) : 1.2 * (p.hidden ? 1 : scares.dim); aura.distance = p.hidden ? 8 : 4.5; }
+  updateLight(lastDt, t);                         // the baked lamps' level, flicker, the moon's clock (js/level.js)
 
   // her
   if (barbi) {
@@ -175,8 +179,9 @@ function render3D(t) {
   if (D) { if (D.setOpen) D.setOpen(powerOn); else if (powerOn && !D.open) { D.open = true; D.door.material = D.openMat; }
     D.lamp.material.color.setHex(powerOn ? 0x4dff88 : (Math.sin(t * 6) > 0 ? 0xff3030 : 0x401010)).multiplyScalar(4);
     exitLight.intensity = powerOn ? 2.5 + Math.sin(t * 5) * 0.5 : 0; }
-  const P = level.prints;
-  prints.forEach((f, i) => { const k = Math.min(1, f.t / 4);
+  const P = level.prints, cs = level.surface && level.surface.cpuSurf;
+  // (her wet blue prints; where the floor is dusty she leaves bare prints in the dust instead: js/surface.js, spec D2)
+  prints.forEach((f, i) => { const k = cs && cs.dust(f.x * S, f.y * S) > 0.4 ? 0 : Math.min(1, f.t / 4);
     _m4.compose(_v.set(f.x * S, 0.004, f.y * S), _q.setFromAxisAngle(_up, -f.a), _sc.set(k, 1, k)); P.setMatrixAt(i, _m4); });
   P.count = prints.length; P.instanceMatrix.needsUpdate = true;
   // dust floating in the flashlight beam
@@ -198,10 +203,18 @@ function render3D(t) {
   }
   if (level.kit && level.kit.update) level.kit.update(lastDt);     // (the kit's rocking chairs, mobiles, pendulums: still with calm effects)
   if (level.house) { level.house.calm = calm(); level.house.dark = scares.dim < 0.5; }
+  if (level.surface) level.surface.update(lastDt, surfActors(p, m));   // (prints in the dust: js/surface.js)
   if (level.house) level.house.update(lastDt, t, camera, p, flash);
   draw(scene, camera);
 }
 
+// who leaves prints in the dust (m): you, the others, her (bare feet)
+function surfActors(p, m) {
+  const a = [{ id: 'me', kind: 'player', x: p.x * S, z: p.y * S }];
+  if (MP.on) for (const o of MP.others.values()) if (!o.dead && !o.away) a.push({ id: o.id, kind: 'player', x: o.x * S, z: o.y * S });
+  if (m.active) a.push({ id: 'her', kind: 'her', x: m.x * S, z: m.y * S });
+  return a;
+}
 function updateDust(dt) {
   const p = player;
   while (dust.length < 50) dust.push({ x: p.x + rnd(-260, 260), y: p.y + rnd(-260, 260), h: rnd(0.2, 2.7), vx: rnd(-5, 5), vy: rnd(-5, 5), ph: rnd(0, 6.28) });

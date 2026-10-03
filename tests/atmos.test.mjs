@@ -1,7 +1,7 @@
 // The night outside and the air inside (js/atmos.js, spec C6, C7, C10, H12, H13): the windows' sky and glass, the moonlight shafts
 // (one mesh per floor, every prism stopped at the first wall), the dust motes (High only, inside the window's light), the flashlight's
 // bounce light (its hit point on synthetic rays: floor, wall, ceiling, a sloped ceiling, a box; and on a real floor), and the fixed
-// light count. js/atmos.js and the modules it reads (dress, lightbake, matlib, kit, arch) aren't in index.html yet, so they're added
+// light count. js/atmos.js and the modules it reads (dress, lightbake, matlib, kit, arch) are in index.html; any missing would be added
 // to the page at run time. Ends with a moonlit window bay per style at medium and high (tests/out/atmos_<style>_<tier>.png).
 import { launch, solo, check, summary, pageErrors, OUT } from './lib.mjs';
 import fs from 'node:fs';
@@ -243,6 +243,8 @@ const live = await p.evaluate(() => {
   const r = {};
   bb.startFloor(0); buildLevel();
   const lights = () => { let n = 0; scene.traverse(o => { if (o.isLight) n++; }); return n; };
+  // (the game re-parents aura at boot, js/world3d.js: noted, then put back on the camera to watch init do it)
+  r.gameDid = aura.parent === scene; if (aura.parent !== camera) camera.add(aura);
   r.lights0 = lights(); r.auraOnCam = aura.parent === camera;
   Atmos.bounce.init(aura, flash, scene);
   r.lights1 = lights(); r.auraInScene = aura.parent === scene;
@@ -277,6 +279,7 @@ const live = await p.evaluate(() => {
 });
 check(live.lights0 === live.lights1 && live.lights1 === live.lights2 && live.lights2 === live.lights3 && live.lights3 === live.lights4, 'the light count never changes (init, build, update, hidden)', [live.lights0, live.lights1, live.lights2, live.lights3, live.lights4]);
 check(live.auraOnCam && live.auraInScene, 'bounce.init re-parents aura from the camera to the scene');
+check(live.gameDid, 'the game itself hands aura to the bounce at boot (js/world3d.js: it lives in the scene)');
 check(live.inLevel, 'Atmos.build adds its group to level.group');
 check(live.hit && live.hit.kind === 'wall' && Math.abs(live.hit.p[0] - live.wallX) < 0.01 && live.hit.n[0] === -1, 'bounce on a real floor: the flashlight hits the wall ahead', [live.hit, live.wallX]);
 check(Math.abs(live.aura[0] - (live.wallX - 0.35)) < 0.05 && live.auraD === 5.5 && live.auraDecay === 2, 'bounce: aura 0.35 m in front of the hit, distance 5.5, decay 2', [live.aura, live.auraD, live.auraDecay]);

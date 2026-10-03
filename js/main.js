@@ -40,6 +40,10 @@ addEventListener('resize', resize); resize(); applySettings();
 loadBarbi(); loadDollTemplate(); loadBoardsTemplate(); loadPortraits();
 if (typeof Kit !== 'undefined' && renderer) Kit.preload(['common', FLOORS[0].style]);   // (the first floor's doors, windows, exit: js/kit.js, E4)
 if (typeof Arch !== 'undefined') FLOORS.forEach(F => Arch.loadProfiles(F.style));       // (the mouldings' profiles from Blender, tiny: js/arch.js)
+// the light's data from Blender (lamp profiles, AO curves, window cookies), the sky and window glass, the floors' reflections, the decals
+if (typeof MatLib !== 'undefined' && renderer) { loadLightData(); FLOORS.forEach(F => envTex(F.style));
+  if (typeof Atmos !== 'undefined') Atmos.preload(FLOORS[0].style, settings.quality);
+  if (typeof Surface !== 'undefined') Surface.load(settings.quality); }
 loadBest(); updateRejoinBtn();
 startAccount();                                          // (sign in, or play as a guest: js/account.js)
 requestAnimationFrame(frame);
