@@ -14,7 +14,7 @@
           ceiling has a skylight, a hole or the loft ladder: nothing hangs there),
           furnished (js/kit.js furnishes this floor's band decor from the Blender kit: no furniture, props or cobwebs here, only the lamps,
           rugs, puddles and pipes; the house's fallback otherwise, E2 step 5), dolls (the plan's [{x, z, y, ry, face}]: the
-          scare dolls sit there, whoever furnishes; else on free wall sides as before), clear(xm, zm, rm) (false where a prop of that
+          scare dolls sit there (fewer on Low and phones), whoever furnishes; else on free wall sides as before), clear(xm, zm, rm) (false where a prop of that
           radius would stand in a box you bump into, SOLIDS: the props keep out of them) }
    h.upgrade(kit, R): the kit arrived late and Kit.upgradeInPlace furnished the band decor: the props here go (the dolls stay). */
 (function () {
@@ -282,7 +282,9 @@ function build(THREE, env) {
     return { x: cx + tx * along + f.nx * depth, z: cz + tz * along + f.nz * depth, ry: Math.atan2(f.nx, f.nz) };
   };
   const ownDolls = !env.dolls;                            // (no plan: the dolls among the props, as before)
-  if (env.dolls) env.dolls.forEach((d, i) => dolls.push(makeDoll(THREE, env, { x: d.x, z: d.z, y: d.y || 0, ry: d.ry }, i)));
+  // (the plan's dolls, thinned on Low and on phones like the props always were (dens): each one is a ~14k-triangle model; WP4.2
+  // takes dens out of placement)
+  if (env.dolls) env.dolls.forEach((d, i) => { if (dens >= 1 || hash(d.face, i, 171) < dens) dolls.push(makeDoll(THREE, env, { x: d.x, z: d.z, y: d.y || 0, ry: d.ry }, i)); });
   const woodMat = std({ map: tex(woodCanvas(style === 'tile' ? '#4a2c18' : style === 'wood' ? '#8a6446' : '#6b5238', 128, 128, true), true), roughness: 0.6 });
   if (style === 'wood') {
     const blocks = new Merge(THREE), bears = [];
