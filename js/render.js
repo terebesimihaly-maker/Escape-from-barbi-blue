@@ -15,7 +15,7 @@ function relPan(x, y) {   // -1 = to your left, 1 = to your right
 /* ---------- getting into and out of a wardrobe ----------
    The doors swing open, the camera steps in (or out) while they're open, and they close again. The game already has you
    inside (or out) from the first moment: only the picture takes its time. */
-const HIDE_T = 0.95, hideAnim = { t: -1, dir: 'in', from: null, c: null };
+const HIDE_T = 1.9, hideAnim = { t: -1, dir: 'in', from: null, c: null };
 function startHideAnim(dir, c) {
   const p = player;
   hideAnim.from = dir === 'in' ? { x: p.x, y: p.y, yaw: p.ang, pitch: p.pitch, h: EYE } : insideView(c, 0);
@@ -28,7 +28,10 @@ const startSwing = c => { if (c) c.swingT = 0; };
 function doorSwing(t) {
   if (t < 0 || t > HIDE_T) return 0;
   const e = x => x * x * (3 - 2 * x);
-  return t < 0.2 ? e(t / 0.2) : t < 0.55 ? 1 : 1 - e((t - 0.55) / (HIDE_T - 0.55));
+  // (in: a beat to reach for the handle, pulled open, held while you slip inside and turn round, then drawn shut from inside;
+  //  out: pushed open at once, held while you step out, swung shut behind you)
+  const o0 = hideAnim.dir === 'in' ? 0.25 : 0, o1 = o0 + 0.35, c0 = 1.25, c1 = 1.8;
+  return t < o0 ? 0 : t < o1 ? e((t - o0) / (o1 - o0)) : t < c0 ? 1 : t < c1 ? 1 - e((t - c0) / (c1 - c0)) : 0;
 }
 function placeCamera(t) {
   const p = player;
@@ -55,9 +58,20 @@ function placeCamera(t) {
   if (!p.hidden && !p.down && !(p.dead && MP.on)) h -= 0.62 * crouchCam * crouchCam * (3 - 2 * crouchCam);
   if (!(p.dead && MP.on)) specCam.on = false;
   if (hideAnim.t >= 0) {                            // stepping into or out of a wardrobe: from where you were to where you are
-    hideAnim.t += lastDt; const f = hideAnim.from, k0 = clamp((hideAnim.t - 0.12) / 0.42, 0, 1), k = k0 * k0 * (3 - 2 * k0);
-    if (hideAnim.t > HIDE_T || !f) hideAnim.t = -1;
-    else { cx = f.x + (cx - f.x) * k; cy = f.y + (cy - f.y) * k; h = f.h + (h - f.h) * k; yaw = lerpAngle(f.yaw, yaw, k); pitch = f.pitch + (pitch - f.pitch) * k; }
+    hideAnim.t += lastDt; const f = hideAnim.from, ht = hideAnim.t, sm = x => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+    if (ht > HIDE_T || !f) hideAnim.t = -1;
+    else {
+      // stepping through while the doors are open (0.55-1.2 s in, 0.3-1.0 s out), turning round on the way
+      const k = hideAnim.dir === 'in' ? sm((ht - 0.55) / 0.65) : sm((ht - 0.3) / 0.7);
+      let fx = f.x, fy = f.y, fp = f.pitch;
+      if (hideAnim.dir === 'in' && hideAnim.c) {
+        // first a lean in to the handle, the eyes dropping to it, as you take hold and pull the door open
+        const c = hideAnim.c, r = sm(ht / 0.3) * (1 - sm((ht - 0.55) / 0.3)), hx = c.x - c.ox * (CLOSET_FRONT - 20), hy = c.y - c.oy * (CLOSET_FRONT - 20);
+        fx += (hx - fx) * 0.35 * r; fy += (hy - fy) * 0.35 * r; fp += (-0.28 - fp) * r;
+      }
+      cx = fx + (cx - fx) * k; cy = fy + (cy - fy) * k; h = f.h + (h - f.h) * k; yaw = lerpAngle(f.yaw, yaw, k); pitch = fp + (pitch - fp) * k;
+      if (hideAnim.dir === 'in' && ht < 0.55) yaw = lerpAngle(f.yaw, Math.atan2(-hideAnim.c.oy, -hideAnim.c.ox), sm(ht / 0.3));   // (facing the doors)
+    }
   }
   // dancing (js/team.js): the camera slides out in front of you and turns round to watch you (the mouse turns it around you)
   const dancing = p.dance >= 0 && !p.hidden && !p.down && !p.dead;
@@ -103,8 +117,8 @@ function render3D(t) {
   flash.intensity = p.hidden || p.dead ? 0 : FLASH_I * (calm() ? 0.8 + 0.2 * flicker : flicker) * (p.down ? 0.5 : 1) * scares.dim;
   // the light around you: in a wardrobe (or out of the game) as it always was, at the camera; otherwise the flashlight's bounce off
   // whatever it lands on (js/atmos.js, spec C7: the same aura light, moved there)
-  if (typeof Atmos !== 'undefined') Atmos.bounce.update(lastDt, camera, flash, p.hidden ? (closetScene && closetScene.t > 0 ? 3.5 : 3.2) : p.dead ? 1.2 * scares.dim : false, p.hidden ? 8 : 4.5);
-  else { aura.intensity = p.hidden ? (closetScene && closetScene.t > 0 ? 3.5 : 3.2) : 1.2 * (p.hidden ? 1 : scares.dim); aura.distance = p.hidden ? 8 : 4.5; }
+  if (typeof Atmos !== 'undefined') Atmos.bounce.update(lastDt, camera, flash, p.hidden ? (closetScene && closetScene.t > 0 ? 0.7 : 0.45) : p.dead ? 1.2 * scares.dim : false, p.hidden ? 8 : 4.5);
+  else { aura.intensity = p.hidden ? (closetScene && closetScene.t > 0 ? 0.7 : 0.45) : 1.2 * (p.hidden ? 1 : scares.dim); aura.distance = p.hidden ? 8 : 4.5; }
   updateLight(lastDt, t);                         // the baked lamps' level, flicker, the moon's clock (js/level.js)
 
   // her
@@ -149,13 +163,13 @@ function render3D(t) {
       camera.rotation.y += angDiff(yaw, camera.rotation.y) * kk * 0.4; camera.rotation.x += (pitch - camera.rotation.x) * kk;
     }
   }
-  // wardrobe doors: only the one you're in ever opens (in the scene). From inside, closed doors are drawn as the slats overlay.
+  // wardrobe doors: only the one you're in ever opens (in the scene). From inside you see the doors themselves.
   for (const c of closets) if (c.doors) {
     const sw = c.swingT >= 0 ? doorSwing(c.swingT) : 0;          // (someone getting in or out: both doors swing)
     if (c.swingT >= 0) { c.swingT += lastDt; if (c.swingT > HIDE_T) c.swingT = -1; }
     for (const d of c.doors) {
       const mine = p.hidden && p.closet === c, k = Math.max(mine && closetScene && d.side < 0 ? sceneDoor(closetScene.t) : d.side < 0 ? scareDoorOpen(c) : 0, sw * 0.62);
-      d.pivot.rotation.y = d.side * k * 1.9; d.leaf.visible = !mine || k > 0.12;
+      d.pivot.rotation.y = d.side * k * 1.9; d.leaf.visible = true;   // (from inside too: the real doors, light through their louvres)
     }
   }
   updateMyFigure();
@@ -228,17 +242,7 @@ function drawScreenFx(t) {
   const p = player, m = monster, cw = cvs.width, ch = cvs.height;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   const sc = closetScene && closetScene.t > 0 ? closetScene : null;
-  if (p.hidden) { // looking out between the louvres of the wardrobe doors
-    const per = 34 * DPR, slat = 14 * DPR, off = (ch / 2) % per;
-    const open = closetScene ? sceneDoor(closetScene.t) : 0, rx = cw / 2 + open * cw * 0.6;   // the right door swings away
-    for (let y = off - per; y < ch; y += per) {
-      const g = ctx.createLinearGradient(0, y, 0, y + slat);
-      g.addColorStop(0, 'rgba(40,24,14,.96)'); g.addColorStop(0.35, 'rgba(22,13,7,.97)'); g.addColorStop(1, 'rgba(6,3,2,.98)');
-      ctx.fillStyle = g; ctx.fillRect(0, y, cw / 2, slat); if (rx < cw) ctx.fillRect(rx, y, cw - rx + 1, slat);
-      ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, y + slat, cw / 2, 2 * DPR); if (rx < cw) ctx.fillRect(rx, y + slat, cw - rx + 1, 2 * DPR);
-    }
-    ctx.fillStyle = 'rgba(8,4,2,.97)'; ctx.fillRect(cw / 2 - 5 * DPR, 0, 10 * DPR, ch);   // the edge of the door that stays shut
-    if (open > 0 && rx < cw) ctx.fillRect(rx - 5 * DPR, 0, 10 * DPR, ch);
+  if (p.hidden) { // inside the wardrobe: only a dark rim around the view (the doors and their louvres are in the scene)
     const fr = ctx.createRadialGradient(cw / 2, ch / 2, Math.min(cw, ch) * 0.35, cw / 2, ch / 2, Math.max(cw, ch) * 0.75);
     fr.addColorStop(0, 'rgba(8,4,2,0)'); fr.addColorStop(1, 'rgba(8,4,2,.7)'); ctx.fillStyle = fr; ctx.fillRect(0, 0, cw, ch);
     ctx.fillStyle = 'rgba(160,130,100,.5)'; ctx.font = (12 * DPR) + 'px Georgia'; ctx.textAlign = 'center';

@@ -656,6 +656,8 @@ function autoDispose(level) {
 }
 
 /* ---------- wardrobes (level.js makeWardrobe's contract) ---------- */
+// (a wardrobe is also seen from inside, when you hide in it: its leaves' louvres and its walls drawn from both sides)
+function twoSided(m) { for (const q of Array.isArray(m.material) ? m.material : [m.material]) if (q && q.side !== 2) { q.side = 2; q.needsUpdate = true; } }
 function wardrobe(c, style, opts) {
   const o = opts || {}, kit = o.kit !== undefined ? o.kit : get(style, o.tier), usePH = o.placeholders !== undefined ? !!o.placeholders : api.placeholderArt;
   const names = ['Ward_body_' + style, 'Ward_leafL_' + style, 'Ward_leafR_' + style];
@@ -663,12 +665,12 @@ function wardrobe(c, style, opts) {
   lightField(kit);
   const g = new THREE.Group(), info = { kind: 'wardrobe', node: names[0], mount: 'floor' };
   g.name = names[0]; g.userData.kit = info;
-  const body = cloneNode(kit, names[0], info); body.traverse(q => { if (q.isMesh) { q.castShadow = true; q.receiveShadow = true; } }); g.add(body);
+  const body = cloneNode(kit, names[0], info); body.traverse(q => { if (q.isMesh) { q.castShadow = true; q.receiveShadow = true; twoSided(q); } }); g.add(body);
   // two leaves on hinges at the outer edges (x = -+0.575, z = 0.305), each on its own pivot; seen from inside, the right one is at -x
   c.doors = []; c.swingT = -1;
   for (const side of [-1, 1]) {
     const pivot = new THREE.Group(); pivot.position.set(side * WARD.hx, WARD.hy, WARD.hz); pivot.userData.kit = info;
-    const leaf = cloneNode(kit, side < 0 ? names[1] : names[2], info); leaf.traverse(q => { if (q.isMesh) q.castShadow = true; });
+    const leaf = cloneNode(kit, side < 0 ? names[1] : names[2], info); leaf.traverse(q => { if (q.isMesh) { q.castShadow = true; twoSided(q); } });
     pivot.add(leaf); g.add(pivot); c.doors.push({ pivot, leaf, side, open: 0 });
   }
   const back = L / 2 - 0.3 - 0.01;                     // its back against the dead end's wall, the doors facing the way out
