@@ -35,7 +35,7 @@ function disposeLevel() {
   level = null;
 }
 function buildLevel() {
-  disposeLevel(); evictSurfaces(floorIdx);
+  disposeLevel(); evictStyles(floorIdx);
   const F = FLOORS[floorIdx], G = new THREE.Group(), L = TILE_M;
   level = { grid, group: G, door: null, prints: null, plan: null, arch: null };
   // the house's shell: from the floor's plan (js/dress.js), the walls at their real heights, the ceilings and their steps and gables,
@@ -93,6 +93,16 @@ function buildLevel() {
   if (lit) lightLevel(level, F);                         // the light: baked lamps, moonlight, the floor's overlays, the night outside (below)
   uploadKitTextures(G);                                  // (now, while the floor is being built, not the first time each piece comes into view)
   scene.add(G);
+  precompile();
+}
+// Without parallel shader compiling (software WebGL, many phones) render.js's compileAsync on the first frame is a plain compile
+// anyway: then it's done here, while the floor is built, so the first seconds of play don't stutter through the new programs (her
+// included, even hidden). With the extension the first frame's compileAsync stays (and High's through the glow's buffer)
+function precompile() {
+  if (!renderer || useBloom || !renderer.compile || (renderer.extensions && renderer.extensions.has('KHR_parallel_shader_compile'))) return;
+  const was = barbi ? barbi.obj.visible : false; if (barbi) barbi.obj.visible = true;
+  try { renderer.compile(scene, camera); level.compiled = true; } catch (e) { console.warn('precompile', e); }
+  if (barbi) barbi.obj.visible = was;
 }
 
 /* ---------- the house's shell from the floor's plan (js/dress.js, js/arch.js, spec E2 step 3-4) ---------- */
@@ -188,7 +198,7 @@ function uploadKitTextures(root, spread) {
 }
 function kitFurnishesBand(kit, plan) { return !!(kit && plan && typeof Kit !== 'undefined' && Kit.covers(kit, plan, { placeholders: false }) >= KIT_BAND_MIN); }
 function furnishOpts(F, kit, band) {
-  return { kit, placeholders: false, windows: false, fixtures: true, band, standIn: (s, it, tier) => standInLook(F.style, s, tier),
+  return { kit, placeholders: false, windows: false, fixtures: true, band, evict: false, standIn: (s, it, tier) => standInLook(F.style, s, tier),
     glassMat: typeof MatLib !== 'undefined' ? pieceGlass(F.style) : undefined };
 }
 // the glass of the kit's pieces (bell jars, cabinet doors, lanterns; the windows have js/atmos.js's, with rain on it): clear, thin, with the
@@ -536,13 +546,17 @@ function floorAssets(i) {
   FLOOR_ASSETS.set(key, e); return e.p;
 }
 function floorAssetsIn(i) { const F = FLOORS[i], e = F && FLOOR_ASSETS.get(F.style + '/' + settings.quality); return !!(e && e.done); }
-// (on floor entry: the baked sets of styles other than this floor's and the next are dropped, like the kits (Kit.furnish evicts
-// them, E5): kept for every style, the High sets alone ran a page out of memory by the fifth floor)
-function evictSurfaces(i) {
-  const keep = new Set([FLOORS[i] && FLOORS[i].style, FLOORS[i + 1] && FLOORS[i + 1].style]);
+// On floor entry on Medium and High: the kits and baked surface sets of the styles other than this floor's and the next (in
+// multiplayer, every floor still ahead: the lobby waited for them) are dropped (E5). Kept for every style, High's alone ran the page
+// out of memory by the fifth floor (textures 186 -> 462 over four floors). Low's are small enough to keep (no reloads); Kit.furnish's
+// own eviction stays off, since it drops the other tiers too (the tests build md floors in a Low page).
+function evictStyles(i) {
+  if (settings.quality === 'low') return;
+  const keep = new Set([i, i + 1].concat(MP.on ? FLOORS.map((F, k) => k).filter(k => k > i) : []).map(k => FLOORS[k] && FLOORS[k].style).filter(Boolean));
+  if (typeof Kit !== 'undefined') for (const F of FLOORS) if (!keep.has(F.style) && Kit.ready(F.style)) Kit.release(F.style);
   for (const [key, p] of surfCache) { if (keep.has(key.split('/')[0])) continue;
     surfCache.delete(key); p.then(s => { if (s) for (const t of Object.values(s)) t.dispose(); }); }
-  for (const [key, e] of FLOOR_ASSETS) if (!keep.has(key.split('/')[0])) FLOOR_ASSETS.delete(key);
+  for (const key of [...FLOOR_ASSETS.keys()]) if (!keep.has(key.split('/')[0])) FLOOR_ASSETS.delete(key);
 }
 function upgradeSurfaces(F, floorMat, G, walls, faces, ceil) {
   const style = SURF_STYLES[floorIdx]; if (!style) return;

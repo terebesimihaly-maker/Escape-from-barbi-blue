@@ -35,7 +35,8 @@
      Motes    high only: one Points mesh, <= 60 per window and <= 600 per floor, drifting on the GPU, lit only where the cookie lets
               moonlight through and no tall box is in the way (each point back-projected to the window every frame).
    R.update(t) (also Atmos.update(t), for the last build): the clock for clouds, noise and motes. R.dispose() frees what it made.
-   Atmos.skyMaterial(tier?) / Atmos.glassMaterial(tier?): the shared materials (the same objects every call; textures marked shared).
+   Atmos.skyMaterial(tier?) / Atmos.glassMaterial(tier?): the shared materials (the same objects every call for a tier: Low has its own,
+              cheaper: no clouds, glass without reflections; no tier: the last sky asked for; textures marked shared).
    Atmos.preload(style, tier): start loading the sky, glass and near-layer pictures early (during the loading screen).
 
    Atmos.bounce (C7): the aura light lit where the flashlight lands.
@@ -135,27 +136,33 @@ void main() {
     vec2 dx = dFdx( uv ), dy = dFdy( uv ); dx.x -= floor( dx.x + 0.5 ); dy.x -= floor( dy.x + 0.5 );     // (no mip seam where atan wraps)
     c = textureGrad( uSky, uv, dx, dy ).rgb * uExposure;
   } else c = night( d );
-  // clouds drifting across the upper sky: a slow veil that dims the stars and catches a little moonlight
+  // clouds drifting across the upper sky: a slow veil that dims the stars and catches a little moonlight (not on Low: four octaves
+  // of noise in every window pixel cost Low's software and phone GPUs more than the rest of the window)
+#ifndef SKY_LOW
   float up = smoothstep( 0.03, 0.2, d.y ), cl = smoothstep( 0.45, 0.85, fbm2( d.xz / ( d.y + 0.15 ) * 1.4 + uTime * vec2( 0.006, 0.0025 ) ) ) * up;
   c = mix( c, c * 0.6 + uMoonCol * uMoonK * 0.006, cl * ( uHasSky > 0.5 ? 0.35 : 0.8 ) );
+#endif
   gl_FragColor = vec4( c, 1.0 );
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
-let skyMat = null;
+let skyMat = null, skyMatLo = null;
 const skyTier = { want: null };
-function newSky() {
+function newSky(low) {
   const U = moonU();
-  const m = new THREE.ShaderMaterial({ name: 'AtmosSky', vertexShader: SKY_V, fragmentShader: SKY_F, fog: false,
+  const m = new THREE.ShaderMaterial({ name: 'AtmosSky', vertexShader: SKY_V, fragmentShader: SKY_F, fog: false, defines: low ? { SKY_LOW: 1 } : {},
     uniforms: { uSky: U.uSky, uHasSky: U.uHasSky, uExposure: U.uExposure, uTime: U.uTime, uMoonTo: U.uMoonTo, uMoonCol: U.uMoonCol, uMoonK: U.uMoonK } });
   m.userData.atmos = 'sky';
   return m;
 }
 // the sky material (one object; its picture is a uniform, so it can arrive late without a recompile)
+// (Low has its own, without the clouds; the same uniforms, so the picture still arrives in both)
+let skyLast = null;
 function skyMaterial(tier) {
-  if (!skyMat) skyMat = newSky();
-  loadSky(tierOf(tier));
-  return skyMat;
+  if (tier === undefined && skyLast) return skyLast;          // (no tier: the one last asked for)
+  const t = tierOf(tier);
+  loadSky(t);
+  return (skyLast = t === 'lo' ? skyMatLo || (skyMatLo = newSky(true)) : skyMat || (skyMat = newSky()));
 }
 function loadSky(t) {
   if (skyTier.want === t) return; skyTier.want = t;
@@ -190,6 +197,9 @@ function flatTex(r, g, b) { const c = canvas(4, 4), x = c.getContext('2d'); x.fi
   const t = shared(new THREE.CanvasTexture(c)); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; }
 function glassMaterial(tier) {
   const t = tierOf(tier); if (glassMats[t]) return glassMats[t];
+  // (Low: a plain dark film, no reflections: a lit, reflecting pane over every window cost Low more than the rest of the window)
+  if (t === 'lo') { const g = new THREE.MeshLambertMaterial({ name: 'AtmosGlass', color: 0x14181c, transparent: true, opacity: 0.2, depthWrite: false });
+    g.userData.atmos = 'glass'; return (glassMats[t] = g); }
   const m = new THREE.MeshStandardMaterial({ name: 'AtmosGlass', color: 0x14181c, roughness: 0.1, metalness: 0, transparent: true, opacity: 0.2,
     depthWrite: false, envMap: envMap(), envMapIntensity: 0.4 });
   if (t !== 'lo') {

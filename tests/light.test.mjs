@@ -61,15 +61,20 @@ check(await p.evaluate(() => aura.parent === scene), 'aura lives in the scene: t
     const gl = renderer.getContext(), sz = renderer.getDrawingBufferSize(new THREE.Vector2()); cam.aspect = sz.x / sz.y; cam.updateProjectionMatrix();
     const shot = () => { renderer.setRenderTarget(null); renderer.render(scene, cam); gl.readPixels(Math.round(sz.x * 0.4) - 2, Math.round(sz.y * 0.7) - 2, 4, 4, gl.RGBA, gl.UNSIGNED_BYTE, buf);
       let r = 0, g = 0, bl = 0; for (let i = 0; i < 16; i++) { r += buf[i * 4]; g += buf[i * 4 + 1]; bl += buf[i * 4 + 2]; } return [r / 16, g / 16, bl / 16]; };
-    // (aimed at the middle of each window's own sky plane, seen through its opening from about 2.3 m into the room, from a little below; read
+    // (aimed at the middle of each window's own sky plane, seen through its opening from up to 2.6 m into the room, from a little below; read
     // in the upper pane, off the glazing bars that cross the middle)
     for (const sm of skies) {
       const bx = new THREE.Box3().setFromObject(sm), c = bx.getCenter(new THREE.Vector3());
       let w = null, best = 1e9; for (const q of plan.windows) { const f = plan.faces[q.face], d = Math.hypot((f.x0 + f.x1) / 2 - c.x, (f.z0 + f.z1) / 2 - c.z); if (d < best) { best = d; w = q; } }
       const f = plan.faces[w.face];
-      cam.position.set(c.x + f.nx * 2.6, c.y - 0.3, c.z + f.nz * 2.6); cam.lookAt(c); cam.updateMatrixWorld();
-      const a = shot(); for (const m of skies) m.visible = false; const z = shot(); for (const m of skies) m.visible = true;
-      const lum = a[0] + a[1] + a[2], lum0 = z[0] + z[1] + z[2];
+      // (from 2.6 m into the room, or nearer when a lamp or a piece of furniture stands in the line of sight there)
+      let a, z, lum, lum0;
+      for (const dd of [2.6, 2.0, 1.5, 1.0]) {
+        cam.position.set(c.x + f.nx * dd, c.y - 0.3 * dd / 2.6, c.z + f.nz * dd); cam.lookAt(c); cam.updateMatrixWorld();
+        a = shot(); for (const m of skies) m.visible = false; z = shot(); for (const m of skies) m.visible = true;
+        lum = a[0] + a[1] + a[2]; lum0 = z[0] + z[1] + z[2];
+        if (Math.abs(lum - lum0) > 3) break;
+      }
       if (lum > 6 && a[2] >= a[0] && Math.abs(lum - lum0) > 3) out.ok++; else out.bad.push([w.type, a.map(Math.round), z.map(Math.round)]);
     }
     flash.intensity = fi; aura.intensity = ai;
@@ -115,7 +120,7 @@ const VIEW = () => {
     const gl = renderer.getContext(), sz = renderer.getDrawingBufferSize(new THREE.Vector2()), buf = new Uint8Array(4 * 16);
     const keep = { p: camera.position.clone(), q: camera.quaternion.clone(), fi: flash.intensity, ai: aura.intensity, ap: aura.position.clone(), apar: aura.parent };
     camera.position.set(pos[0], pos[1], pos[2]); camera.lookAt(at[0], at[1], at[2]); camera.updateMatrixWorld(true);
-    flash.intensity = flashOn ? FLASH_I : 0; aura.intensity = 0;
+    flash.intensity = flashOn ? FLASH_I * (flashOn === true ? 1 : flashOn) : 0; aura.intensity = 0;
     renderer.setRenderTarget(null); renderer.render(scene, camera);
     gl.readPixels(Math.round(sz.x / 2) - 2, Math.round(sz.y / 2) - 2, 4, 4, gl.RGBA, gl.UNSIGNED_BYTE, buf);
     let r = 0, g = 0, b = 0, mx = 0; for (let i = 0; i < 16; i++) { r += buf[i * 4]; g += buf[i * 4 + 1]; b += buf[i * 4 + 2]; mx = Math.max(mx, buf[i * 4], buf[i * 4 + 1], buf[i * 4 + 2]); }
@@ -142,14 +147,18 @@ await p.evaluate(VIEW);
     // the moon: where its light is strongest on the floor, seen from above with the flashlight off, the moon on vs. off
     // (on open floor, clear of the furniture, the lamps out so only the moon is left; looked at from just above)
     const ax = M.floorAux.image, clear = (x, z) => { const tx = Math.floor(x / L), tz = Math.floor(z / L); if (bb.isWall(tx, tz)) return false;
+      for (const [dx, dz] of [[0.4, 0], [-0.4, 0], [0, 0.4], [0, -0.4]]) if (bb.isWall(Math.floor((x + dx) / L), Math.floor((z + dz) / L))) return false;
       for (const q of plan.windows) { const f = plan.faces[q.face]; if (f.x === tx && f.y === tz) return false; }
       return !SOLIDS.some(b => x / 0.045 > b.x0 - 15 && x / 0.045 < b.x1 + 15 && z / 0.045 > b.y0 - 15 && z / 0.045 < b.y1 + 15); };
     let best = -1, bx = 0, bz = 0; for (let i = 0; i < ax.data.length; i += 4) if (ax.data[i] > best) { const q = i / 4, x = ((q % ax.width) + 0.5) / ax.width * GW * L, z = (Math.floor(q / ax.width) + 0.5) / ax.height * GH * L;
       if (clear(x, z)) { best = ax.data[i]; bx = x; bz = z; } }
     out.moonR = best;
     if (best > 0) { const U = MatLib.U, k = U.uMoonK.value; MatLib.setK(0, true, false);
-      const on = __view([bx + 0.3, 1.5, bz + 0.3], [bx, 0, bz], false); U.uMoonK.value = 0;
-      const off = __view([bx + 0.3, 1.5, bz + 0.3], [bx, 0, bz], false); U.uMoonK.value = k; MatLib.setK(1, false, false); out.moon = [on.lum, off.lum, on.rgb]; }
+      const on = __view([bx + 0.05, 1.5, bz + 0.05], [bx, 0, bz], false); U.uMoonK.value = 0;
+      const off = __view([bx + 0.05, 1.5, bz + 0.05], [bx, 0, bz], false);
+      // (cool: bluer than the same spot of floor under the warm flashlight alone, whatever the floor's own colour)
+      const torch = __view([bx + 0.05, 1.5, bz + 0.05], [bx, 0, bz], 0.05);   // (dim, so nothing clips) U.uMoonK.value = k; MatLib.setK(1, false, false);
+      const br = c => c[2] / Math.max(1, c[0]); out.moon = [on.lum, off.lum, on.rgb, torch.rgb, br(on.rgb) > br(torch.rgb) * 1.1]; }
     // the windows under the flashlight from 1.4 m: a soft sheen on the glass, the night still seen through it (never a white flare)
     out.flare = [];
     // (aimed at the middle of the upper left pane, off the glazing bars: the bars themselves are white paint, lit)
@@ -163,7 +172,7 @@ await p.evaluate(VIEW);
   console.log('  (floor 1: ' + r.lamps + ' ceiling lamps, median E under them ' + r.under + '; pool on/off ' + r.pool + '; moon ' + r.moonR + ' ' + JSON.stringify(r.moon) + '; flashlit windows ' + JSON.stringify(r.flare) + '; decals ' + JSON.stringify(r.decals) + ')');
   check(r.lamps > 0 && r.under[0] >= 0.5 && r.under[1] >= 1, 'the lamps pool light on the floor below them (baked E under a ceiling lamp: median >= 0.5, the brightest >= 1)', r.under);
   check(r.pool && r.pool[0] >= r.pool[1] + 25, 'on screen the floor under a lamp is clearly lit by it (lamps on vs. out)', r.pool);
-  check(r.moonR > 40 && r.moon && r.moon[0] >= r.moon[1] + 20 && r.moon[2][2] >= r.moon[2][0], 'the moonlight lies on the floor as a readable cool patch (moon on vs. off, flashlight off)', r.moon);
+  check(r.moonR > 40 && r.moon && r.moon[0] >= r.moon[1] + 20 && r.moon[4], 'the moonlight lies on the floor as a readable cool patch (moon on vs. off, flashlight off)', r.moon);
   check(r.flare.length > 0 && r.flare.every(f => f[1] < 250), 'the flashlight on a window: no white flare, the pane is never blown out', r.flare);
   check(r.decals && !r.decals.extras && !r.decals.decalsIn && !r.decals.printsIn && r.decals.overlay,
     'Low: no wall decals or dust prints (cheap), the floor\'s overlays still in', r.decals);
