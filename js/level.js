@@ -35,7 +35,7 @@ function disposeLevel() {
   level = null;
 }
 function buildLevel() {
-  disposeLevel();
+  disposeLevel(); evictSurfaces(floorIdx);
   const F = FLOORS[floorIdx], G = new THREE.Group(), L = TILE_M;
   level = { grid, group: G, door: null, prints: null, plan: null, arch: null };
   // the house's shell: from the floor's plan (js/dress.js), the walls at their real heights, the ceilings and their steps and gables,
@@ -188,7 +188,7 @@ function uploadKitTextures(root, spread) {
 }
 function kitFurnishesBand(kit, plan) { return !!(kit && plan && typeof Kit !== 'undefined' && Kit.covers(kit, plan, { placeholders: false }) >= KIT_BAND_MIN); }
 function furnishOpts(F, kit, band) {
-  return { kit, placeholders: false, windows: false, fixtures: true, band, evict: false, standIn: (s, it, tier) => standInLook(F.style, s, tier),
+  return { kit, placeholders: false, windows: false, fixtures: true, band, standIn: (s, it, tier) => standInLook(F.style, s, tier),
     glassMat: typeof MatLib !== 'undefined' ? pieceGlass(F.style) : undefined };
 }
 // the glass of the kit's pieces (bell jars, cabinet doors, lanterns; the windows have js/atmos.js's, with rain on it): clear, thin, with the
@@ -536,6 +536,14 @@ function floorAssets(i) {
   FLOOR_ASSETS.set(key, e); return e.p;
 }
 function floorAssetsIn(i) { const F = FLOORS[i], e = F && FLOOR_ASSETS.get(F.style + '/' + settings.quality); return !!(e && e.done); }
+// (on floor entry: the baked sets of styles other than this floor's and the next are dropped, like the kits (Kit.furnish evicts
+// them, E5): kept for every style, the High sets alone ran a page out of memory by the fifth floor)
+function evictSurfaces(i) {
+  const keep = new Set([FLOORS[i] && FLOORS[i].style, FLOORS[i + 1] && FLOORS[i + 1].style]);
+  for (const [key, p] of surfCache) { if (keep.has(key.split('/')[0])) continue;
+    surfCache.delete(key); p.then(s => { if (s) for (const t of Object.values(s)) t.dispose(); }); }
+  for (const [key, e] of FLOOR_ASSETS) if (!keep.has(key.split('/')[0])) FLOOR_ASSETS.delete(key);
+}
 function upgradeSurfaces(F, floorMat, G, walls, faces, ceil) {
   const style = SURF_STYLES[floorIdx]; if (!style) return;
   const lv = level, tier = surfTier();
