@@ -10,9 +10,9 @@ const p = await solo(b, 'low', 480, 300);
 p.on('console', m => { if (m.type() === 'error') console.log('  console:', m.text().slice(0, 300)); });
 await until(p, () => typeof LIGHT_DATA !== 'undefined' && !!LIGHT_DATA.data, null, 60000);
 
-// a floor built synchronously (as the tests do), its kit loaded first, nothing to disturb it
+// a floor built synchronously (as the tests do), its assets loaded first, nothing to disturb it
 async function floor(pg, i, seed) {
-  await pg.evaluate(i => Kit.want(FLOORS[i].style).then(k => !!k), i);
+  await pg.evaluate(i => floorAssets(i).then(() => !!Kit.get(FLOORS[i].style)), i);   // (the kit, light data, decals, surfaces: E4)
   await pg.evaluate(([i, seed]) => {
     if (seed === undefined) bb.startFloor(i); else applyFloor(generateFloor(i, 1, 'medium', seed), 0);
     bb.state = 'play'; notes.forEach(n => { n.read = true; }); const m = bb.monster; m.active = false; m.spawnT = 1e9; huntTimer = 1e9; scares.next = 1e9; buildLevel();
@@ -108,6 +108,67 @@ check(await p.evaluate(() => aura.parent === scene), 'aura lives in the scene: t
   check(r.wallLambert && r.ceilLambert && !r.pom && !r.env, 'Low: Lambert walls and ceilings, no parallax, no wet reflections', r);
 }
 
+/* ---------- what you see: lamps pool light, the moon lies on the floor, the glass doesn't flare, the decals ---------- */
+// (the game's own camera, so the flashlight (its child) comes along; the picture as shown, read back in the same task)
+const VIEW = () => {
+  window.__view = (pos, at, flashOn) => {
+    const gl = renderer.getContext(), sz = renderer.getDrawingBufferSize(new THREE.Vector2()), buf = new Uint8Array(4 * 16);
+    const keep = { p: camera.position.clone(), q: camera.quaternion.clone(), fi: flash.intensity, ai: aura.intensity, ap: aura.position.clone(), apar: aura.parent };
+    camera.position.set(pos[0], pos[1], pos[2]); camera.lookAt(at[0], at[1], at[2]); camera.updateMatrixWorld(true);
+    flash.intensity = flashOn ? FLASH_I : 0; aura.intensity = 0;
+    renderer.setRenderTarget(null); renderer.render(scene, camera);
+    gl.readPixels(Math.round(sz.x / 2) - 2, Math.round(sz.y / 2) - 2, 4, 4, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    let r = 0, g = 0, b = 0, mx = 0; for (let i = 0; i < 16; i++) { r += buf[i * 4]; g += buf[i * 4 + 1]; b += buf[i * 4 + 2]; mx = Math.max(mx, buf[i * 4], buf[i * 4 + 1], buf[i * 4 + 2]); }
+    camera.position.copy(keep.p); camera.quaternion.copy(keep.q); camera.updateMatrixWorld(true); flash.intensity = keep.fi; aura.intensity = keep.ai;
+    return { rgb: [r / 16, g / 16, b / 16].map(Math.round), lum: Math.round((r + g + b) / 16), mx };
+  };
+};
+await p.evaluate(VIEW);
+{
+  const r = await p.evaluate(() => {
+    const plan = level.plan, M = MatLib.maps(), L = 2.25, out = {};
+    // the lamps' pools: the floor's baked light right under each working ceiling lamp, against 3 m off (E = byte decoded x E_MAX)
+    const lm = M.floorLM.image, dec = v => { v /= 255; return (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)) * 4; };
+    const E = (x, z) => { const u = Math.min(lm.width - 1, Math.max(0, Math.floor(x / (GW * L) * lm.width))), v = Math.min(lm.height - 1, Math.max(0, Math.floor(z / (GH * L) * lm.height)));
+      const i = (v * lm.width + u) * 4; return (dec(lm.data[i]) + dec(lm.data[i + 1]) + dec(lm.data[i + 2])) / 3; };
+    const ceil = plan.fixtures.filter(f => f.state === 'ok' && f.face < 0);
+    const under = ceil.map(f => E(f.x, f.z)).sort((a, b) => a - b);
+    out.lamps = ceil.length; out.under = under.length ? [+under[under.length >> 1].toFixed(2), +under[under.length - 1].toFixed(2)] : [0, 0];
+    // and on screen: looking down at the floor under the brightest of them, the lamps on vs. out
+    if (ceil.length) { const f = ceil.slice().sort((a, b) => E(b.x, b.z) - E(a.x, a.z))[0];
+      const at = [f.x, 0, f.z], pos = [f.x + 0.6, 1.62, f.z + 0.6];
+      const on = __view(pos, at, false); MatLib.setK(0, true, false); const off = __view(pos, at, false); MatLib.setK(1, false, false);
+      out.pool = [on.lum, off.lum]; }
+    // the moon: where its light is strongest on the floor, seen from above with the flashlight off, the moon on vs. off
+    // (on open floor, clear of the furniture, the lamps out so only the moon is left; looked at from just above)
+    const ax = M.floorAux.image, clear = (x, z) => { const tx = Math.floor(x / L), tz = Math.floor(z / L); if (bb.isWall(tx, tz)) return false;
+      for (const q of plan.windows) { const f = plan.faces[q.face]; if (f.x === tx && f.y === tz) return false; }
+      return !SOLIDS.some(b => x / 0.045 > b.x0 - 15 && x / 0.045 < b.x1 + 15 && z / 0.045 > b.y0 - 15 && z / 0.045 < b.y1 + 15); };
+    let best = -1, bx = 0, bz = 0; for (let i = 0; i < ax.data.length; i += 4) if (ax.data[i] > best) { const q = i / 4, x = ((q % ax.width) + 0.5) / ax.width * GW * L, z = (Math.floor(q / ax.width) + 0.5) / ax.height * GH * L;
+      if (clear(x, z)) { best = ax.data[i]; bx = x; bz = z; } }
+    out.moonR = best;
+    if (best > 0) { const U = MatLib.U, k = U.uMoonK.value; MatLib.setK(0, true, false);
+      const on = __view([bx + 0.3, 1.5, bz + 0.3], [bx, 0, bz], false); U.uMoonK.value = 0;
+      const off = __view([bx + 0.3, 1.5, bz + 0.3], [bx, 0, bz], false); U.uMoonK.value = k; MatLib.setK(1, false, false); out.moon = [on.lum, off.lum, on.rgb]; }
+    // the windows under the flashlight from 1.4 m: a soft sheen on the glass, the night still seen through it (never a white flare)
+    out.flare = [];
+    // (aimed at the middle of the upper left pane, off the glazing bars: the bars themselves are white paint, lit)
+    for (const w of plan.windows) { const f = plan.faces[w.face], u = w.u0 + (w.u1 - w.u0) * 0.27, v0 = w.v0 || 0.9, v1 = w.v1 || 2.2, c = [f.x0 + (f.x1 - f.x0) * u, v0 + (v1 - v0) * 0.72, f.z0 + (f.z1 - f.z0) * u];
+      const v = __view([c[0] + f.nx * 1.4, c[1], c[2] + f.nz * 1.4], c, true); out.flare.push([w.type, v.mx, v.lum]); }
+    // the decals: Blender's atlas (textures/decals), cheap on Low (the small atlas, one merged mesh per chunk)
+    const S = level.surface, at = S && S.decals.atlas;
+    out.decals = S ? { n: S.stats.decals, chunks: S.stats.decalChunks, src: at.source, w: at.img ? at.img.width : 0, meshes: S.decals.group.children.length } : null;
+    return out;
+  });
+  console.log('  (floor 1: ' + r.lamps + ' ceiling lamps, median E under them ' + r.under + '; pool on/off ' + r.pool + '; moon ' + r.moonR + ' ' + JSON.stringify(r.moon) + '; flashlit windows ' + JSON.stringify(r.flare) + '; decals ' + JSON.stringify(r.decals) + ')');
+  check(r.lamps > 0 && r.under[0] >= 0.5 && r.under[1] >= 1, 'the lamps pool light on the floor below them (baked E under a ceiling lamp: median >= 0.5, the brightest >= 1)', r.under);
+  check(r.pool && r.pool[0] >= r.pool[1] + 25, 'on screen the floor under a lamp is clearly lit by it (lamps on vs. out)', r.pool);
+  check(r.moonR > 40 && r.moon && r.moon[0] >= r.moon[1] + 20 && r.moon[2][2] >= r.moon[2][0], 'the moonlight lies on the floor as a readable cool patch (moon on vs. off, flashlight off)', r.moon);
+  check(r.flare.length > 0 && r.flare.every(f => f[1] < 250), 'the flashlight on a window: no white flare, the pane is never blown out', r.flare);
+  check(r.decals && r.decals.n > 0 && r.decals.src === 'file' && r.decals.w > 0 && r.decals.w <= 1024 && r.decals.meshes <= r.decals.chunks + 1,
+    'Low: the wall decals from Blender\'s atlas, the small one, one mesh per chunk (cheap)', r.decals);
+}
+
 /* ---------- the same floor bakes the same light (F4.5) ---------- */
 {
   const h = async () => { await floor(p, 1, 424242); return p.evaluate(() => { const d = MatLib.maps().floorLM.image.data; let x = 0x811c9dc5; for (let i = 0; i < d.length; i++) { x ^= d[i]; x = Math.imul(x, 16777619); } return [x >>> 0, d.length]; }); };
@@ -131,6 +192,24 @@ await p.context().close();
   check(r.moonlit === 0 || (r.shafts && r.steps === 4 && !r.motes), 'Medium: one shaft mesh with 4 steps for the moonlit windows, no motes (High only)', r);
   check(r.lights === 4, 'Medium has the same 4 lights as Low (a quality change doesn\'t change the light count)', r.lights);
   await m.context().close();
+}
+
+/* ---------- High: the decals' big atlas, beams and motes, and still the same 4 lights ---------- */
+{
+  const h = await solo(b, 'high', 320, 200);
+  await until(h, () => typeof LIGHT_DATA !== 'undefined' && !!LIGHT_DATA.data, null, 60000);
+  await h.evaluate(() => floorAssets(1));
+  let r = null;
+  for (let s = 0; s < 4 && !(r && r.moonlit); s++) {
+    await floor(h, 1, 9000 + s);
+    r = await h.evaluate(() => { const A = level.atmos, S = level.surface, at = S && S.decals.atlas; let n = 0; scene.traverse(o => { if (o.isLight) n++; });
+      return { moonlit: level.light.bake.moonlit.length, shafts: !!(A && A.shafts), steps: A && A.stats.steps, motes: !!(A && A.motes), lights: n,
+        decals: S ? S.stats.decals : 0, src: at && at.source, w: at && at.img ? at.img.width : 0 }; });
+  }
+  check(r.decals > 0 && r.src === 'file' && r.w >= 2048, 'High: the wall decals (stains, damp, scuffs) from Blender\'s big atlas', r);
+  check(r.moonlit === 0 || (r.shafts && r.steps === 8 && r.motes), 'High: the moonlight beams with 8 steps and the dust motes in them', r);
+  check(r.lights === 4, 'High: still the same 4 lights', r.lights);
+  await h.context().close();
 }
 
 /* ---------- no kit: plain lamps at the plan's spots, no moonlight through walls that stay closed (E7) ---------- */

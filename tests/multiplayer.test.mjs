@@ -58,6 +58,12 @@ const grids = await Promise.all([A, B, C].map(P => P.evaluate(() => bb.grid.map(
 check(grids[0] === grids[1] && grids[1] === grids[2], 'everyone got the same house');
 const lay1 = await Promise.all([A, B, C].map(layoutOf));
 check(sameLayout(lay1), 'and the same layout: this version\'s (d.v, d.kv), the same seed, and the same furniture, nav and ceilings built from it (hash)', lay1);
+// Ready waited for the floor's house to load on every page (spec E4), so nobody starts half-built: the kit's shell and the baked light
+// are there for all, from the same plan (windows, lamps, decals: js/dress.js), so everyone sees the same house
+const built = await Promise.all([A, B, C].map(P => P.evaluate(() => ({ kit: !!(level && level.archKit), light: !!(level && level.light && level.light.bake),
+  plan: level && level.plan ? Dress.hash(level.plan) : null, decals: level && level.surface ? level.surface.stats.decals : -1 }))));
+check(built.every(q => q.kit && q.light) && built.every(q => q.plan && q.plan === built[0].plan && q.decals === built[0].decals),
+  'every player\'s floor was built with its kit and baked light, from the same plan (the same house, decals and all)', built);
 const pos = await Promise.all([A, B, C].map(P => P.evaluate(() => [bb.player.x, bb.player.y])));
 check(pos.every(([x, y]) => x > 50 && x < 200 && y > 50 && y < 200), 'everyone spawned in the start room', pos);
 const dmin = Math.min(...[[0, 1], [0, 2], [1, 2]].map(([i, j]) => Math.hypot(pos[i][0] - pos[j][0], pos[i][1] - pos[j][1])));
