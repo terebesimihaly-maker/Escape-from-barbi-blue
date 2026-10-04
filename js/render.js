@@ -169,7 +169,7 @@ function render3D(t) {
     if (c.swingT >= 0) { c.swingT += lastDt; if (c.swingT > HIDE_T) c.swingT = -1; }
     for (const d of c.doors) {
       const mine = p.hidden && p.closet === c, k = Math.max(mine && closetScene && d.side < 0 ? sceneDoor(closetScene.t) : d.side < 0 ? scareDoorOpen(c) : 0, sw * 0.62);
-      d.pivot.rotation.y = d.side * k * 1.9; d.leaf.visible = true;   // (from inside too: the real doors, light through their louvres)
+      d.pivot.rotation.y = d.side * Math.max(k, mine && hideAnim.t < 0 ? 0.03 : 0) * 1.9; d.leaf.visible = true;   // (hiding: pulled to, not latched, a crack at the middle to peek through)
     }
   }
   updateMyFigure();
