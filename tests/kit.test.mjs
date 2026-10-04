@@ -262,6 +262,7 @@ for (let i = 0; i < 5; i++) {
         && Math.abs(a.min[1]) < 1e-6 && Math.abs(a.max[1] - h) < 1e-3; });
     const boards = level.group.children.filter(o => o.children.some(c => /^Board(Short|Long)/.test(c.name)));
     window.__up = { R, plan, boards, paintings: level.paintings, doll: scares.doll, lights0, door: level.door, wards: closets.map(c => c.doors && c.doors[0].pivot.parent) };
+    await Kit.want('concrete', 'lo');      // (the floor's own request for its kit, made while it was blocked: let it fail first, so it isn't the one answered below)
     return { got, ready: Kit.ready('concrete', 'lo'), get: Kit.get('concrete', 'lo'), ph: R.placeholder, n: SOLIDS.length, exact, phAll: R.solids.every(s => s.placeholder),
       others: R.items.filter(x => x.kind !== 'placeholder').length, inGroup: R.group.parent === level.group, isLevelKit: level.kit === R, boards: boards.length,
       wardrobe: Kit.wardrobe({ x: 100, y: 100, ox: 1, oy: 0 }, 'concrete', { tier: 'lo' }), exitNull: Kit.exit('concrete', { tier: 'lo', plan }) };
