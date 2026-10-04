@@ -179,7 +179,7 @@ function render3D(t) {
   if (D) { if (D.setOpen) D.setOpen(powerOn); else if (powerOn && !D.open) { D.open = true; D.door.material = D.openMat; }
     D.lamp.material.color.setHex(powerOn ? 0x4dff88 : (Math.sin(t * 6) > 0 ? 0xff3030 : 0x401010)).multiplyScalar(4);
     exitLight.intensity = powerOn ? 2.5 + Math.sin(t * 5) * 0.5 : 0; }
-  const P = level.prints, cs = level.surface && level.surface.cpuSurf;
+  const P = level.prints, cs = level.surface && level.surface.extras && level.surface.cpuSurf;
   // (her wet blue prints; where the floor is dusty she leaves bare prints in the dust instead: js/surface.js, spec D2)
   prints.forEach((f, i) => { const k = cs && cs.dust(f.x * S, f.y * S) > 0.4 ? 0 : Math.min(1, f.t / 4);
     _m4.compose(_v.set(f.x * S, 0.004, f.y * S), _q.setFromAxisAngle(_up, -f.a), _sc.set(k, 1, k)); P.setMatrixAt(i, _m4); });
@@ -203,7 +203,7 @@ function render3D(t) {
   }
   if (level.kit && level.kit.update) level.kit.update(lastDt);     // (the kit's rocking chairs, mobiles, pendulums: still with calm effects)
   if (level.house) { level.house.calm = calm(); level.house.dark = scares.dim < 0.5; }
-  if (level.surface) level.surface.update(lastDt, surfActors(p, m));   // (prints in the dust: js/surface.js)
+  if (level.surface && level.surface.extras) level.surface.update(lastDt, surfActors(p, m));   // (prints in the dust: js/surface.js)
   if (level.house) level.house.update(lastDt, t, camera, p, flash);
   draw(scene, camera);
 }

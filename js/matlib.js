@@ -445,23 +445,18 @@ function decalMaterial(o = {}) {
 // included), trims, frames, beams, wardrobes, doors, puzzle boxes, dolls, her and teammates. Keeps the material's own patch.
 // Calling it again is harmless. A clone() of a patched material comes out patched (the dolls and teammates clone theirs); a copy made
 // any other way loses three's patch, and withLightField on it patches it again. The glTF aoMap then darkens it (indirect light).
-// Low (the test tier, phones): the same light field read per vertex instead of per pixel (two texture reads per vertex, one varying),
-// which on software and phone GPUs costs a fraction of the per-pixel reads over the whole kit; the light varies over a few cm of
-// furniture either way. The tier is read when the program is built: a later quality change rebuilds it (withLightField again)
+// Low (the test tier, phones): the light field read once per vertex instead of three reads per pixel: the lamps' light where the
+// vertex stands, its flickering share at a steady warm average, without the wrap toward the light's direction and without the moon
+// (on Low the moon lies only on the floor and walls). On software and phone GPUs this is a fraction of the cost over the whole kit.
+// The tier is read when the program is built: a later quality change rebuilds it (withLightField again)
 const LF_VDECL = `
 uniform sampler2D uLF0;
-uniform sampler2D uLF1;
 varying vec3 vLFirr;
 vec3 mlLFw;`;
 const LF_VTERM = `
 	{
-		vec2 mlU = mlPlanUv( mlLFw );
-		vec4 mlA = texture2D( uLF0, mlU ), mlB = texture2D( uLF1, mlU );
-		vec3 mlNw = normalize( inverseTransformDirection( transformedNormal, viewMatrix ) );
-		vec3 mlD = vec3( mlB.r * 2.0 - 1.0, mlB.b * 2.0 - 1.0, mlB.g * 2.0 - 1.0 );
-		mlD = dot( mlD, mlD ) > 1e-6 ? normalize( mlD ) : vec3( 0.0, 1.0, 0.0 );
-		float mlWrap = 0.35 + 0.65 * max( dot( mlNw, mlD ), 0.0 );
-		vLFirr = ( mlA.rgb + mlA.a * mlFlick( mlU ) ) * uEMax * uLampK * mlWrap + mlB.a * uMoonK * uMoonCol * max( dot( mlNw, - uMoonDir ), 0.25 );
+		vec4 mlA = texture2D( uLF0, mlPlanUv( mlLFw ) );
+		vLFirr = ( mlA.rgb + mlA.a * vec3( 0.8, 0.6, 0.4 ) ) * ( 0.7 * uEMax * uLampK );
 	}`;
 const LF_FTERM_V = `
 #if defined( RE_IndirectDiffuse )

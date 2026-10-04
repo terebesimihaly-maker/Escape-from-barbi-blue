@@ -153,7 +153,7 @@ function lateKit(lv, kit) {
     // as they were), the band decor if the kit has it (house.js drops its props then: level.house.upgrade); compiled first too
     if (lv.kit) Kit.upgradeAsync(lv, lv.plan, { kit, band: kitFurnishesBand(kit, lv.plan), exitDoor: false })
       .then(R => { if (R && level === lv) { if (lv.house) lv.house.kitCount = R.kitCount; lv.compiled = false; uploadKitTextures(lv.group, true);
-        if (lv.light) MatLib.withLightField(R.group); } });
+        if (lv.light) { MatLib.withLightField(R.group); lv.light.fix = null; } } });
   };
   if (renderer.compileAsync) renderer.compileAsync(A.group, camera, scene).then(swap, swap); else swap();
 }
@@ -426,7 +426,10 @@ function lightLevel(lv, F) {
   lv.light = { flick: new Float32Array(16).fill(1), phase: Array.from({ length: 16 }, (_, g) => hash(g, floorIdx, 913) * 100), ms: {} };
   if (lv.house) lv.house.flick = lv.light.flick;
   try { lv.surface = Surface.build(Object.assign(Surface.lvFromGame({ tier: settings.quality, plan: lv.plan }), { cells: lv.archOpts.cells, aoProfiles: LIGHT_DATA.data && LIGHT_DATA.data.aoProfiles }));
-    lv.group.add(lv.surface.decals.group); if (lv.surface.dustPrints) lv.group.add(lv.surface.dustPrints); }
+    // (Low, the test tier and phones, leaves out the wall decals and the prints in the dust: overdraw and a few hundred instances for
+    // detail you'd hardly see there; the overlays (shade, dust, wet, walked paths) stay. Medium and High have them)
+    lv.surface.extras = settings.quality !== 'low';
+    if (lv.surface.extras) { lv.group.add(lv.surface.decals.group); if (lv.surface.dustPrints) lv.group.add(lv.surface.dustPrints); } }
   catch (e) { console.error('Surface.build', e); lv.surface = null; }
   lv.light.ms.surface = +(performance.now() - t0).toFixed(1);
   bakeLight(lv);
@@ -472,6 +475,17 @@ function updateLight(dt, t) {
   if (!L.failed) MatLib.setK(scares.dim, scares.dim < 0.5, calmNow, dt);
   MatLib.setFlick(L.flick); MatLib.setTime(t);
   if (level.atmos) level.atmos.update(t);
+  if (settings.quality === 'low') farFixtures(L);
+}
+// Low: the lamps' bodies (the kit's fixtures, a few thousand triangles each) are left out past 8 m (their lo models are barely lighter than hi), in the fog where they’re
+// barely shapes; their glow and emissive parts stay, so a far lamp still shines. Nothing solid is touched (H5). Medium and High draw all
+const FAR_FIX = 8;
+function farFixtures(L) {
+  if (!L.fix) { L.fix = []; const g = level.kit && level.kit.group; if (!g) return;
+    for (const o of g.children) if (o.isInstancedMesh && o.userData.kit && o.userData.kit.kind === 'fixture') {
+      if (!o.boundingSphere) o.computeBoundingSphere(); L.fix.push({ o, c: o.boundingSphere.center.clone().applyMatrix4(o.matrixWorld), r: o.boundingSphere.radius }); } }
+  const cp = camera.position;
+  for (const f of L.fix) f.o.visible = f.c.distanceTo(cp) - f.r < FAR_FIX;
 }
 
 /* ---------- the surfaces baked in Blender (textures/surf/<style>/, made by tools/blender/kit/surfaces2.py) ----------

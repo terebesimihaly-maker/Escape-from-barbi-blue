@@ -155,9 +155,9 @@ await p.evaluate(VIEW);
     // (aimed at the middle of the upper left pane, off the glazing bars: the bars themselves are white paint, lit)
     for (const w of plan.windows) { const f = plan.faces[w.face], u = w.u0 + (w.u1 - w.u0) * 0.27, v0 = w.v0 || 0.9, v1 = w.v1 || 2.2, c = [f.x0 + (f.x1 - f.x0) * u, v0 + (v1 - v0) * 0.72, f.z0 + (f.z1 - f.z0) * u];
       const v = __view([c[0] + f.nx * 1.4, c[1], c[2] + f.nz * 1.4], c, true); out.flare.push([w.type, v.mx, v.lum]); }
-    // the decals: Blender's atlas (textures/decals), cheap on Low (the small atlas, one merged mesh per chunk)
-    const S = level.surface, at = S && S.decals.atlas;
-    out.decals = S ? { n: S.stats.decals, chunks: S.stats.decalChunks, src: at.source, w: at.img ? at.img.width : 0, meshes: S.decals.group.children.length } : null;
+    // Low leaves out the wall decals and the prints in the dust (the overlays stay: shade, dust, wet, walked paths)
+    const S = level.surface;
+    out.decals = S ? { extras: S.extras, decalsIn: !!S.decals.group.parent, printsIn: !!(S.dustPrints && S.dustPrints.parent), overlay: !!MatLib.maps().ovAlbedo } : null;
     return out;
   });
   console.log('  (floor 1: ' + r.lamps + ' ceiling lamps, median E under them ' + r.under + '; pool on/off ' + r.pool + '; moon ' + r.moonR + ' ' + JSON.stringify(r.moon) + '; flashlit windows ' + JSON.stringify(r.flare) + '; decals ' + JSON.stringify(r.decals) + ')');
@@ -165,8 +165,11 @@ await p.evaluate(VIEW);
   check(r.pool && r.pool[0] >= r.pool[1] + 25, 'on screen the floor under a lamp is clearly lit by it (lamps on vs. out)', r.pool);
   check(r.moonR > 40 && r.moon && r.moon[0] >= r.moon[1] + 20 && r.moon[2][2] >= r.moon[2][0], 'the moonlight lies on the floor as a readable cool patch (moon on vs. off, flashlight off)', r.moon);
   check(r.flare.length > 0 && r.flare.every(f => f[1] < 250), 'the flashlight on a window: no white flare, the pane is never blown out', r.flare);
-  check(r.decals && r.decals.n > 0 && r.decals.src === 'file' && r.decals.w > 0 && r.decals.w <= 1024 && r.decals.meshes <= r.decals.chunks + 1,
-    'Low: the wall decals from Blender\'s atlas, the small one, one mesh per chunk (cheap)', r.decals);
+  check(r.decals && !r.decals.extras && !r.decals.decalsIn && !r.decals.printsIn && r.decals.overlay,
+    'Low: no wall decals or dust prints (cheap), the floor\'s overlays still in', r.decals);
+  const fx = await p.evaluate(() => { for (let k = 0; k < 3; k++) updateLight(0.05, 50 + k); const f = level.light.fix || [];
+    return { n: f.length, near: f.filter(q => q.o.visible).every(q => q.c.distanceTo(camera.position) - q.r < 8), far: f.filter(q => !q.o.visible).every(q => q.c.distanceTo(camera.position) - q.r >= 8) }; });
+  check(fx.n > 0 && fx.near && fx.far, 'Low: the lamps\' bodies are drawn only within 8 m (their glow everywhere)', fx);
 }
 
 /* ---------- the same floor bakes the same light (F4.5) ---------- */
@@ -204,9 +207,9 @@ await p.context().close();
     await floor(h, 1, 9000 + s);
     r = await h.evaluate(() => { const A = level.atmos, S = level.surface, at = S && S.decals.atlas; let n = 0; scene.traverse(o => { if (o.isLight) n++; });
       return { moonlit: level.light.bake.moonlit.length, shafts: !!(A && A.shafts), steps: A && A.stats.steps, motes: !!(A && A.motes), lights: n,
-        decals: S ? S.stats.decals : 0, src: at && at.source, w: at && at.img ? at.img.width : 0 }; });
+        decals: S ? S.stats.decals : 0, src: at && at.source, w: at && at.img ? at.img.width : 0, decalsIn: !!(S && S.decals.group.parent === level.group), printsIn: !!(S && S.dustPrints && S.dustPrints.parent === level.group) }; });
   }
-  check(r.decals > 0 && r.src === 'file' && r.w >= 2048, 'High: the wall decals (stains, damp, scuffs) from Blender\'s big atlas', r);
+  check(r.decals > 0 && r.src === 'file' && r.w >= 2048 && r.decalsIn && r.printsIn, 'High: the wall decals (stains, damp, scuffs) from Blender\'s big atlas, and the prints in the dust', r);
   check(r.moonlit === 0 || (r.shafts && r.steps === 8 && r.motes), 'High: the moonlight beams with 8 steps and the dust motes in them', r);
   check(r.lights === 4, 'High: still the same 4 lights', r.lights);
   await h.context().close();
