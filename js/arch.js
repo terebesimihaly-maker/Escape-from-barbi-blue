@@ -842,6 +842,9 @@ function doorways(plan, kit, opts) {
   const frameParts = frameN ? partsOf(frameN) : null;
   let leafParts = leafN ? partsOf(leafN) : null, ownLeaf = null;
   if (!leafParts) { ownLeaf = boxGeo(0, 0, -LEAF.D / 2, LEAF.W, LEAF.H, LEAF.D / 2); leafParts = [{ geometry: ownLeaf, material: matOf(opts, 'leaf', 'frame', 'trim') || grey(), rel: new THREE.Matrix4(), own: true }]; }
+  // (a half-glazed leaf's panes come in the opaque 'Glass' stand-in, which read as flat white panels: the floor's glass instead, B1)
+  const gM = (opts.materials || {}).glass;
+  if (gM) for (const pt of leafParts) if (pt.material && /^Glass/.test(pt.material.name || '')) pt.material = gM;
   const lb = partsBox(leafParts), thick = Math.max(0.005, lb.max.z - lb.min.z), zc = (lb.max.z + lb.min.z) / 2;
   // the frame's real extent: the header starts on top of its head (no soffit coplanar with the head's at 2.60 m), the leaves hinge
   // just past its architraves (no leaf end buried in them)

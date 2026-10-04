@@ -396,8 +396,8 @@ function archMaterialsLit(F, plan) {
    the lamps dimmed by a scare, flicker, the clock), so nothing recompiles (H13). Without the plan (or MatLib) none of this runs. */
 // (MOON_GAIN: C9's ~0.7 on the floor is true to a real moon but reads as nothing on a dark floor beside the flashlight; the patches are
 // kept clearly readable, still well under a lamp's pool. LAMP_GAIN: the profiles' k0 calibrated against Blender gives pools you barely
-// see at 2.6 m below a pendant; the lamps light their rooms visibly, the flashlight stays far the brightest. SHAFTS: the beams' density)
-const LIGHT_DATA = { data: null, loading: null }, MOON_GAIN = 5, LAMP_GAIN = 1.8, SHAFTS = 0.045;
+// see at 2.6 m below a pendant; the lamps light their rooms visibly, the flashlight stays far the brightest. SHAFTS: the beams' density, kept low so the moon reads as shafts, not a haze)
+const LIGHT_DATA = { data: null, loading: null }, MOON_GAIN = 5, LAMP_GAIN = 1.8, SHAFTS = 0.025;
 const COOKIE_TYPES = ['sash', 'tall', 'cellar', 'cellar_short', 'dormer', 'industrial', 'oculus'];
 // the light data from Blender (emission profiles, AO curves, window cookies): once, at boot; the bake works without (isotropic lamps,
 // soft-edged window patches) and a floor built before it arrived is baked again when it does
