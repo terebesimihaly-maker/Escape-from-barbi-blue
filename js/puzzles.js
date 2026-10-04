@@ -3,9 +3,9 @@
      1 The Nursery    maze   - a tilting ball maze: roll the ball into the gold hole, around the holes (a hole is loud: she hears it)
      2 The Hallway    slide  - a sliding-tile puzzle: put the doll's portrait back together
      3 The Basement   pipes  - turn the pipes until the water runs from the valve to the drain
-     4 The Attic      simon  - a music box plays a melody on four keys; play it back, one note longer and a little faster each time
-                             (a wrong note is loud and sets you back two rounds; on hard, to the start)
-     5 The Workshop   rings  - turn the rings until her face lines up; turning a ring also turns the next two out
+     4 The Attic      simon  - a music box plays a melody on four keys; play it back, one note longer and a little faster each time, and after
+                             a few rounds in the dark (only the notes); a wrong note is loud and sets you back rounds (hard: to the start)
+     5 The Workshop   rings  - turn the rings until her face lines up; turning a ring turns the one outside it too, and the one inside it back
    The game keeps going while you play: she can come. Each box is made from a seed, so every player gets the same one.
    Later floors and harder difficulties: bigger boards, more holes, longer melodies, more rings. */
 'use strict';
@@ -24,8 +24,9 @@ function puzzleSpec(kind, floor, diff) {
   if (kind === 'slide') return { n: d === 2 ? 4 : 3, moves: [16, 36, 70][d] };
   if (kind === 'pipes') return { n: 4 + d };
   // (the attic and the workshop come last: a long melody that speeds up, and a wrong note costs you rounds; rings that drag two more)
-  if (kind === 'simon') return { len: 6 + 2 * d, back: d === 2 ? 99 : 2, fast: true };
-  return { rings: [4, 5, 5][d], steps: 12, drag: 2 };
+  // (from a few rounds in the music box plays in the dark: only the notes, no lit keys; rings pull their neighbours both ways)
+  if (kind === 'simon') return { len: [8, 11, 14][d], back: [2, 4, 99][d], fast: true, darkFrom: [5, 4, 3][d] };
+  return { rings: [4, 5, 6][d], steps: 12, mix: true, scramble: [6, 9, 12][d] };
 }
 // a small seeded random number generator (the same box for everyone)
 function seeded(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -247,7 +248,7 @@ function pipesFlow(n, M, rot, r0, r1) {
 const MB_KEYS = [{ col: '#d8423a', f: 523 }, { col: '#e8d24a', f: 659 }, { col: '#5ab85a', f: 784 }, { col: '#4a7ae8', f: 988 }];
 KINDS.simon = {
   title: 'The music box',
-  help: pc => 'Listen, then play the melody back. One note longer, and a little faster, each time. A wrong note is loud and sets you back. ' + (pc ? '(Click the keys, or press 1 2 3 4.)' : ''),
+  help: pc => 'Listen, then play the melody back. One note longer, and a little faster, each time; later the keys stop lighting up, so listen. A wrong note is loud and sets you back. ' + (pc ? '(Click the keys, or press 1 2 3 4.)' : ''),
   build: pz => { const rnd = seeded(pz.seed); return { seq: Array.from({ length: pz.spec.len }, () => rnd() * 4 | 0) }; },
   start: () => ({ round: 1, phase: 'listen', t: -0.6, i: 0, lit: -1, litT: 0 }),
   resume: s => ({ round: s.round, phase: 'listen', t: -0.6, i: 0, lit: -1, litT: 0 }),   // (the round you'd reached, played to you again)
@@ -261,7 +262,7 @@ KINDS.simon = {
     g.fillText(o.phase === 'listen' ? 'listen...' : 'your turn', cx, cy - 4); g.fillText(Math.min(o.round, pz.spec.len) + ' / ' + pz.spec.len, cx, cy + 16); },
   update: (o, pz, dt) => { if (o.litT > 0 && (o.litT -= dt) <= 0) o.lit = -1;
     if (o.phase !== 'listen') return; o.t += dt;
-    if (o.t >= (pz.spec.fast ? Math.max(0.38, 0.65 - 0.035 * (o.round - 1)) : 0.65)) { o.t = 0; if (o.i < o.round) { const k = pz.data.seq[o.i++]; o.lit = k; o.litT = 0.45; sfx.note(MB_KEYS[k].f, 0.3, 0); } else { o.phase = 'play'; o.i = 0; } } },
+    if (o.t >= (pz.spec.fast ? Math.max(0.38, 0.65 - 0.035 * (o.round - 1)) : 0.65)) { o.t = 0; if (o.i < o.round) { const k = pz.data.seq[o.i++]; o.lit = pz.spec.darkFrom && o.round >= pz.spec.darkFrom ? -1 : k; o.litT = 0.45; sfx.note(MB_KEYS[k].f, 0.3, 0); } else { o.phase = 'play'; o.i = 0; } } },
   click: (o, pz, x, y, cv) => { const cx = cv.width / 2, cy = cv.height / 2, R = Math.min(cv.width, cv.height) * 0.42, d = Math.hypot(x - cx, y - cy);
     if (d < R * 0.32 || d > R) return; let a = Math.atan2(y - cy, x - cx) + Math.PI / 2; if (a < 0) a += Math.PI * 2; musicKey(o, pz, Math.floor(a / (Math.PI / 2)) % 4); },
   key: (o, pz, code) => { const k = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3 }[code]; if (k !== undefined) musicKey(o, pz, k); },
@@ -277,10 +278,15 @@ function musicKey(o, pz, k) {
 // 5. the rings: her face in rings, turned out of place. Turning a ring also turns the next one out.
 KINDS.rings = {
   title: 'Her face',
-  help: pc => 'Turn the rings until her face lines up. ' + (pc ? 'Click' : 'Tap') + ' a ring to turn it; the next two rings out turn with it.',
+  help: pc => 'Turn the rings until her face lines up. ' + (pc ? 'Click' : 'Tap') + ' a ring to turn it; the ring outside it turns with it, and the ring inside it turns back.',
   build: pz => { const rnd = seeded(pz.seed), R = pz.spec.rings, S = pz.spec.steps; let off;
-    do { off = Array.from({ length: R }, () => rnd() * S | 0); } while (off.every(v => v === 0));
-    return { R, S, off, pic: portraitCanvas(pz.seed) }; },
+    let moves = null;
+    if (pz.spec.mix) {                                   // (scrambled by real turns, so it can always be turned back)
+      do { off = new Array(R).fill(0); moves = new Array(R).fill(0);
+        for (let k = 0; k < pz.spec.scramble; k++) { const i = rnd() * R | 0, n = 1 + (rnd() * (S - 1) | 0); moves[i] = (moves[i] + n) % S;
+          for (let m = 0; m < n; m++) ringMove(off, R, S, i, pz.spec); } } while (off.every(v => v === 0));
+    } else do { off = Array.from({ length: R }, () => rnd() * S | 0); } while (off.every(v => v === 0));
+    return { R, S, off, moves, pic: portraitCanvas(pz.seed) }; },
   start: pz => ({ off: pz.data.off.slice() }),
   draw: (o, pz, cv) => { const g = cv.getContext('2d'), W = cv.width, H = cv.height, cx = W / 2, cy = H / 2, Rm = Math.min(W, H) * 0.46, { R, S, pic } = pz.data;
     g.fillStyle = '#1a1210'; g.fillRect(0, 0, W, H);
@@ -291,8 +297,13 @@ KINDS.rings = {
   click: (o, pz, x, y, cv) => { const cx = cv.width / 2, cy = cv.height / 2, Rm = Math.min(cv.width, cv.height) * 0.46, { R } = pz.data, d = Math.hypot(x - cx, y - cy);
     const ring = Math.ceil(d / (Rm / (R + 1))) - 1; if (ring < 1 || ring > R) return; turnRing(o, pz, ring - 1); },
 };
+// one click on ring i: it turns a notch; the ring outside it turns with it; with spec.mix the ring inside it turns back a notch
+function ringMove(off, R, S, i, spec) {
+  off[i] = (off[i] + 1) % S; if (i + 1 < R) off[i + 1] = (off[i + 1] + 1) % S;
+  if (spec.mix && i > 0) off[i - 1] = (off[i - 1] + S - 1) % S;
+}
 function turnRing(o, pz, i) {
-  const { R, S } = pz.data; o.off[i] = (o.off[i] + 1) % S; for (let j = 1; j <= (pz.spec.drag || 1); j++) if (i + j < R) o.off[i + j] = (o.off[i + j] + 1) % S; sfx.creak(0.06);
+  const { R, S } = pz.data; ringMove(o.off, R, S, i, pz.spec); sfx.creak(0.06);
   if (o.off.every(v => v === 0)) pzWin();
 }
 

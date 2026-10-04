@@ -147,7 +147,9 @@ const sim = await p.evaluate(() => {
     else if (kind === 'simon') { while (t < 120 && !o.won) { KINDS.simon.update(o, pz, 1 / 30); t += 1 / 30;
         if (o.phase === 'play') for (let i = 0; i < o.round && !o.won && o.phase === 'play'; ) { const r = o.round; musicKey(o, pz, pz.data.seq[i]); if (o.round !== r) break; i = o.i; } }
       info = pz.spec.len + ' notes'; }
-    else { for (let i = 0; i < pz.data.R && !o.won; i++) while (o.off[i] !== 0 && !o.won) turnRing(o, pz, i); info = pz.data.R + ' rings'; }
+    else { if (pz.data.moves) { for (let i = 0; i < pz.data.R && !o.won; i++) for (let n = (pz.data.S - pz.data.moves[i]) % pz.data.S; n > 0 && !o.won; n--) turnRing(o, pz, i); }   // (each scrambling turn undone by going on round)
+      else for (let i = 0; i < pz.data.R && !o.won; i++) while (o.off[i] !== 0 && !o.won) turnRing(o, pz, i);
+      info = pz.data.R + ' rings'; }
     res.push({ fl, diff, kind, ok: !!o.won, info });
   }
   pzOpen = null; puzzles = []; fuses = fx; drawBoard = keep; tilt.mx = tilt.my = 0;
