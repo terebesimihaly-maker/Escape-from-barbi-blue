@@ -5,27 +5,27 @@
  "axes": "three.js: y up, front +z; aabb [min, max] in metres in the node frame",
  "tiers": {
   "hi": {
-   "wood": 30208768,
+   "wood": 30207996,
    "tile": 18937564,
-   "concrete": 22599604,
-   "attic": 21727848,
-   "workshop": 25573464,
+   "concrete": 22600956,
+   "attic": 21751004,
+   "workshop": 25569912,
    "common": 1079144
   },
   "md": {
-   "wood": 12034604,
+   "wood": 12032416,
    "tile": 8290628,
-   "concrete": 9175348,
-   "attic": 8061800,
-   "workshop": 10093156,
-   "common": 400152
+   "concrete": 9177596,
+   "attic": 8081032,
+   "workshop": 10092672,
+   "common": 400148
   },
   "lo": {
-   "wood": 6461872,
+   "wood": 6458916,
    "tile": 4704996,
-   "concrete": 4724976,
-   "attic": 4153372,
-   "workshop": 5421416,
+   "concrete": 4724544,
+   "attic": 4164464,
+   "workshop": 5420088,
    "common": 188652
   }
  },
@@ -286,7 +286,7 @@
    "aabb": [
     [
      -0.45,
-     -0.0093,
+     0.0,
      -0.002
     ],
     [
@@ -1828,7 +1828,7 @@
    "aabb": [
     [
      -0.2027,
-     -0.0082,
+     0.0,
      0.0071
     ],
     [
@@ -1840,7 +1840,7 @@
    "tris": {
     "hi": 768,
     "md": 768,
-    "lo": 666
+    "lo": 676
    }
   },
   "Band_service_shelf": {
@@ -3832,7 +3832,7 @@
    "placeholder": false,
    "materials": [
     "Kit_iron_bed",
-    "Kit_isl_wood"
+    "Kit_isl_wood_bed_screen_crib_rocker_dollhouse_tea_party_twin_cribs_washst"
    ],
    "uv1": false,
    "children": [],
@@ -3880,7 +3880,7 @@
    "aabb": [
     [
      -0.9448,
-     -0.0112,
+     0.0,
      -0.74
     ],
     [
@@ -3892,7 +3892,7 @@
    "tris": {
     "hi": 5866,
     "md": 5866,
-    "lo": 5414
+    "lo": 5408
    },
    "slot": "island",
    "foot": [
@@ -3952,7 +3952,7 @@
    "placeholder": false,
    "materials": [
     "Kit_crib_v0",
-    "Kit_isl_wood",
+    "Kit_isl_wood_bed_screen_crib_rocker_dollhouse_tea_party_twin_cribs_washst",
     "Kit_rocking_chair"
    ],
    "uv1": false,
@@ -3962,12 +3962,12 @@
    "aabb": [
     [
      -0.6958,
-     -0.0021,
-     -0.8651
+     -0.0012,
+     -0.8642
     ],
     [
-     0.6975,
-     1.0986,
+     0.6958,
+     1.0998,
      0.876
     ]
    ],
@@ -4037,14 +4037,14 @@
    "placeholder": false,
    "materials": [
     "Kit_doll_house",
-    "Kit_isl_wood"
+    "Kit_isl_wood_bed_screen_crib_rocker_dollhouse_tea_party_twin_cribs_washst"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
      -0.795,
-     -0.01,
+     0.0,
      -0.645
     ],
     [
@@ -4056,7 +4056,7 @@
    "tris": {
     "hi": 5572,
     "md": 5572,
-    "lo": 5039
+    "lo": 5035
    },
    "slot": "island",
    "foot": [
@@ -4083,7 +4083,7 @@
    "aabb": [
     [
      -0.8,
-     -0.0119,
+     0.0,
      -0.6428
     ],
     [
@@ -4095,7 +4095,7 @@
    "tris": {
     "hi": 5308,
     "md": 5308,
-    "lo": 3946
+    "lo": 3956
    },
    "slot": "island",
    "foot": [
@@ -4202,7 +4202,7 @@
    "aabb": [
     [
      -0.8,
-     -0.0052,
+     0.0,
      -0.6383
     ],
     [
@@ -4593,14 +4593,14 @@
    "fit": "exact",
    "placeholder": false,
    "materials": [
-    "Kit_isl_wood"
+    "Kit_isl_wood_bed_screen_crib_rocker_dollhouse_tea_party_twin_cribs_washst"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
      -0.7508,
-     -0.0021,
+     -0.0012,
      -0.7007
     ],
     [
@@ -4639,7 +4639,7 @@
    "aabb": [
     [
      -0.845,
-     -0.008,
+     -0.0001,
      -0.845
     ],
     [
@@ -4712,7 +4712,7 @@
    "fit": "exact",
    "placeholder": false,
    "materials": [
-    "Kit_isl_wood",
+    "Kit_isl_wood_bed_screen_crib_rocker_dollhouse_tea_party_twin_cribs_washst",
     "Kit_crib_v0"
    ],
    "uv1": false,
@@ -4756,7 +4756,7 @@
    "fit": "exact",
    "placeholder": false,
    "materials": [
-    "Kit_isl_wood"
+    "Kit_isl_wood_bed_screen_crib_rocker_dollhouse_tea_party_twin_cribs_washst"
    ],
    "uv1": false,
    "children": [],
@@ -4802,7 +4802,7 @@
    "aabb": [
     [
      -0.9,
-     -0.004,
+     0.0,
      -0.645
     ],
     [
@@ -4814,7 +4814,7 @@
    "tris": {
     "hi": 4080,
     "md": 4080,
-    "lo": 3479
+    "lo": 3483
    },
    "slot": "island",
    "foot": [
@@ -6967,9 +6967,9 @@
    "children": [],
    "aabb": [
     [
-     -0.643,
+     -0.614,
      0.0,
-     -0.345
+     -0.3
     ],
     [
      0.609,

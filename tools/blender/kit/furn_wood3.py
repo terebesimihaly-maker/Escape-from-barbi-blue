@@ -11,7 +11,7 @@ HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import bpy, bmesh
 import numpy as np
 from mathutils import Vector, Matrix, noise as mnoise
-import kitlib
+import kitlib, defs
 import surfaces2 as S
 import doors as Dr
 import furnlib as F
@@ -189,14 +189,28 @@ def build_islands(want):
     rnd = random.Random(23); M = isl_materials(); roots = []; new_parts = []
     # ---- isl_crib_rocker
     if want('isl_crib_rocker'):
+        it = defs.KIT['items']['isl_crib_rocker']; H, D = it['h'], it['d']; amp = defs.KIT['anims'][it['anim']]['amp']
         cr = append('furn_wood_crib', ['Solid_crib_v0']); ch = append('rocking_chair', ['Solid_rocking_chair'])
         crib = cr['Solid_crib_v0']; mob = cr.get('Solid_crib_v0_MobilePivot')
         place(crib, (-0.33, 0.415, 0)); bake_world(crib)
         if mob: bake_world(mob)
+        sz = H / max((o.matrix_world @ v.co).z for o in [crib] + ([mob] if mob else []) for v in o.data.vertices)
+        for o in [crib] + ([mob] if mob else []): o.data.transform(Matrix.Diagonal((1.0, 1.0, sz, 1.0)))   # (a tall Victorian cot: the island's 1.10 m)
         root_c = ch['Solid_rocking_chair']; chair = ch['Solid_rocking_chair_RockPivot']
-        root_c.location = (0.37, 0.385, 0.0); bpy.context.view_layer.update(); bake_world(root_c); bake_world(chair)
+        root_c.location = (0.0, 0.0, 0.0); bpy.context.view_layer.update(); bake_world(root_c); bake_world(chair)
+        # the chair rocks about its rockers' arc centre (the rockers roll on the floor: they never leave it or sink into it), made a
+        # little smaller than the standalone one so its crest at the top of the swing is the island's 1.10 m and no higher, and set
+        # forward so its rockers' tips swing inside the island's box
+        st = random.getstate(); import rocking_chair as RC; random.setstate(st)
+        P = np.array([v.co[:] for v in chair.data.vertices]); c = np.array([0.0, 0.0, P[:, 2].min() + RC.R])
+        rx = lambda a: np.array([[1, 0, 0], [0, math.cos(a), -math.sin(a)], [0, math.sin(a), math.cos(a)]])
+        sw = [(P - c) @ rx(a).T + c for a in np.linspace(-amp, amp, 41)]
+        s = (H - 0.002) / max(q[:, 2].max() for q in sw); y1 = max(q[:, 1].max() for q in sw) * s
+        yc = min(0.385, D / 2 - 0.006 - y1)
+        chair.data.transform(Matrix.Translation((0.37, yc, 0.0)) @ Matrix.Scale(s, 4))
+        print(f'  isl_crib_rocker: cot x{sz:.3f} high, chair x{s:.3f} at y {yc:.3f}, rocking about z {c[2] * s:.3f}', flush=True)
         G = S.Geo(1, 1, False, False); braided_rug(G, M, 0.69, 0.86, rnd); rug = F.build_obj('isl_rug', G); new_parts.append(rug)
-        roots.append(('Isl_crib_rocker', [crib] + ([mob] if mob else []) + [rug], chair, 'Isl_crib_rocker_RockPivot', (0.37, 0.385, 0.42), [root_c]))
+        roots.append(('Isl_crib_rocker', [crib] + ([mob] if mob else []) + [rug], chair, 'Isl_crib_rocker_RockPivot', (0.37, yc, c[2] * s), [root_c]))
     # ---- isl_twin_cribs
     if want('isl_twin_cribs'):
         a = append('furn_wood_crib', ['Solid_crib_v0', 'Solid_crib_v1']); parts = []

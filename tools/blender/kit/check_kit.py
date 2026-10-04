@@ -7,13 +7,15 @@
 #   a module (uv1) lacks TEXCOORD_1; a wardrobe hinge is more than 0.005 m off; a declared child, pivot or socket is missing;
 #   node names repeat or contain dots, a mesh has more than 2 materials, a reserved material's name is mangled ('Glass.001');
 #   a solid or island covers less than 85% of its box's width or depth above 0.4 m, or swings (rock, mobile) out of its box
-#   grown by 0.05 m; a KIT node isn't at the origin (only wardrobe leaves sit on their hinges); the manifest disagrees.
+#   grown by 0.05 m, below the floor (5 mm) or to a top more than 0.05 m off its h at any moment of the swing (F3.8, every tier);
+#   a piece whose box starts at the floor reaches more than 5 mm below it; a wardrobe body is off-centre (5 mm) or reaches behind
+#   its back (into the wall); a KIT node isn't at the origin (only wardrobe leaves sit on their hinges); the manifest disagrees.
 #   /tmp/claude-0/bpyenv/bin/python tools/blender/kit/check_kit.py [--tier hi] [--file wood] [--only <node or id>] [--dir models/kit] [--quiet]
 import sys, os, json, math
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import numpy as np
 import defs, glbinfo
-KITDIR = os.path.join(defs.REPO, 'models', 'kit'); TOL = 0.02; HINGE = 0.005; BAND = 0.44; UMAX = 1.0125
+KITDIR = os.path.join(defs.REPO, 'models', 'kit'); TOL = 0.02; HINGE = 0.005; BAND = 0.44; UMAX = 1.0125; FLOOR = 0.005
 PHYSICAL = ('KHR_lights_punctual', 'KHR_materials_transmission', 'KHR_materials_clearcoat', 'KHR_materials_sheen', 'KHR_materials_ior',
             'KHR_materials_specular', 'KHR_materials_volume', 'KHR_materials_iridescence', 'KHR_materials_anisotropy', 'KHR_materials_dispersion')
 DECOR = ('band', 'fix')                                      # (non-solid: the 0.44 m band rule)
@@ -61,6 +63,13 @@ def check_file(path, f, tier, only, fails, notes):
         except Exception as ex: P = T = None; b = g.box(i); notes.append(f'{tier}/{f}: vertices not decoded ({ex}); boxes from accessor bounds')
         if b is None: err(n['name'], 'no geometry'); continue
         b = [np.array(b[0]), np.array(b[1])]
+        # standing on the floor: nothing of a piece whose box starts at the floor is below it (the game allows 5 mm, F3.8)
+        if n['group'] != 'arch' and lo[2] == 0 and b[0][2] < -FLOOR: err(n['name'], f'sits {-b[0][2]:.4f} m below the floor (at most {FLOOR})')
+        # a wardrobe body: centred on its hinges (x), and nothing behind its back, which stands 1 cm off the wall (kit.js wardrobe)
+        if n['group'] == 'ward' and n.get('part') == 'body':
+            back = n['piece']['body'][1] / 2; cx = (b[0][0] + b[1][0]) / 2
+            if b[1][1] > back + 2e-3: err(n['name'], f'reaches {b[1][1] - back:.3f} m behind its back (y {b[1][1]:.3f} > {back}): into the wall')
+            if abs(cx) > HINGE: err(n['name'], f'off-centre: x {b[0][0]:.3f}..{b[1][0]:.3f} (centre {cx:+.4f}, at most {HINGE} off)')
         if n['fit'] == 'max':
             out = np.maximum(lo - b[0], b[1] - hi).max()
             if out > TOL: err(n['name'], f'sticks out of its envelope by {out:.3f} m (box {np.round(b[0], 3).tolist()}..{np.round(b[1], 3).tolist()}, envelope {lo.tolist()}..{hi.tolist()})')
@@ -80,12 +89,12 @@ def check_file(path, f, tier, only, fails, notes):
         sub = {g.nodes[j].get('name') for j in g.subtree(i)}
         for c in n['children'] + n['sockets']:
             if c not in sub: err(n['name'], f'child {c} missing')
-        # solids and islands: cover the box above knee height; swing inside it
-        if n['group'] in ('solid', 'island') and P is not None and len(P) and tier == 'hi':
+        # solids and islands: cover the box above knee height (hi); swing inside it (every tier: lo is cut down, the game tests lo and md)
+        if n['group'] in ('solid', 'island') and P is not None and len(P):
             z0 = min(0.4, 0.5 * hi[2]); cb = glbinfo.clip_box(P, T, z0)
             for k, ax in ((0, 'width'), (1, 'depth')):
                 share = 0 if cb is None else (cb[1][k] - cb[0][k]) / (hi[k] - lo[k])
-                if share < 0.85: err(n['name'], f'covers {share:.0%} of its {ax} above {z0:.2f} m (at least 85%)')
+                if share < 0.85 and tier == 'hi': err(n['name'], f'covers {share:.0%} of its {ax} above {z0:.2f} m (at least 85%)')
             an = defs.KIT['anims'].get(n.get('anim') or '', {})
             piv = g.find(n['name'] + an['pivot']) if an.get('pivot') else None
             if piv is not None and an.get('axis'):
@@ -93,10 +102,17 @@ def check_file(path, f, tier, only, fails, notes):
                 if len(Q):
                     M = g.rel(piv, i); c = np.array([M[0, 3], -M[2, 3], M[1, 3]])
                     angs = np.linspace(-an['amp'], an['amp'], 9) if 'amp' in an else np.linspace(0, 2 * math.pi, 16, endpoint=False)
-                    sw = np.concatenate([Q @ rot(an['axis'], a).T + c for a in angs]); s0, s1 = sw.min(0), sw.max(0)
+                    poses = [Q @ rot(an['axis'], a).T + c for a in angs]
+                    sw = np.concatenate(poses); s0, s1 = sw.min(0), sw.max(0)
                     out = max((lo[:2] - s0[:2]).max(), (s1[:2] - hi[:2]).max())
                     if out > 0.05: err(n['name'], f'swings {out:.3f} m out of its box (at most 0.05): {np.round(s0, 3).tolist()}..{np.round(s1, 3).tolist()}')
-                    notes.append(f'{tier}/{f} {n["name"]}: swing box {np.round(s0, 3).tolist()}..{np.round(s1, 3).tolist()}')
+                    # up and down: at every moment of the swing the piece stands on the floor and is as tall as KIT says (F3.8:
+                    # its bottom >= -5 mm, its top within 0.05 m of h), the static part and the swinging one together
+                    S, _ = g.vertices(i, skip=piv); zs0 = S[:, 2].min() if len(S) else np.inf; zs1 = S[:, 2].max() if len(S) else -np.inf
+                    bot = min(min(zs0, q[:, 2].min()) for q in poses); tops = [max(zs1, q[:, 2].max()) for q in poses]
+                    if bot < -FLOOR: err(n['name'], f'dips {-bot:.4f} m below the floor as it swings (at most {FLOOR})')
+                    if min(tops) < hi[2] - 0.05 or max(tops) > hi[2] + 0.05: err(n['name'], f'its top goes {min(tops):.3f}..{max(tops):.3f} m as it swings (KIT h {hi[2]}, within 0.05)')
+                    notes.append(f'{tier}/{f} {n["name"]}: swing box {np.round(s0, 3).tolist()}..{np.round(s1, 3).tolist()}, bottom {bot:+.4f}, top {min(tops):.3f}..{max(tops):.3f}')
     return g
 
 def main():

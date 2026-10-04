@@ -452,40 +452,42 @@ def build_body(style, M):
 def dust_sheet(rnd):
     """a dust sheet thrown over the wardrobe and pulled half off to the left: lying in rucks over the left of the roof (its free edge
        rolled loose across the middle), over the cornice's edge, and hanging down the left side in folds that fan out from the front
-       corner, its hem longer toward the back; inside the body's envelope (the side has 7 cm between the carcass and the envelope),
-       clear of the left door. -> bmesh, and each vertex's position on the flat sheet (m)"""
+       corner, its hem longer toward the back; clear of the left door, and inside the body's box as kit.js stands it: it ends at the
+       back edge (the back is 1 cm off the wall) and its folds hang inside the cornice's line (the fold crests on it), so the body
+       is as wide to the left as the cornice makes it to the right. -> bmesh, and each vertex's position on the flat sheet (m)"""
     xr = 0.24 + 0.06 * rnd.random(); top = CROWN['attic'][-1][1] + 0.002; X = -(BW / 2 + max(d for d, z in CROWN['attic']) + 0.001)   # (its free edge; the cornice's top and left face)
-    nu, nv = 54, 26; y0, y1 = -0.326, 0.352; r = 0.016
-    Lr = xr - X; Le = math.pi / 2 * r; ph = [rnd.uniform(0, 6.28) for _ in range(8)]
+    nr, ne, nh, nv = 16, 4, 34, 26; y0, y1 = -0.326, YB - 0.004; r = 0.004; XO = X - r   # (XO: the outermost the sheet goes, round the cornice)
+    zt = top + 0.003                                                    # (where it lies on the roof's edge, before it bends over it)
+    Lr = xr - X; Le = math.pi / 2 * r; ph = [rnd.uniform(0, 6.28) for _ in range(9)]
     def hang_len(v):                                                    # (the hem: higher at the front corner, uneven)
         return 0.95 + 0.72 * v ** 0.8 + 0.06 * math.sin(9 * v + ph[0]) + 0.03 * math.sin(23 * v + ph[1])
-    Lmax = Lr + Le + hang_len(1.0) + 0.05
     def P(u, v):
         y = y0 + (y1 - y0) * v
-        if u <= Lr:                                                    # (on the roof: rucked, its free edge rolled up a little)
-            s_ = u / Lr; x = xr - u
+        if u <= Lr:                                                    # (on the roof: rucked, its free edge rolled up a little; flat at the cornice)
+            s_ = u / Lr; x = xr - u; edge = min(1.0, (Lr - u) / 0.06)
             ruck = 0.012 * max(0.0, math.sin(11 * s_ + 4 * v + ph[2])) ** 2 + 0.006 * math.sin(17 * v + 5 * s_ + ph[3]) ** 2
             roll = 0.018 * math.exp(-u / 0.03)
-            return Vector((x + 0.01 * math.sin(6 * v + ph[4]) * math.exp(-u / 0.05), y, top + 0.003 + ruck + roll))
-        if u <= Lr + Le:                                               # (over the cornice's edge)
+            return Vector((x + 0.01 * math.sin(6 * v + ph[4]) * math.exp(-u / 0.05), y, zt + edge * ruck + roll))
+        if u <= Lr + Le:                                               # (bent tight over the cornice's corner)
             a = (u - Lr) / Le * math.pi / 2
-            return Vector((X - r * math.sin(a) + r * 0.0, y, top - r * (1 - math.cos(a))))
+            return Vector((X - r * math.sin(a), y, zt - r * (1 - math.cos(a))))
         h = u - Lr - Le; L = hang_len(v); h = min(h, L)                 # (down the side; past the hem: nothing, clamped)
-        A = 0.004 + 0.03 * min(1.0, h / 0.55)                          # (folds deepen downward, fan from the front corner)
-        f = (math.sin(2 * math.pi * v / 0.21 + ph[5] + h * (6.0 - 5.0 * v)) * 0.6 + math.sin(2 * math.pi * v / 0.13 + ph[6] - h * 3.0) * 0.3
-             + math.sin(2 * math.pi * v / 0.37 + ph[7] + h * 2.0) * 0.4)
-        x = X - r - 0.012 + A * f
-        x = max(-0.643, min(-0.583, x))
+        A = 0.0005 + 0.017 * min(1.0, h / 0.5) ** 0.8                   # (folds deepen downward, fan from the front corner)
+        f = (math.sin(2 * math.pi * v / 0.21 + ph[5] + h * (6.0 - 5.0 * v)) * 0.55 + math.sin(2 * math.pi * v / 0.13 + ph[6] - h * 3.0) * 0.25
+             + math.sin(2 * math.pi * v / 0.37 + ph[7] + h * 2.0) * 0.45 + math.sin(2 * math.pi * v / 0.6 + ph[8] + h * 1.2) * 0.35) / 1.2
+        f = math.copysign(min(1.0, abs(f)) ** 0.8, f)                   # (rounder crests and hollows)
+        x = XO + A * (1.0 - f)                                          # (the crests on the cornice's line, the hollows in toward the side)
         sag = 0.035 * (h / max(L, 1e-3)) ** 2 * math.sin(math.pi * v)   # (the hem swings in at the middle)
-        return Vector((x, y, top - r - h + sag * 0.3))
-    bm = bmesh.new(); V = []; flat = {}
+        return Vector((x, y, zt - r - h + sag * 0.3))
+    bm = bmesh.new(); V = []; flat = {}; nu = nr + ne + nh
     for j in range(nv + 1):
         v = j / nv; row = []
-        Lv = Lr + Le + hang_len(v)
-        for i in range(nu + 1):
-            u = Lv * i / nu; p = P(u, v)
+        Lh = hang_len(v)                                                # (roof, the bend and the drop each sampled finely enough for its shape)
+        us = [Lr * k / nr for k in range(nr)] + [Lr + Le * k / ne for k in range(ne)] + [Lr + Le + Lh * k / nh for k in range(nh + 1)]
+        for u in us:
+            p = P(u, v)
             if p.z < 2.25: p.y = max(p.y, -0.296)                       # (clear of the left door)
-            p.y = min(p.y, 0.345); p.z = min(p.z, 2.362)
+            p.y = min(p.y, YB - 0.001); p.z = min(p.z, 2.35)
             q = bm.verts.new(p); row.append(q); flat[q] = (u, (y1 - y0) * v)
         V.append(row)
     for j in range(nv):

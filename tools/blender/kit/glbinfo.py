@@ -78,11 +78,14 @@ class Glb:
         if not np.isfinite(lo).all(): return None
         return g2b_box(lo, hi)
     # ---- vertices (meshopt-decoded through node)
-    def vertices(self, i, frame=None):
-        """(points (n, 3), triangles (m, 3) indices into points) of i's subtree in frame's space, Blender axes"""
+    def vertices(self, i, frame=None, skip=None):
+        """(points (n, 3), triangles (m, 3) indices into points) of i's subtree in frame's space, Blender axes (without the subtree
+           of node skip: a piece's static part, its animated child left out)"""
         if self.pos is None: self.pos = _decode(self.path)
         frame = i if frame is None else frame; P = []; T = []; base = 0
+        out = set(self.subtree(skip)) if skip is not None else set()
         for j in self.subtree(i):
+            if j in out: continue
             for pts, idx in self.pos.get(self.nodes[j].get('name', ''), []):
                 M = self.rel(j, frame); q = (np.c_[pts, np.ones(len(pts))] @ M.T)[:, :3]
                 P.append(np.c_[q[:, 0], -q[:, 2], q[:, 1]]); T.append(idx + base); base += len(pts)

@@ -61,6 +61,42 @@ def drape(G, mat, nu, nv, f, attrs, smooth=True, out=None):
         below = Vector((c.x, c.y, min(p.z for p in pts) - 1.5 * ext)); out = lambda q: q - below
     grid_surface(G, mat, P, attrs, smooth=smooth, flip_to=out)
 
+# ---------------------------------------------------------------- standing on the floor
+def settle(objs, depth=0.03, thin=0.03):
+    """whatever was set a little into the floor (a toy tipped on its side, a frame's skid, a lump of coal, a rolled rug) brought up
+       onto it, in world space: a thin loose part (under 3 cm tall: a photograph, a card) lifted whole until it lies on the floor,
+       anything taller cut off at the floor (what showed above the floor stays exactly as it was; the faces that come to lie on it
+       face down). Parts sunk deeper than depth are left alone (and reported). -> vertices moved"""
+    moved = 0
+    for o in objs:
+        if o is None or o.type != 'MESH': continue
+        mw = o.matrix_world.copy(); inv = mw.inverted(); me = o.data
+        W = [mw @ v.co for v in me.vertices]
+        if not W or min(w.z for w in W) >= 0.0: continue
+        bm = bmesh.new(); bm.from_mesh(me); bm.verts.ensure_lookup_table()
+        seen = [False] * len(W); n0 = moved
+        for v in bm.verts:
+            if seen[v.index]: continue
+            part = []; st = [v]; seen[v.index] = True
+            while st:
+                q = st.pop(); part.append(q.index)
+                for e in q.link_edges:
+                    w = e.other_vert(q)
+                    if not seen[w.index]: seen[w.index] = True; st.append(w)
+            z0 = min(W[i].z for i in part); z1 = max(W[i].z for i in part)
+            if z0 >= 0.0: continue
+            if z0 < -depth: print(f'  settle: {o.name} has a part {-z0:.3f} m into the floor (left as it is)', flush=True); continue
+            for i in part:
+                if z1 - z0 < thin: W[i].z -= z0
+                elif W[i].z < 0.0: W[i].z = 0.0
+                else: continue
+                moved += 1
+        bm.free()
+        if moved > n0:
+            for v, w in zip(me.vertices, W): v.co = inv @ w
+            me.update()
+    return moved
+
 # ---------------------------------------------------------------- bake and register
 def build_obj(name, G):
     ob = G.build(name)
@@ -81,13 +117,18 @@ def _split_reserved(ob):
     me2 = ob.data.copy(); rb.to_mesh(me2); rb.free(); bm.to_mesh(ob.data); bm.free()
     r = kitlib.link(bpy.data.objects.new(ob.name + '_res', me2)); r.matrix_world = ob.matrix_world.copy(); return r
 
-def bake_objs(name, objs, px=2048, alpha=None, double=False, spread=False):
+def bake_objs(name, objs, px=2048, alpha=None, double=False, spread=False, dens=None):
     """the objects' shared texture set: unwrapped together (islands off the border), baked, the baked material on each; faces in the
-       reserved materials (Glass, Emit) are kept out of the bake and joined back after, in their own material"""
+       reserved materials (Glass, Emit) are kept out of the bake and joined back after, in their own material. dens [(pred(polygon), k)]:
+       those faces' texels scaled by k before the islands are packed again (a label's lettering more, the back against the wall less)"""
     res = {o: _split_reserved(o) for o in objs}
     if spread:
         for i, o in enumerate(objs): o.location.x += 4.0 * i
     kitlib.unwrap(objs, margin=0.004, smart=True, angle=60)
+    if dens:
+        for o in objs:
+            for pred, k in dens: kitlib.uv_scale(o, pred, k)
+        kitlib.unwrap(objs, margin=0.004, smart=False, average=False)
     files = kitlib.bake_set(objs, name, px, 64)
     if spread:
         for i, o in enumerate(objs): o.location.x -= 4.0 * i
@@ -171,7 +212,10 @@ def build_simple(node, asset, builder, mats, rnd_seed, px=2048):
     """one node from a builder(G, M, rnd): built, baked into its own set; G.sockets [(name, loc)] become empties under it"""
     rnd = random.Random(rnd_seed); M = mats(); G = S.Geo(1, 1, False, False); builder(G, M, rnd)
     body = build_obj(node, G); pivs = getattr(G, 'pivots', [])
-    files = bake_objs(asset, [body] + [ob for _, ob, _ in pivs], px, double=getattr(G, 'double', False), alpha=getattr(G, 'alpha', None))   # (animated parts share the piece's texture set; G.double: cloth seen from both sides; G.alpha: a card)
+    kn = defs.by_name().get(node)
+    if kn and kn['box'][0][2] == 0: settle([body] + [ob for _, ob, _ in pivs])   # (standing on the floor, nothing under it: F3.8)
+    files = bake_objs(asset, [body] + [ob for _, ob, _ in pivs], px, double=getattr(G, 'double', False), alpha=getattr(G, 'alpha', None),
+                      dens=getattr(G, 'dens', None))   # (animated parts share the piece's texture set; G.double: cloth seen from both sides; G.alpha: a card; G.dens: texel density)
     body = bpy.data.objects[node] if node in bpy.data.objects else body
     body.name = node; body.data.name = node; body['kit'] = 'band' if node.startswith('Band_') else 'solid'
     for nm, loc in getattr(G, 'sockets', []):                               # (empties: a fixture's place, where the game seats a doll)
@@ -181,12 +225,12 @@ def build_simple(node, asset, builder, mats, rnd_seed, px=2048):
     print(f'  {node}: {kitlib.tris(body) + sum(kitlib.tris(c) for c in body.children if c.type == "MESH")} triangles, box {footprint_check([body] + [c for c in body.children if c.type == "MESH"], None, None)}, bake {files["times"]["total"]}s', flush=True)
     return body, files
 
-def run(style, asset, nodes_builders, wall=False):
-    """build, bake, sheet and register one asset (one or more nodes)"""
+def run(style, asset, nodes_builders, wall=False, look=None):
+    """build, bake, sheet (on look's floor and wall: by default the style's own) and register one asset (one or more nodes)"""
     t0 = time.time(); kitlib.reset(); roots = []; info = {}
     for args in nodes_builders:
         r, f = build_simple(*args); roots.append(r); info[r.name] = {'tris': kitlib.tris(r), 'bake': f['times']['total']}
-    if '--sheets' in sys.argv: print('sheet', sheet(asset, roots, style, wall=wall))
+    if '--sheets' in sys.argv: print('sheet', sheet(asset, roots, look or style, wall=wall))
     json.dump(info, open(os.path.join(TMP, f'furn_{style}_{asset}.json'), 'w'), indent=1)
     kitlib.register(f'furn_{style}_{asset}', roots); print(f'{asset}: {time.time() - t0:.0f}s', flush=True)
 
@@ -195,6 +239,7 @@ def islands(style, build_fn, ids, double=False):
        together, the reused pieces joined in, the animated part on its pivot; one registration per island"""
     t0 = time.time(); kitlib.reset()
     specs, new_parts, M = build_fn(lambda k: k in ids)
+    for spec in specs: settle(list(spec[1]) + ([spec[2]] if spec[2] is not None else []))   # (on the floor, nothing under it: F3.8)
     files = bake_objs(f'isl_{style}_' + '_'.join(sorted(i[4:] for i in ids))[:60], new_parts, 2048, spread=True, double=double) if new_parts else None
     roots = []; info = {}
     for spec in specs:
