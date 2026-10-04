@@ -5,7 +5,7 @@
 /* ---------- rendering (3D, three.js) ---------- */
 // The game logic still works in the flat world units above (a tile is T = 50 units, y runs down the map).
 // The 3D world is in metres: world (x, y) sits at (x * S, height, y * S).
-const S = 0.045, TILE_M = T * S, WALL_H = 3.0, EYE = 1.62, M_SCALE = 1.38;
+const S = 0.045, TILE_M = T * S, WALL_H = 3.0, EYE = 1.75, M_SCALE = 1.38;
 const LOWQ = matchMedia('(pointer: coarse)').matches;
 const FLASH_I = 25;
 let renderer = null, scene, camera, flash, aura, exitLight, hemi, dustPts, glowTex, level = null;
