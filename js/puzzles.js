@@ -3,8 +3,9 @@
      1 The Nursery    maze   - a tilting ball maze: roll the ball into the gold hole, around the holes (a hole is loud: she hears it)
      2 The Hallway    slide  - a sliding-tile puzzle: put the doll's portrait back together
      3 The Basement   pipes  - turn the pipes until the water runs from the valve to the drain
-     4 The Attic      simon  - a music box plays a melody on four keys; play it back, one note longer each time (a wrong note is loud)
-     5 The Workshop   rings  - turn the rings until her face lines up; turning a ring also turns the next one
+     4 The Attic      simon  - a music box plays a melody on four keys; play it back, one note longer and a little faster each time
+                             (a wrong note is loud and sets you back two rounds; on hard, to the start)
+     5 The Workshop   rings  - turn the rings until her face lines up; turning a ring also turns the next two out
    The game keeps going while you play: she can come. Each box is made from a seed, so every player gets the same one.
    Later floors and harder difficulties: bigger boards, more holes, longer melodies, more rings. */
 'use strict';
@@ -22,8 +23,9 @@ function puzzleSpec(kind, floor, diff) {
   if (kind === 'maze') return mazeSpec(floor, diff);
   if (kind === 'slide') return { n: d === 2 ? 4 : 3, moves: [16, 36, 70][d] };
   if (kind === 'pipes') return { n: 4 + d };
-  if (kind === 'simon') return { len: 4 + d };
-  return { rings: 3 + (d === 2 ? 1 : 0), steps: 8 };
+  // (the attic and the workshop come last: a long melody that speeds up, and a wrong note costs you rounds; rings that drag two more)
+  if (kind === 'simon') return { len: 6 + 2 * d, back: d === 2 ? 99 : 2, fast: true };
+  return { rings: [4, 5, 5][d], steps: 12, drag: 2 };
 }
 // a small seeded random number generator (the same box for everyone)
 function seeded(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -245,7 +247,7 @@ function pipesFlow(n, M, rot, r0, r1) {
 const MB_KEYS = [{ col: '#d8423a', f: 523 }, { col: '#e8d24a', f: 659 }, { col: '#5ab85a', f: 784 }, { col: '#4a7ae8', f: 988 }];
 KINDS.simon = {
   title: 'The music box',
-  help: pc => 'Listen, then play the melody back. One note longer each time. A wrong note is loud. ' + (pc ? '(Click the keys, or press 1 2 3 4.)' : ''),
+  help: pc => 'Listen, then play the melody back. One note longer, and a little faster, each time. A wrong note is loud and sets you back. ' + (pc ? '(Click the keys, or press 1 2 3 4.)' : ''),
   build: pz => { const rnd = seeded(pz.seed); return { seq: Array.from({ length: pz.spec.len }, () => rnd() * 4 | 0) }; },
   start: () => ({ round: 1, phase: 'listen', t: -0.6, i: 0, lit: -1, litT: 0 }),
   resume: s => ({ round: s.round, phase: 'listen', t: -0.6, i: 0, lit: -1, litT: 0 }),   // (the round you'd reached, played to you again)
@@ -259,7 +261,7 @@ KINDS.simon = {
     g.fillText(o.phase === 'listen' ? 'listen...' : 'your turn', cx, cy - 4); g.fillText(Math.min(o.round, pz.spec.len) + ' / ' + pz.spec.len, cx, cy + 16); },
   update: (o, pz, dt) => { if (o.litT > 0 && (o.litT -= dt) <= 0) o.lit = -1;
     if (o.phase !== 'listen') return; o.t += dt;
-    if (o.t >= 0.65) { o.t = 0; if (o.i < o.round) { const k = pz.data.seq[o.i++]; o.lit = k; o.litT = 0.45; sfx.note(MB_KEYS[k].f, 0.3, 0); } else { o.phase = 'play'; o.i = 0; } } },
+    if (o.t >= (pz.spec.fast ? Math.max(0.38, 0.65 - 0.035 * (o.round - 1)) : 0.65)) { o.t = 0; if (o.i < o.round) { const k = pz.data.seq[o.i++]; o.lit = k; o.litT = 0.45; sfx.note(MB_KEYS[k].f, 0.3, 0); } else { o.phase = 'play'; o.i = 0; } } },
   click: (o, pz, x, y, cv) => { const cx = cv.width / 2, cy = cv.height / 2, R = Math.min(cv.width, cv.height) * 0.42, d = Math.hypot(x - cx, y - cy);
     if (d < R * 0.32 || d > R) return; let a = Math.atan2(y - cy, x - cx) + Math.PI / 2; if (a < 0) a += Math.PI * 2; musicKey(o, pz, Math.floor(a / (Math.PI / 2)) % 4); },
   key: (o, pz, code) => { const k = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3 }[code]; if (k !== undefined) musicKey(o, pz, k); },
@@ -267,14 +269,15 @@ KINDS.simon = {
 function musicKey(o, pz, k) {
   if (o.phase !== 'play') return;
   o.lit = k; o.litT = 0.25; sfx.note(MB_KEYS[k].f, 0.3, 0);
-  if (k !== pz.data.seq[o.i]) { Object.assign(o, { phase: 'listen', t: -0.9, i: 0 }); pzFail('Wrong note. That was loud...'); return; }
+  if (k !== pz.data.seq[o.i]) { const r = Math.max(1, o.round - (pz.spec.back || 0)); Object.assign(o, { round: r, phase: 'listen', t: -0.9, i: 0 });
+    pzFail(r === 1 && pz.spec.back ? 'Wrong note. That was loud... and the tune starts over.' : pz.spec.back ? 'Wrong note. That was loud... back a little.' : 'Wrong note. That was loud...'); return; }
   if (++o.i >= o.round) { if (o.round >= pz.spec.len) { pzWin(); return; } Object.assign(o, { round: o.round + 1, phase: 'listen', t: -0.5, i: 0 }); }
 }
 
 // 5. the rings: her face in rings, turned out of place. Turning a ring also turns the next one out.
 KINDS.rings = {
   title: 'Her face',
-  help: pc => 'Turn the rings until her face lines up. ' + (pc ? 'Click' : 'Tap') + ' a ring to turn it; the next ring out turns with it.',
+  help: pc => 'Turn the rings until her face lines up. ' + (pc ? 'Click' : 'Tap') + ' a ring to turn it; the next two rings out turn with it.',
   build: pz => { const rnd = seeded(pz.seed), R = pz.spec.rings, S = pz.spec.steps; let off;
     do { off = Array.from({ length: R }, () => rnd() * S | 0); } while (off.every(v => v === 0));
     return { R, S, off, pic: portraitCanvas(pz.seed) }; },
@@ -289,7 +292,7 @@ KINDS.rings = {
     const ring = Math.ceil(d / (Rm / (R + 1))) - 1; if (ring < 1 || ring > R) return; turnRing(o, pz, ring - 1); },
 };
 function turnRing(o, pz, i) {
-  const { R, S } = pz.data; o.off[i] = (o.off[i] + 1) % S; if (i + 1 < R) o.off[i + 1] = (o.off[i + 1] + 1) % S; sfx.creak(0.06);
+  const { R, S } = pz.data; o.off[i] = (o.off[i] + 1) % S; for (let j = 1; j <= (pz.spec.drag || 1); j++) if (i + j < R) o.off[i + j] = (o.off[i + j] + 1) % S; sfx.creak(0.06);
   if (o.off.every(v => v === 0)) pzWin();
 }
 
