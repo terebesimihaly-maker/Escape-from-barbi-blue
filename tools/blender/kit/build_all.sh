@@ -18,7 +18,7 @@ run() { echo "== $(date +%H:%M:%S) $*" | tee -a "$LOG"; $NICE "$PY" "$@" >> "$LO
 start=$(date +%s)
 run $K/placeholder.py $(echo "$ARGS" | sed 's/--only [^ ]*//')
 # the asset scripts, in the order of the spec's work packages (B13) (when two provide the same node, pack.py takes the newer build)
-for s in surfaces2 trims doors windows modules wardrobes fixtures furn_wood furn_tile furn_concrete furn_attic furn_workshop clutter \
+for s in surfaces2 trims doors windows modules wardrobes fixtures furn_wood furn_tile furn_concrete furn_attic furn_workshop furn_common clutter \
          decals sky env glass cookies ao_profiles doll2 lookdev rocking_chair; do
   if [ -f $K/$s.py ]; then run $K/$s.py $ARGS; fi
 done

@@ -10,7 +10,7 @@
    "concrete": 22600956,
    "attic": 21751004,
    "workshop": 25569912,
-   "common": 1079144
+   "common": 3430592
   },
   "md": {
    "wood": 12032416,
@@ -18,7 +18,7 @@
    "concrete": 9177596,
    "attic": 8081032,
    "workshop": 10092672,
-   "common": 400148
+   "common": 1229752
   },
   "lo": {
    "wood": 5442592,
@@ -26,7 +26,7 @@
    "concrete": 4016584,
    "attic": 3750376,
    "workshop": 4677472,
-   "common": 169724
+   "common": 521512
   }
  },
  "nodes": {
@@ -96,28 +96,28 @@
    "id": "bell_board",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_bell_board"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -0.45,
-     1.9,
+     -0.452,
+     1.944,
      0.0
     ],
     [
-     0.45,
-     2.5,
-     0.12
+     0.452,
+     2.452,
+     0.1105
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 3656,
+    "md": 3656,
+    "lo": 1821
    }
   },
   "Band_bookshelf_low": {
@@ -397,28 +397,28 @@
    "id": "conduit",
    "mount": "wall",
    "fit": "max",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_conduit"
    ],
    "uv1": false,
    "children": [],
    "aabb": [
     [
-     -1.0,
-     2.1,
-     0.0
+     -0.9902,
+     2.1755,
+     -0.0124
     ],
     [
-     1.0,
-     2.5,
-     0.06
+     0.9902,
+     2.479,
+     0.0573
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 1386,
+    "md": 1386,
+    "lo": 368
    }
   },
   "Band_console": {
@@ -1849,9 +1849,9 @@
    "id": "service_shelf",
    "mount": "wall",
    "fit": "exact",
-   "placeholder": true,
+   "placeholder": false,
    "materials": [
-    "Kit_grey"
+    "Kit_band_service_shelf"
    ],
    "uv1": false,
    "children": [],
@@ -1868,9 +1868,9 @@
     ]
    ],
    "tris": {
-    "hi": 12,
-    "md": 12,
-    "lo": 12
+    "hi": 3900,
+    "md": 3900,
+    "lo": 1950
    }
   },
   "Band_sideboard": {

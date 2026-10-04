@@ -56,6 +56,8 @@ Before each push: `git pull --rebase origin claude/elegant-babbage-h8btki`, then
    `rod` (bent bars), `Moved` (a Geo proxy that moves parts while their attributes keep their own frame), `cloth_drape`
    (Blender's cloth solver, headless: the attic's dust sheets, over `furn_attic.hulls` colliders). The doll parts (heads with
    painted faces, glass eyes, limbs) are in `furn_workshop.py`. Clutter has no kitdefs nodes yet.
+   The servants' runs' pieces, in any style (`common.glb`): `furn_common.py` (Band_service_shelf, Band_bell_board with the rooms'
+   names lettered from a system serif font into a label atlas, Band_conduit), sheeted on the tile floor's wall.
 6. WP2.8 lookdev reference: `py -3.11 tools/blender/kit/lookdev.py [--only wood] [--preview]` renders a reference room per
    style from the shipped surfaces, the packed hi kit (`pack.py all hi` first) and the style's lamps (point lights through
    their profiles at 4π·k0 W: Cycles then gives E = k0 at 1 m, the game's convention) → `models/kit/lookdev/*.png` and
