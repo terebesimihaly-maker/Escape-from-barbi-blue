@@ -2,7 +2,8 @@
 # and fails the build (exit 1) if:
 #   a KIT node is missing, or its box is more than 0.02 m off (or, for an envelope, sticks out of it by more than 0.02 m);
 #   wall decor reaches more than 0.44 m out from its face, or a wall item crosses u outside [0.05, 0.95] (|x| > 1.0125 m);
-#   a node is over its triangle budget (hi and md: tris; lo: trisLo); a GLB has a light or a material extension that would
+#   a node is over its triangle budget (hi and md: tris; lo: trisLo, and half its hi triangles or fewer, at most 3000 but for the
+#   heroes: defs.lo_target); a GLB has a light or a material extension that would
 #   make three.js build a MeshPhysicalMaterial (transmission, clearcoat, sheen, ior, specular, volume, ...);
 #   a module (uv1) lacks TEXCOORD_1; a wardrobe hinge is more than 0.005 m off; a declared child, pivot or socket is missing;
 #   node names repeat or contain dots, a mesh has more than 2 materials, a reserved material's name is mangled ('Glass.001');
@@ -32,7 +33,7 @@ def rot(axis, a):
     return {'x': np.array([[1, 0, 0], [0, c, -s], [0, s, c]]), 'y': np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]]),
             'z': np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])}[axis]
 
-def check_file(path, f, tier, only, fails, notes):
+def check_file(path, f, tier, only, fails, notes, man=None):
     g = glbinfo.Glb(path); js = g.js; err = lambda node, msg: fails.append(f'{tier}/{f} {node}: {msg}')
     for e in sorted(g.ext & set(PHYSICAL)): err('-', f'uses {e}')
     if any('KHR_lights_punctual' in n.get('extensions', {}) for n in g.nodes): err('-', 'contains a light')
@@ -85,6 +86,9 @@ def check_file(path, f, tier, only, fails, notes):
         budget = n['trisLo'] if tier == 'lo' else max(n['tris'], HERO.get(n['name'], 0)); tc = g.tris(i)
         if tier != 'lo' and n['name'] in HERO and tc > n['tris']: notes.append(f'{tier}/{f} {n["name"]}: {tc} triangles on the hero budget {HERO[n["name"]]} (KIT says {n["tris"]})')
         if tc > budget: err(n['name'], f'{tc} triangles, budget {budget}')
+        th = (man or {}).get('nodes', {}).get(n['name'], {}).get('tris', {}).get('hi')
+        if tier == 'lo' and th and th >= defs.LO_MIN and tc > 1.08 * defs.lo_target(n, th):
+            err(n['name'], f'{tc} triangles on lo, {th} on hi (lo at most {defs.lo_target(n, th):.0f}: half, and {defs.LO_CAP} unless a hero)')
         if n['uv1'] and not g.uv1(i, defs.RESERVED[1:]): err(n['name'], 'module without TEXCOORD_1 (uv1)')
         sub = {g.nodes[j].get('name') for j in g.subtree(i)}
         for c in n['children'] + n['sockets']:
@@ -127,7 +131,7 @@ def main():
         for f in files:
             p = os.path.join(KITDIR, t, f + '.glb')
             if not os.path.exists(p): fails.append(f'{t}/{f}.glb missing'); continue
-            check_file(p, f, t, only, fails, notes); sizes[f'{t}/{f}'] = os.path.getsize(p)
+            check_file(p, f, t, only, fails, notes, man); sizes[f'{t}/{f}'] = os.path.getsize(p)
             if man and man.get('tiers', {}).get(t, {}).get(f) != os.path.getsize(p): fails.append(f'manifest: {t}/{f} size {man.get("tiers", {}).get(t, {}).get(f)} != {os.path.getsize(p)}')
     if man:
         for n in defs.nodes():

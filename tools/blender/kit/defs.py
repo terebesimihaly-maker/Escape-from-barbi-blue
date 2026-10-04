@@ -12,6 +12,9 @@ SRC = os.path.join(REPO, 'js', 'kitdefs.js')
 # beside the repository when there is one (the PC keeps it on a big drive), else /tmp/efbb-kit
 WORK = os.environ.get('EFBB_WORK') or next((p for p in (os.path.join(os.path.dirname(REPO), 'renders'),) if os.path.isdir(p)), '/tmp/efbb-kit')
 RESERVED = ('WallSurface', 'Glass', 'SkyPlane', 'Emit')        # material names the game's loader swaps for its own
+# the hero pieces (B3, B6, B5: KIT's notes say '(hero)'), plus the rocking chair, WP2.0's hero smoke asset (check_kit.HERO): the lo
+# tier keeps more of them (pack.py)
+HEROES = {'Solid_rocking_chair'}
 
 def load(path=SRC):
     text = open(path, encoding='utf-8').read()
@@ -32,11 +35,12 @@ def _box(mount, W, D, H, z0=0.0, R=0.0, side=1):
 def nodes(style=None):
     """every node the kit must contain: dicts with name, group (solid, island, col, band, fix, arch, ward), id, style (the file:
        a style or 'common'), mount, box, fit ('exact' within 0.02 m, or 'max' = an envelope), tris, trisLo, uv1, children (names),
-       sockets (empties: anim pivots, fixture sockets), and for furniture slot, foot [w, d] (m) and footU (u); hinge for leaves"""
+       sockets (empties: anim pivots, fixture sockets), hero (KIT's notes call it one), and for furniture slot, foot [w, d] (m) and
+       footU (u); hinge for leaves"""
     out = []
     def add(**n):
         n.setdefault('fit', 'exact'); n.setdefault('uv1', False); n.setdefault('children', []); n.setdefault('sockets', [])
-        n.setdefault('trisLo', n.get('tris'))
+        n.setdefault('trisLo', n.get('tris')); n['hero'] = n['name'] in HEROES or '(hero)' in n.pop('notes', '')
         if style is None or n['style'] == style: out.append(n)
     for k in KIT['solidIds']:
         it = KIT['items'][k]; slot = it['slot']
@@ -52,12 +56,13 @@ def nodes(style=None):
             if it.get('fix'): socks.append(name + '_fix')
             add(name=name, group='island' if slot == 'island' else ('col' if 'hcm' in it else 'solid'), id=k, style=it['style'],
                 mount='wall' if slot == 'wall' else 'floor', slot=slot, box=box, h=h, top=top, tris=it['tris'], trisLo=it.get('trisLo', it['tris']),
-                foot=[it['w'], it['d']], footU=[u(it['w']), u(it['d'])], anim=it.get('anim'), sockets=socks, occ=var.get('occ', it['occ']))
+                foot=[it['w'], it['d']], footU=[u(it['w']), u(it['d'])], anim=it.get('anim'), sockets=socks, occ=var.get('occ', it['occ']),
+                notes=it.get('notes', ''))
     for k, b in KIT['band'].items():
         for name in b.get('nodes') or [b['node']]:
             socks = ([name + KIT['anims'][b['anim']]['pivot']] if b.get('anim') else []) + ([name + '_fix'] if b.get('fix') else [])
             add(name=name, group='band', id=k, style=b['style'], mount=b['mount'], box=_box(b['mount'], b['W'], b['D'], b['H'], b.get('z0', 0.0)),
-                fit=b.get('fit', 'exact'), tris=b['tris'], trisLo=b.get('trisLo', b['tris']), sockets=socks, anim=b.get('anim'))
+                fit=b.get('fit', 'exact'), tris=b['tris'], trisLo=b.get('trisLo', b['tris']), sockets=socks, anim=b.get('anim'), notes=b.get('notes', ''))
     for k, f in KIT['fixtures'].items():
         add(name=f['node'], group='fix', id=k, style=f['style'], mount=f['mount'], box=_box(f['mount'], f['W'], f['D'], f['H'], f.get('z0', 0.0)),
             fit=f.get('fit', 'exact'), tris=f['tris'], children=[f['emit']], flicker=bool(f.get('flicker')))
@@ -66,7 +71,7 @@ def nodes(style=None):
         socks = ([name + '_fix'] if p.get('fix') else []) + ([name + KIT['anims'][p['anim']]['pivot']] if p.get('anim') and 'pivot' in KIT['anims'][p['anim']] else [])
         add(name=name, group='arch', id=name, kind=p['kind'], style=p['style'], mount=p['mount'],
             box=_box(p['mount'], p['W'], p['D'], p['H'], p.get('z0', 0.0), p.get('R', 0.0)), fit=p.get('fit', 'exact'), tris=p['tris'],
-            uv1=bool(p.get('uv1')), children=kids, sockets=socks, piece=p)
+            uv1=bool(p.get('uv1')), children=kids, sockets=socks, piece=p, notes=p.get('notes', ''))
     for name, w in KIT['wardrobes'].items():
         if w['part'] == 'body':
             add(name=name, group='ward', id=name, part='body', style=w['style'], mount='floor', box=_box('floor', w['W'], w['D'], w['H']),
@@ -76,6 +81,14 @@ def nodes(style=None):
             add(name=name, group='ward', id=name, part='leaf', style=w['style'], mount='hinge', hinge=[hx, hy, hz],
                 box=_box('hinge', w['W'], w['D'], w['H'], 0.0, 0.0, side), fit=w.get('fit', 'exact'), tris=w['tris'], piece=w)
     return out
+
+# the lo tier (pack.py cuts it, check_kit.py holds it to this): every node of LO_MIN triangles or more at half its hi triangles or fewer
+# (B1), within its trisLo budget, and no more than LO_CAP unless it's a hero (with the lo tier at nearly the hi counts the game ran
+# at about 3 fps at Low on weak machines)
+LO_CAP, LO_MIN = 3000, 600
+def lo_target(n, t):
+    T = min(0.5 * t, 0.92 * n['trisLo'])
+    return T if n.get('hero') else min(T, LO_CAP)
 
 def files():
     """the GLB files the kit is packed into: one per style, plus common"""

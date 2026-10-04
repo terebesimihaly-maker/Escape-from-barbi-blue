@@ -2,11 +2,13 @@
 # from the asset .blend files the kit scripts registered in /tmp/efbb-kit/assets (a real asset always wins over its grey-box
 # placeholder; among real ones the newest), points the textures at the tier's copies (md half, lo quarter size), splits any
 # node with more than 2 materials into <name>_p0, <name>_p1 under an empty <name>, exports one GLB, compresses it
-# (meshopt; lo also simplified to half the triangles) into models/kit/<tier>/<style>.glb and updates models/kit/manifest.json.
+# (meshopt; lo cut to half the triangles or fewer, defs.lo_target) into models/kit/<tier>/<style>.glb and updates models/kit/manifest.json.
 #   /tmp/claude-0/bpyenv/bin/python tools/blender/kit/pack.py <style|all> <tier|all> [--if-stale]
 import sys, os, json, glob, time
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import bpy
+import numpy as np
+from mathutils import Vector
 import kitlib, defs, glbinfo
 from kitlib import TMP, KITDIR, TIERS
 
@@ -103,31 +105,52 @@ def _split(ob):
     return holder
 
 def _lo_decimate(style, roots):
-    """the lo tier's deep cuts (an island's 25k to 6k): meshopt keeps every UV seam and a kit piece is all seams, so these are cut
-       in Blender (collapse, which crosses seams and carries the UVs along) before export -> the meshes it cut"""
-    done = set(); budget = {n['name']: n['trisLo'] for n in defs.nodes(style)}
+    """the lo tier's cuts, every node of defs.LO_MIN triangles or more down to defs.lo_target: in Blender (collapse, which crosses UV seams and
+       carries the UVs along; meshopt keeps every seam and a kit piece is all seams, so it stalls short of half), the same ratio for
+       every mesh of a node that can be cut, then each node stretched back to its box -> the meshes cut"""
+    done = set(); by = {n['name']: n for n in defs.nodes(style)}
     for r in roots:
         meshes = [o for o in [r] + list(r.children_recursive) if o.type == 'MESH']
-        t = sum(kitlib.tris(o) for o in meshes)
-        if not t or 0.92 * budget[r.name] / t >= 0.85: continue            # (meshopt manages a light trim; on a piece that is all seams it stalls short of anything more)
-        ratio = min(0.5, 0.92 * budget[r.name] / t)
-        for o in meshes:
+        t = sum(kitlib.tris(o) for o in meshes); n = by[r.name]
+        if t < defs.LO_MIN: continue
+        cut = [o for o in meshes if kitlib.tris(o) >= 8 and not all(m and m.name in defs.RESERVED[1:] for m in o.data.materials)]   # (glass, sky, glow: as they are)
+        fixed = t - sum(kitlib.tris(o) for o in cut)
+        if not cut: continue
+        ratio = max(0.05, min(1.0, (defs.lo_target(n, t) - fixed) / (t - fixed)))   # (what can't be cut leaves the rest less)
+        bpy.context.view_layer.update(); inv = r.matrix_world.inverted()
+        def box():
+            P = np.array([tuple(inv @ o.matrix_world @ v.co) for o in cut for v in o.data.vertices]); return P.min(0), P.max(0)
+        b0 = box()
+        for o in cut:
             if o.data.users > 1: o.data = o.data.copy()
-            m = o.modifiers.new('lo', 'DECIMATE'); m.decimate_type = 'COLLAPSE'; m.ratio = ratio; m.use_collapse_triangulate = True
-            with bpy.context.temp_override(object=o, active_object=o): bpy.ops.object.modifier_apply(modifier=m.name)
+            if o.data.shape_keys:                                         # (a curtain's sway morph: the edit-mode cut carries its keys along)
+                kitlib.select([o], o); bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
+                bpy.ops.mesh.decimate(ratio=ratio); bpy.ops.mesh.quads_convert_to_tris(); bpy.ops.object.mode_set(mode='OBJECT')
+            else:
+                m = o.modifiers.new('lo', 'DECIMATE'); m.decimate_type = 'COLLAPSE'; m.ratio = ratio; m.use_collapse_triangulate = True
+                with bpy.context.temp_override(object=o, active_object=o): bpy.ops.object.modifier_apply(modifier=m.name)
             done.add(o.data.name)
+        # the cut pulls a corner in or pushes one out by up to a couple of cm: stretched back (each axis, in the node's frame) to the
+        # box it had, so the lo piece fills KIT's box exactly as hi does (and what stood on the floor still does)
+        b1 = box(); k = np.where(b1[1] - b1[0] > 1e-6, (b0[1] - b0[0]) / np.maximum(b1[1] - b1[0], 1e-6), 1.0)
+        k = np.where(np.abs(k - 1.0) < 0.03, k, 1.0)                      # (more than 3% is a part gone, not a corner moved: left alone)
+        for o in cut:
+            M = inv @ o.matrix_world; Mi = M.inverted()
+            for v in o.data.vertices:
+                q = np.array(tuple(M @ v.co)); v.co = Mi @ Vector(tuple(b0[0] + (q - b1[0]) * k))
+            for kb in (o.data.shape_keys.key_blocks if o.data.shape_keys else []):
+                for d in kb.data:
+                    q = np.array(tuple(M @ d.co)); d.co = Mi @ Vector(tuple(b0[0] + (q - b1[0]) * k))
+        print(f'  lo {r.name}: {t} -> {sum(kitlib.tris(o) for o in meshes)} triangles (target {defs.lo_target(n, t):.0f}), box stretched x{np.round(k, 3).tolist()}', flush=True)
     return done
 
 def _lo_targets(style, roots, cut=()):
-    """lo keeps about half the triangles (B1), less where a node's trisLo budget needs it (islands: 25k -> 6k); written as
-       {mesh name: [ratio, error]} for compress-kit.mjs"""
-    out = {}; budget = {n['name']: n['trisLo'] for n in defs.nodes(style)}
+    """the rest of the lo tier's meshes (the small nodes and what _lo_decimate left alone) to meshopt at half their triangles (B1),
+       written as {mesh name: [ratio, error]} for compress-kit.mjs; the meshes already cut pass through"""
+    out = {}
     for r in roots:
-        meshes = [o for o in [r] + list(r.children_recursive) if o.type == 'MESH']
-        t = sum(kitlib.tris(o) for o in meshes)
-        if not t: continue
-        ratio = min(0.5, 0.92 * budget[r.name] / t); err = 0.0015 if ratio >= 0.5 else 0.004   # (a deep cut may move a vertex 4 mm per m)
-        for o in meshes: out[o.data.name] = [1.0, 0.0015] if o.data.name in cut else [round(ratio, 4), err]
+        for o in [r] + list(r.children_recursive):
+            if o.type == 'MESH': out[o.data.name] = [1.0, 0.0015] if o.data.name in cut else [0.5, 0.0015]
     path = os.path.join(TMP, 'pack', 'lo', style + '.targets.json'); json.dump(out, open(path, 'w')); return path
 
 def stale(style, tier):
