@@ -109,21 +109,34 @@ function buildArch(F, plan, G) {
   const tier = BAKE_TIER[settings.quality] || 'lo', atlas = LightBaker.packAtlas(B.faces, tier, LightBaker.faceHeights(B, B.faces));
   const materials = archMaterials(F, plan);
   level.archOpts = { bake: B, cells: atlas.cells, tier, materials, windows: true, lightData: !!LIGHT_DATA.data };
-  level.arch = Arch.build(plan, kit, level.archOpts); level.archKit = kit;
+  level.arch = Arch.build(plan, kit, level.archOpts); level.archKit = kit; sheerVeils(level.arch.group);
   G.add(level.arch.group);
   if (typeof Kit !== 'undefined') {
     // (no eviction here yet: Kit.furnish does it on floor entry once the furniture comes from the kit, WP2.3)
     const next = FLOORS[floorIdx + 1];
-    if (next) Kit.want(next.style);                        // (fetched while you play this one)
+    if (next) floorAssets(floorIdx + 1);                   // (the next floor's, fetched while you play this one)
     const lv = level;
     if (!kit) Kit.want(F.style).then(k => { if (k && level === lv && !lv.archKit) lateKit(lv, k); });   // (the shell, then the furniture)
   }
   return materials;
 }
+// The lace behind a window's curtains (Kit_*_curtain_veil) is drawn with the curtain's own picture, whose lace is about 70% opaque:
+// lit by the flashlight it hid the window like a patterned wall. A sheer net lets the night through; the kit's material, changed once.
+// And the window frames' glossy paint: right in the flashlight's hot spot the glazing bars threw a highlight that bloomed into a
+// glowing cross over the pane; satin paint (a fixed roughness) keeps them plainly lit.
+function sheerVeils(root) {
+  root.traverse(o => { if (!o.isMesh) return;
+    for (const m of [].concat(o.material)) {
+      if (!m || m.userData.sheer) continue;
+      if (/_veil$/.test(m.name || '')) { m.userData.sheer = true; m.transparent = true; m.opacity = 0.2; m.depthWrite = false; if (m.color) m.color.multiplyScalar(0.65); }
+      else if (/^Kit_Win_.*_frame$/.test(m.name || '') && m.isMeshStandardMaterial) { m.userData.sheer = true; m.roughnessMap = null; m.roughness = 0.7; m.needsUpdate = true; }
+    } });
+}
 // The floor's kit came after the floor was built (multiplayer, a slow connection): the shell again with it, compiled off screen first
 // (no stutter, H13), then swapped in. Nothing else is rebuilt: the boards, the paintings and scares.doll stay (E4, brief B11).
 function lateKit(lv, kit) {
-  const A = Arch.build(lv.plan, kit, lv.archOpts);
+  const A = Arch.build(lv.plan, kit, lv.archOpts); sheerVeils(A.group);
+  if (lv.light) MatLib.withLightField(A.group);             // (the kit's frames, doors and curtains lit where they stand, like the rest)
   const swap = () => {
     if (level !== lv || lv.archKit) { A.dispose(); return; }
     lv.arch.dispose(); lv.arch = A; lv.archKit = kit; lv.group.add(A.group);
@@ -371,7 +384,10 @@ function archMaterialsLit(F, plan) {
    the windows, and on Medium and High beams of light with dust in them (js/atmos.js). js/surface.js paints the floor's overlays (corner
    shade, contact shadows, dust, wet, walked paths) and the wall decals. Everything that changes during play is a uniform (MatLib.U:
    the lamps dimmed by a scare, flicker, the clock), so nothing recompiles (H13). Without the plan (or MatLib) none of this runs. */
-const LIGHT_DATA = { data: null, loading: null }, MOON_GAIN = 1.7;
+// (MOON_GAIN: C9's ~0.7 on the floor is true to a real moon but reads as nothing on a dark floor beside the flashlight; the patches are
+// kept clearly readable, still well under a lamp's pool. LAMP_GAIN: the profiles' k0 calibrated against Blender gives pools you barely
+// see at 2.6 m below a pendant; the lamps light their rooms visibly, the flashlight stays far the brightest. SHAFTS: the beams' density)
+const LIGHT_DATA = { data: null, loading: null }, MOON_GAIN = 5, LAMP_GAIN = 1.8, SHAFTS = 0.045;
 const COOKIE_TYPES = ['sash', 'tall', 'cellar', 'cellar_short', 'dormer', 'industrial', 'oculus'];
 // the light data from Blender (emission profiles, AO curves, window cookies): once, at boot; the bake works without (isotropic lamps,
 // soft-edged window patches) and a floor built before it arrived is baked again when it does
@@ -423,9 +439,11 @@ function bakeLight(lv) {
   const t0 = performance.now(), B = lv.archOpts.bake;
   let R = null;
   // (no kit, no windows: the walls are closed there (E7), so no moonlight comes in until they open)
-  // (the moon's K: the formula K cookie sin(elevation) with K 0.7 gives floor patches of about 0.4; C9's target is about 0.7)
+  // (the moon's K: K cookie sin(elevation) with K 0.7 gives floor patches of about 0.4; MOON_GAIN lifts them to a readable ~2, see above;
+  // the lamps' k by LAMP_GAIN)
   const moon = B.moon ? Object.assign({}, B.moon, { k: (B.moon.k || 0.7) * MOON_GAIN }) : B.moon;
-  try { R = LightBaker.bake(Object.assign({}, B, { moon }, lv.archKit ? {} : { windows: [] }), lv.archOpts.tier); }
+  const fixtures = (B.fixtures || []).map(f => Object.assign({}, f, { k: (Number.isFinite(f.k) && f.k > 0 ? f.k : 2) * LAMP_GAIN }));
+  try { R = LightBaker.bake(Object.assign({}, B, { moon, fixtures }, lv.archKit ? {} : { windows: [] }), lv.archOpts.tier); }
   catch (e) { console.error('LightBaker.bake', e); }
   if (!R) { MatLib.setK(0, true, false); hemi.intensity = 0.3; lv.light.failed = true; return; }   // (E7: no baked lamps, the old ambient)
   if (R.stats && R.stats.warnings && R.stats.warnings.length) console.warn('LightBaker:', R.stats.warnings.slice(0, 5).join(' | '));
@@ -440,7 +458,7 @@ function bakeLight(lv) {
 // the night outside: the sky in the windows, their glass, the moonlight's beams and the dust in them (js/atmos.js)
 function buildAtmos(lv) {
   // (no kit yet: the walls are closed where the windows will be, so no beams either)
-  try { return Atmos.build(lv, lv.archKit ? lv.plan : Object.assign({}, lv.plan, { windows: [] }), { tier: settings.quality, grid }); }
+  try { return Atmos.build(lv, lv.archKit ? lv.plan : Object.assign({}, lv.plan, { windows: [] }), { tier: settings.quality, grid, shaftDensity: SHAFTS }); }
   catch (e) { console.error('Atmos.build', e); return null; }
 }
 // every frame (render.js): uniforms only. The lamps dim with a scare and go out in the dark one (the moon never does: C8), the
@@ -486,6 +504,24 @@ function bakedSet(style, part, tier) {
     .then(([map, normalMap, orh]) => map && normalMap && orh ? { map, normalMap, orh } : null);
   surfCache.set(key, p); return p;
 }
+// Everything a floor is built from (E4): its kit, the mouldings' profiles, the light's data from Blender, the decal atlas and the
+// baked surface sets, so the floor never starts half-built (the sky, the glass and the reflections load beside them). floorAssets(i)
+// settles when all have loaded or failed (it never rejects); floorAssetsIn(i): they already have, for this quality.
+const FLOOR_ASSETS = new Map();
+function floorAssets(i) {
+  const F = FLOORS[i]; if (!F) return Promise.resolve();
+  const key = F.style + '/' + settings.quality; let e = FLOOR_ASSETS.get(key);
+  if (e) return e.p;
+  const ok = q => Promise.resolve(q).catch(() => null), lit = typeof MatLib !== 'undefined', tier = surfTier();
+  if (lit && typeof Atmos !== 'undefined') Atmos.preload(F.style, settings.quality);
+  if (lit) envTex(F.style);
+  e = { done: false };
+  e.p = Promise.all([typeof Kit !== 'undefined' ? ok(Kit.want(F.style)) : null, typeof Arch !== 'undefined' ? ok(Arch.loadProfiles(F.style)) : null,
+    lit ? ok(loadLightData()) : null, lit && typeof Surface !== 'undefined' ? ok(Surface.load(settings.quality)) : null,
+    ...['floor', 'wall', 'upper', 'service', 'ceil'].map(q => lit || q === 'floor' ? ok(bakedSet(F.style, q, tier)) : null)]).then(() => { e.done = true; });
+  FLOOR_ASSETS.set(key, e); return e.p;
+}
+function floorAssetsIn(i) { const F = FLOORS[i], e = F && FLOOR_ASSETS.get(F.style + '/' + settings.quality); return !!(e && e.done); }
 function upgradeSurfaces(F, floorMat, G, walls, faces, ceil) {
   const style = SURF_STYLES[floorIdx]; if (!style) return;
   const lv = level, tier = surfTier();

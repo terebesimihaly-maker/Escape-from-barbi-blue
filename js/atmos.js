@@ -190,7 +190,7 @@ function flatTex(r, g, b) { const c = canvas(4, 4), x = c.getContext('2d'); x.fi
   const t = shared(new THREE.CanvasTexture(c)); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; }
 function glassMaterial(tier) {
   const t = tierOf(tier); if (glassMats[t]) return glassMats[t];
-  const m = new THREE.MeshStandardMaterial({ name: 'AtmosGlass', color: 0xa9b6c4, roughness: 0.1, metalness: 0, transparent: true, opacity: 0.2,
+  const m = new THREE.MeshStandardMaterial({ name: 'AtmosGlass', color: 0x14181c, roughness: 0.1, metalness: 0, transparent: true, opacity: 0.2,
     depthWrite: false, envMap: envMap(), envMapIntensity: 0.4 });
   if (t !== 'lo') {
     m.normalMap = flatTex(128, 128, 255); m.roughnessMap = flatTex(255, 26, 0); m.roughness = 1; m.normalScale.set(0.6, 0.6);
@@ -199,6 +199,13 @@ function glassMaterial(tier) {
     loadImg('textures/glass/rain_normal.webp', img => swap(m.normalMap, img));
     loadImg('textures/glass/grime_orm.webp', img => swap(m.roughnessMap, img));
   }
+  // (glass scatters almost nothing: a dark colour, or the flashlight lights the pane up milky white. And old window glass is never a
+  // mirror for the flashlight: Blender's grime map says 0.07-0.27, a hot spot thousands of times the lit wall's brightness that blew
+  // the pane out to white (and bloomed on High). At 0.35 or rougher the torch makes a small glint, the night stays visible through
+  // it; the sky's reflection hardly changes. Compiled once, never changed)
+  m.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <roughnessmap_fragment>',
+    '#include <roughnessmap_fragment>\n\troughnessFactor = max( roughnessFactor, 0.35 );'); };
+  m.customProgramCacheKey = () => 'atmosGlass1';
   m.userData.atmos = 'glass';
   return (glassMats[t] = m);
 }
