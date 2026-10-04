@@ -43,7 +43,8 @@ if (typeof Arch !== 'undefined') FLOORS.forEach(F => Arch.loadProfiles(F.style))
 // the light's data from Blender (lamp profiles, AO curves, window cookies), the sky and window glass, the floors' reflections, the decals
 if (typeof MatLib !== 'undefined' && renderer) { loadLightData(); FLOORS.forEach(F => envTex(F.style));
   if (typeof Atmos !== 'undefined') Atmos.preload(FLOORS[0].style, settings.quality);
-  if (typeof Surface !== 'undefined') Surface.load(settings.quality); }
+  if (typeof Surface !== 'undefined') Surface.load(settings.quality);
+  floorAssets(0); }                                      // (and the first floor's surfaces: js/level.js, E4)
 loadBest(); updateRejoinBtn();
 startAccount();                                          // (sign in, or play as a guest: js/account.js)
 requestAnimationFrame(frame);

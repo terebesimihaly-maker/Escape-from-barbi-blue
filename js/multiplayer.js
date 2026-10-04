@@ -327,10 +327,24 @@ $('mpCreate').onclick = () => { unlockAudio(); createLobby(); };
 $('mpJoin').onclick = () => { unlockAudio(); joinLobby(); };
 $('mpCode').addEventListener('keydown', e => { if (e.key === 'Enter') { unlockAudio(); joinLobby(); } });
 $('mpName').addEventListener('change', e => saveName(e.target.value));
+// Ready waits for this floor's house to load here (js/level.js floorAssets: the kit, the light's data, the surfaces; spec E4), the
+// button saying how far, at most 30 s; the next floors are fetched behind it. A player who still lacks the kit when the floor starts
+// gets the same house with stand-ins, upgraded in place when it comes (js/level.js lateKit), so everyone always plays the same house.
+let readyWait = 0;
 $('lbReady').onclick = () => {
   unlockAudio(); primeVoice();
   const me = lobbyPlayer(MP.myId); if (!me) return;
-  if (MP.host) { me.ready = !me.ready; hostLobbyChanged(); } else { send(MP.hostConn, { t: 'ready', ready: !me.ready }); }
+  const toggle = () => { const m = lobbyPlayer(MP.myId); if (!m || !MP.lobby || MP.lobby.started) return;
+    if (MP.host) { m.ready = !m.ready; hostLobbyChanged(); } else { send(MP.hostConn, { t: 'ready', ready: !m.ready }); } };
+  const lv = (MP.lobby && MP.lobby.level) || 0;
+  if (me.ready || typeof floorAssets !== 'function' || floorAssetsIn(lv)) { toggle(); for (let i = lv + 1; i < FLOORS.length && i <= lv + 1; i++) floorAssets(i); return; }
+  const btn = $('lbReady'), my = ++readyWait; let done = false;
+  btn.disabled = true;
+  const tick = setInterval(() => { btn.textContent = 'Loading the house… ' + Math.round((typeof Kit !== 'undefined' ? Kit.progress() : 1) * 100) + '%'; }, 250);
+  const finish = () => { if (done) return; done = true; clearInterval(tick); clearTimeout(cap); btn.disabled = false;
+    if (my === readyWait && MP.lobby && !MP.lobby.started) toggle(); renderLobby(); floorAssets(lv + 1); };
+  const cap = setTimeout(finish, 30000);
+  floorAssets(lv).then(finish, finish);
 };
 $('lbName').addEventListener('input', e => {
   saveName(e.target.value);

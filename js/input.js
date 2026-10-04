@@ -228,7 +228,7 @@ function playFloor(i) {
 let kitWait = 0;
 function withKit(i, btn, go) {
   const F = FLOORS[i];
-  if (typeof Kit === 'undefined' || !F || MP.on || Kit.ready(F.style)) { go(); return; }
+  if (typeof Kit === 'undefined' || !F || MP.on || (Kit.ready(F.style) && floorAssetsIn(i))) { go(); return; }
   const my = ++kitWait, st = state, label = btn ? btn.innerHTML : '';
   let done = false;
   const tick = setInterval(() => { if (btn) btn.textContent = 'Loading the house… ' + Math.round(Kit.progress() * 100) + '%'; }, 250);
@@ -239,7 +239,7 @@ function withKit(i, btn, go) {
   };
   const cap = setTimeout(finish, 30000);
   if (btn) btn.disabled = true;
-  Promise.all([Kit.want(F.style), typeof Arch !== 'undefined' ? Arch.loadProfiles(F.style) : null, typeof MatLib !== 'undefined' ? loadLightData() : null]).then(finish, finish);
+  floorAssets(i).then(finish, finish);                     // (the kit, profiles, light data, decals, surfaces: js/level.js)
 }
 function renderLevels() {
   document.querySelectorAll('#diffSeg button').forEach(b => b.classList.toggle('on', b.dataset.d === settings.difficulty));
