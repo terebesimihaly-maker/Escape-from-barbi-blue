@@ -368,7 +368,7 @@ function archMaterialsLit(F, plan) {
     const rep = (t, x) => { const c = t.clone(); c.repeat.set(x, 1); if (clampV) c.wrapT = 1001; c.needsUpdate = true; return c; };   // (1001: ClampToEdgeWrapping)
     const put = (m, k, t, x) => { const o = m[k]; if (!o) return; m[k] = rep(t, x); if (!o.userData.mlStandIn) o.dispose(); };
     for (const m of mats) {
-      put(m, 'map', s.map, rx); put(m, 'normalMap', s.normalMap, nx); put(m, 'roughnessMap', s.orh, nx);
+      put(m, 'map', s.map, rx); if (!low) { put(m, 'normalMap', s.normalMap, nx); put(m, 'roughnessMap', s.orh, nx); }   // (Low: the colour alone, lighter)
       if (m.roughnessMap) m.roughness = 1;
       if (m.userData.mlFamily) m.color.setScalar(part === 'wall' || part === 'upper' || part === 'service' ? 1.1 : 1);
     }
@@ -529,8 +529,10 @@ function upgradeSurfaces(F, floorMat, G, walls, faces, ceil) {
     bakedSet(style, 'floor', tier).then(s => {
       if (!s || level !== lv) return;
       const rep = t => { const c = t.clone(); c.repeat.set(GW, GH); c.needsUpdate = true; return c; };
-      for (const [k, t] of [['map', s.map], ['normalMap', s.normalMap], ['roughnessMap', s.orh]]) { const o = floorMat[k]; floorMat[k] = rep(t); if (o && !o.userData.mlStandIn) o.dispose(); }
-      floorMat.roughness = 1; floorMat.color.setScalar(1.25);
+      // (Low: the colour alone, as Low always had: relief and gloss are the costly reads over the whole floor)
+      const low = settings.quality === 'low';
+      for (const [k, t] of low ? [['map', s.map]] : [['map', s.map], ['normalMap', s.normalMap], ['roughnessMap', s.orh]]) { const o = floorMat[k]; floorMat[k] = rep(t); if (o && !o.userData.mlStandIn) o.dispose(); }
+      if (!low) floorMat.roughness = 1; floorMat.color.setScalar(1.25);
     });
     return;
   }
